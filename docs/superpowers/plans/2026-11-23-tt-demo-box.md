@@ -329,7 +329,9 @@ and `battery-survey.md` beside it). Read it first.
 
 **Interfaces:**
 - `blender -b --factory-startup -P render/render_scene.py -- --manifest <json> --out <png>`;
-  1600 x 1200, Cycles, 64 samples, white world, a three-point light rig and an orthographic-ish
+  1600 x 1200, Cycles on CPU with `scene.cycles.use_denoising = False` (Debian's Blender 4.3.2
+  has no OpenImageDenoise; leaving it on fails with "build has no OpenImageDenoise support"),
+  256 samples to keep the noise down without it, white world, a three-point light rig and an orthographic-ish
   35 mm camera framed on the scene's bounding box. Monitor screens use an emissive material with
   a TT VGA test pattern image (draw it in `export_scene.py` with Pillow; colour bars are fine).
 
