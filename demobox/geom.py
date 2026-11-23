@@ -62,6 +62,29 @@ class Cyl:
     what: str = ""
 
 
+@dataclass(frozen=True)
+class Stadium:
+    """A stadium (slot) prism along Z: the hull of two radius-``r`` circles
+    centred at (x0, y0) and (x1, y1)."""
+
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    r: float
+    z0: float
+    z1: float
+    what: str = ""
+
+    def covers(self, x: float, y: float) -> bool:
+        """True when (x, y) lies inside the stadium's outline."""
+        dx, dy = self.x1 - self.x0, self.y1 - self.y0
+        n = dx * dx + dy * dy
+        t = 0.0 if n == 0 else max(0.0, min(1.0, ((x - self.x0) * dx + (y - self.y0) * dy) / n))
+        px, py = self.x0 + t * dx, self.y0 + t * dy
+        return (x - px) ** 2 + (y - py) ** 2 <= self.r ** 2 + 1e-9
+
+
 def box_gap(a: Box, b: Box) -> float:
     """Clearance between two boxes: positive = gap, 0 = touching, negative =
     overlap depth (the smallest translation that would separate them)."""

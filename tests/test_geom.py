@@ -51,3 +51,11 @@ def test_inverted_box_rejected():
 def test_cyl_and_bedoverflow():
     assert Cyl(0, 0, 0, 5, 2, "c").r == 2
     assert issubclass(BedOverflow, Exception)
+
+
+def test_stadium_covers():
+    from demobox.geom import Stadium
+    s = Stadium(0.0, 0.0, 0.0, 5.0, 3.2, 0.0, 6.0, "slot")
+    assert s.covers(0.0, 0.0) and s.covers(0.0, 5.0) and s.covers(3.2, 2.5)
+    assert s.covers(0.0, 8.2) and not s.covers(0.0, 8.3)
+    assert not s.covers(3.3, 2.5) and not s.covers(2.5, -2.5)

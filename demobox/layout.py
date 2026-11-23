@@ -60,7 +60,7 @@ from dataclasses import dataclass
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from tools.schema import Source
 
-from demobox.geom import Box, Cyl
+from demobox.geom import Box, Cyl, Stadium
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.board import BOARD_KEYS, board_envelope, board_spec
 from demobox.parts.cables import CABLES
@@ -86,6 +86,9 @@ INSERT_MATERIAL = 1.2
 DRIVER_STANDOFF = 5.0
 #: Deck standoff minimum: takes an M3 heat-set insert (5.7 deep) from the top.
 STANDOFF_MIN = 6.0
+#: MT1 locating peg: into the board's 3.2 mm hole, below the PCB's top face.
+PEG_DIA = 3.0
+PEG_HEIGHT = 1.2
 #: Finger hole in the drawer face, around the bank's end button.
 FINGER_HOLE_D = 20.0
 
@@ -209,7 +212,10 @@ class Layout:
     deck_z: float
     board_origin: tuple[float, float, float]
     board_keepouts: dict[str, Box]   # "<rev>/envelope", "<rev>/usb_plug", "<rev>/tinyvga"
-    standoffs: tuple[Cyl, ...]
+    standoffs: tuple[Cyl, ...]       # screwed, M3 heat-set insert (shared MT2)
+    mt1_boss: Stadium                # merged boss under both MT1s, no insert
+    pegs: dict[str, Cyl]             # per revision: locating peg into MT1
+    supports: tuple[Cyl, ...]        # plain edge-support pads, no insert
     usb_slot: Box
     bay: Box
     cable_bay: Box
@@ -284,22 +290,43 @@ def layout(wall: float) -> Layout:
     height = origin[2] + u.z1 + CLOSED_CLEARANCE
     outer = Box(0.0, 0.0, 0.0, width, depth, height, "base")
 
-    # standoffs at the holes (shared positions once), plus edge supports at
-    # the other two corners of the hole rectangle, clear of J1
+    # Under-board supports, all with their tops at the board underside:
+    #  * ``standoffs``: screwed, with an M3 heat-set insert -- the holes both
+    #    revisions share (MT2);
+    #  * ``mt1_boss``: one merged stadium boss under the revisions' MT1 holes,
+    #    which differ by 5 mm (too close for two inserted bosses), no insert;
+    #  * ``pegs``: a locating peg per revision rising from the boss into that
+    #    revision's MT1 hole.  Each revision's peg sits under the other
+    #    revision's PCB, so a fixed pair would lift either board: the boss has a
+    #    PEG_DIA hole at each MT1 and only the fitted revision's peg (a loose
+    #    printed pin) is pushed in;
+    #  * ``supports``: plain pads at the other two corners of the hole
+    #    rectangle (clear of J1), so two fixings do not let the board rock.
+    def at(x, y):
+        return ox - x, oy - y
+
     std_r = max(h.keepout_dia for k in BOARD_KEYS for h in board_spec(k).holes) / 2
     holes: dict[tuple[float, float], list[str]] = {}
     for k in BOARD_KEYS:
         for h in board_spec(k).holes:
             holes.setdefault((h.x, h.y), []).append(f"{k} {h.label}")
-    spots = {xy: ", ".join(names) for xy, names in holes.items()}
-    mt1x = min(h.x for k in BOARD_KEYS for h in board_spec(k).holes if h.label == "MT1")
+    shared = {xy: names for xy, names in holes.items() if len(names) == len(BOARD_KEYS)}
+    standoffs = tuple(Cyl(*at(x, y), deck_z, origin[2], std_r, "standoff " + ", ".join(n))
+                      for (x, y), n in shared.items())
+    mt1 = {k: next(h for h in board_spec(k).holes if h.label == "MT1") for k in BOARD_KEYS}
+    ends = sorted(at(h.x, h.y) for h in mt1.values())
+    mt1_boss = Stadium(*ends[0], *ends[-1], std_r, deck_z, origin[2], "MT1 boss (no insert)")
+    pegs = {k: Cyl(*at(h.x, h.y), origin[2], origin[2] + PEG_HEIGHT, PEG_DIA / 2,
+                   f"{k} MT1 locating peg") for k, h in mt1.items()}
     mt2 = next(h for h in board_spec(BOARD_KEYS[0]).holes if h.label == "MT2")
     j1_y0 = min(f.y0 for k in BOARD_KEYS for f in board_spec(k).features
                 if f.kind == "usb_power")
-    spots[(mt1x, mt2.y)] = "edge support (Pmod corner)"
-    spots[(mt2.x, j1_y0 - std_r - FIT)] = "edge support (J1 corner)"
-    standoffs = tuple(Cyl(ox - x, oy - y, deck_z, origin[2], std_r, f"standoff {what}")
-                      for (x, y), what in spots.items())
+    supports = (
+        Cyl(*at(min(h.x for h in mt1.values()), mt2.y), deck_z, origin[2], std_r,
+            "edge support (Pmod corner)"),
+        Cyl(*at(mt2.x, j1_y0 - std_r - FIT), deck_z, origin[2], std_r,
+            "edge support (J1 corner)"),
+    )
 
     # USB-C slot: under both revisions' plug cable ends
     plugs = [keepouts[f"{k}/usb_plug"] for k in BOARD_KEYS]
@@ -333,7 +360,8 @@ def layout(wall: float) -> Layout:
 
     return Layout(
         wall=wall, outer=outer, deck_z=deck_z, board_origin=origin,
-        board_keepouts=keepouts, standoffs=standoffs, usb_slot=usb_slot,
+        board_keepouts=keepouts, standoffs=standoffs, mt1_boss=mt1_boss, pegs=pegs,
+        supports=supports, usb_slot=usb_slot,
         bay=bay, cable_bay=cable_bay, drawer_face_hole=drawer_face_hole,
         drawer_out=(-1.0, 0.0, 0.0), drawer_travel=drawer_travel,
         boost_pocket=boost_pocket, hinge_axis=hinge,

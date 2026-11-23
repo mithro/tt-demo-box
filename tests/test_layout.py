@@ -102,23 +102,87 @@ def test_board_placed_rotated_not_mirrored(lay):
     assert j1.y1 <= env.y0 + 1e-9
 
 
-def test_standoffs_at_holes(lay):
-    ox, oy, oz = lay.board_origin
-    centres = [(round(s.cx, 6), round(s.cy, 6)) for s in lay.standoffs]
-    assert len(centres) == len(set(centres))
-    for s in lay.standoffs:
-        assert s.z0 == pytest.approx(lay.deck_z) and s.z1 == pytest.approx(oz)
+def _hole_at(lay, key, label):
+    ox, oy, _ = lay.board_origin
+    h = next(h for h in board_spec(key).holes if h.label == label)
+    return (ox - h.x, oy - h.y)
 
-    def at(key, label):
-        h = next(h for h in board_spec(key).holes if h.label == label)
-        return (round(ox - h.x, 6), round(oy - h.y, 6))
 
-    assert at("v3.2", "MT2") == at("v3.3", "MT2")
+def _outline_base(lay, key):
+    """The revision's PCB outline (rounded rectangle) in base-frame XY."""
+    from shapely.geometry import box as sbox
+    ox, oy, _ = lay.board_origin
+    o = board_spec(key).outline
+    r = o.corner_radius
+    return sbox(ox - o.width + r, oy - o.height + r, ox - r, oy - r).buffer(r)
+
+
+def test_screwed_standoffs_at_shared_mt2(lay):
+    _, _, oz = lay.board_origin
+    assert _hole_at(lay, "v3.2", "MT2") == pytest.approx(_hole_at(lay, "v3.3", "MT2"))
+    assert len(lay.standoffs) == 1
+    s = lay.standoffs[0]
+    assert (s.cx, s.cy) == pytest.approx(_hole_at(lay, "v3.2", "MT2"))
+    assert s.z0 == pytest.approx(lay.deck_z) and s.z1 == pytest.approx(oz)
+
+
+def test_no_two_bosses_overlap(lay):
+    """Inserted standoffs and plain pads are separate bosses: none overlap
+    each other or the merged MT1 boss."""
+    from shapely.geometry import LineString, Point
+    b = lay.mt1_boss
+    shapes = [Point(c.cx, c.cy).buffer(c.r) for c in lay.standoffs + lay.supports]
+    shapes.append(LineString([(b.x0, b.y0), (b.x1, b.y1)]).buffer(b.r))
+    for i in range(len(shapes)):
+        for j in range(i + 1, len(shapes)):
+            assert not shapes[i].intersects(shapes[j]), (i, j)
+    # in particular the inserted standoffs keep a full boss apart
+    for i, a in enumerate(lay.standoffs):
+        for c in lay.standoffs[i + 1:]:
+            assert math.dist((a.cx, a.cy), (c.cx, c.cy)) >= a.r + c.r
+
+
+def test_mt1_boss_and_pegs(lay):
+    _, _, oz = lay.board_origin
+    b = lay.mt1_boss
+    assert b.z0 == pytest.approx(lay.deck_z)
+    # the boss top is the support plane, not above it: it lifts neither board
+    assert b.z1 == pytest.approx(oz) == pytest.approx(lay.standoffs[0].z1)
     for key in BOARD_KEYS:
-        assert at(key, "MT1") in centres
-        assert at(key, "MT2") in centres
-    # plus edge supports, so two holes do not let the board rock
-    assert len(lay.standoffs) >= 5
+        x, y = _hole_at(lay, key, "MT1")
+        assert b.covers(x, y), key
+        peg = lay.pegs[key]
+        assert (peg.cx, peg.cy) == pytest.approx((x, y))
+        hole = next(h for h in board_spec(key).holes if h.label == "MT1")
+        assert 2 * peg.r == pytest.approx(L.PEG_DIA) and L.PEG_DIA < hole.dia
+        assert peg.z0 == pytest.approx(oz)
+        assert peg.z1 - peg.z0 == pytest.approx(L.PEG_HEIGHT)
+        assert L.PEG_HEIGHT < board_spec(key).outline.thickness
+    assert set(lay.pegs) == set(BOARD_KEYS)
+
+
+def test_pegs_are_per_revision(lay):
+    """Each revision's peg would sit under the other revision's PCB, which is
+    why only the fitted revision's peg goes in."""
+    from shapely.geometry import Point
+    for key in BOARD_KEYS:
+        for other in BOARD_KEYS:
+            if other != key:
+                p = lay.pegs[other]
+                assert Point(p.cx, p.cy).buffer(p.r).intersects(_outline_base(lay, key))
+
+
+def test_under_board_supports_inside_each_outline(lay):
+    from shapely.geometry import Point
+    _, _, oz = lay.board_origin
+    for key in BOARD_KEYS:
+        outline = _outline_base(lay, key)
+        own = (lay.pegs[key],)
+        for c in lay.standoffs + lay.supports + own:
+            assert Point(c.cx, c.cy).buffer(c.r).within(outline), (key, c.what)
+        for c in lay.standoffs + lay.supports:
+            assert c.z1 == pytest.approx(oz)
+    assert len(lay.supports) == 2
 
 
 def test_usb_slot_under_each_j1_plug(lay):
