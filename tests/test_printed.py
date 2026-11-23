@@ -1,6 +1,5 @@
 """The 3D-printed body (route "printed", ``layout(2.4)``) and its assembly."""
 
-import itertools
 import math
 
 import cadquery as cq
@@ -8,16 +7,13 @@ import pytest
 
 from demobox import checks as C
 from demobox import layout as L
+from demobox.clash import clashes
 from demobox.geom import BedOverflow
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.monitors import MONITORS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
 from demobox.shared import inserts as I
-
-#: Pairwise interpenetration allowed between assembled solids (mm^3).
-VOL_TOL = 1.0
-
 
 @pytest.fixture(scope="module")
 def lay():
@@ -251,18 +247,7 @@ def test_boost_pocket_is_clear(parts, lay):
 # --- assembly ----------------------------------------------------------------------
 
 def _clashes(items):
-    bad = []
-    for (na, a, _), (nb, b, _) in itertools.combinations(items, 2):
-        if frozenset((na, nb)) in B.DECLARED_OVERLAPS:
-            continue
-        ba, bb = a.BoundingBox(), b.BoundingBox()
-        if (ba.xmax < bb.xmin or bb.xmax < ba.xmin or ba.ymax < bb.ymin or bb.ymax < ba.ymin
-                or ba.zmax < bb.zmin or bb.zmax < ba.zmin):
-            continue
-        v = a.intersect(b).Volume()
-        if v > VOL_TOL:
-            bad.append((na, nb, round(v, 3)))
-    return bad
+    return clashes(items, B.DECLARED_OVERLAPS)
 
 
 @pytest.mark.parametrize("angle", [0.0, L.LID_OPEN_DEG])
@@ -280,12 +265,14 @@ def test_assembly_drawer_out_has_no_intersections(lay):
     assert _clashes(items) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("key", sorted(MONITORS))
 def test_assembly_each_monitor(key):
     items = B.assembly("printed", 0.0, 0.0, monitor=key)
     assert _clashes(items) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("key", sorted(BATTERIES))
 def test_assembly_each_bank(key):
     items = B.assembly("printed", 0.0, 0.0, bank=key)
@@ -300,9 +287,9 @@ def test_assembly_lid_turns_about_the_axis(lay):
     assert closed["base"].BoundingBox().xlen == opened["base"].BoundingBox().xlen
 
 
-def test_assembly_laser_is_task_8():
-    with pytest.raises(NotImplementedError, match="Task 8"):
-        B.assembly("laser", 0.0, 0.0)
+def test_assembly_unknown_route():
+    with pytest.raises(ValueError, match="unknown route"):
+        B.assembly("cnc", 0.0, 0.0)
 
 
 def test_over_bed_lid_splits_with_joints(lay):
@@ -423,3 +410,12 @@ def test_detent_groove_leaves_a_full_wall(lay):
     groove_bottom = lay.wall - B.GROOVE_D
     assert not _inside(tub, (x, groove_bottom + 0.05, z))
     assert _inside(tub, (x, groove_bottom - lay.wall + 0.05, z))
+
+
+def test_nothing_stands_below_the_printed_floor():
+    """R19, printed route: no screw goes through the tub's floor (its screws go
+    into heat-set inserts from inside or from the sides), so nothing stands
+    below Z = 0 and the box needs no feet."""
+    items = B.assembly("printed", 0.0, 0.0)
+    assert min(s.BoundingBox().zmin for _, s, _ in items) == pytest.approx(0.0, abs=1e-6)
+    assert not [n for n, _, _ in items if n.startswith("hw:") and "foot" in n]

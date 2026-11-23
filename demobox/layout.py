@@ -86,6 +86,7 @@ LID_POCKET_MIN = (185.0, 120.0)
 FIT = 0.5                 # insert / slide clearance, per side
 CLOSED_CLEARANCE = 2.0    # lid underside above the tallest thing on the deck
 PRINT_BED = (220.0, 220.0)
+LASER_BED = (300.0, 200.0)
 #: M3 heat-set insert in printed parts: hole diameter and depth.
 HEATSET_HOLE_D = 4.0
 HEATSET_DEPTH = 5.7

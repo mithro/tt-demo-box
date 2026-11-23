@@ -1,19 +1,24 @@
 # Everything runs through uv; no pyproject.toml.
 PY := uv run --no-project --with pytest --with cadquery --with ezdxf --with pypdf --with pillow --with shapely
 
-.PHONY: test verify outputs check tools fetch renders sheets
+.PHONY: test test-all verify outputs check tools fetch renders sheets
 
-## test: run the pytest suite
+## test: run the pytest suite, less the tests marked slow (R21)
 test:
+	$(PY) python -m pytest tests -v -m "not slow"
+
+## test-all: run every test, slow ones included
+test-all:
 	$(PY) python -m pytest tests -v
 
 ## verify: check dimensions and report UNCONFIRMED figures
 verify:
 	$(PY) python verify.py
 
-## outputs: regenerate everything under output/ (printed route; Task 8 adds laser)
+## outputs: regenerate everything under output/ (printed and laser routes)
 outputs:
 	$(PY) python scripts/export_printed.py
+	$(PY) python scripts/export_laser.py
 
 ## check: test + verify + sheet checks
 check: test verify

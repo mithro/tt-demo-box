@@ -1081,9 +1081,11 @@ def assembly(route: str, angle_deg: float, drawer_out: float,
              board: str = ASSEMBLY_BOARD) -> list[tuple[str, cq.Shape, tuple[float, float, float]]]:
     """The box in the base frame: lid ``angle_deg`` open, drawer pulled
     ``drawer_out`` mm along ``drawer_out``'s direction, with ``monitor``,
-    ``bank`` and ``board`` fitted (bought parts as plain blocks)."""
+    ``bank`` and ``board`` fitted (bought parts as plain blocks).  The one
+    entry point for both routes: ``"laser"`` is ``demobox.laser.fittings``'."""
     if route == "laser":
-        raise NotImplementedError("Task 8: the laser-cut body registers its assembly here")
+        from demobox.laser.fittings import assembly as laser_assembly
+        return laser_assembly(angle_deg, drawer_out, monitor=monitor, bank=bank, board=board)
     if route != "printed":
         raise ValueError(f"unknown route {route!r}; routes are {sorted(ROUTES)}")
     lay = layout(ROUTES[route])
