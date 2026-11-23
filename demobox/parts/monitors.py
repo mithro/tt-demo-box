@@ -47,6 +47,13 @@ class Monitor:
     cable_edge: Edge | None = None
     #: The cased monitor's own bezel opening (W, H); None for bare kits.
     window: tuple[float, float] | None = None
+    #: Bare kits: the driver board's PCB thickness.  The PCB is the
+    #: panel-side face of ``driver`` (z 0 .. driver_pcb_t); its components
+    #: stand rearward of it, up to ``driver.z1``.
+    driver_pcb_t: float | None = None
+    #: Bare kits: the driver board's M3 mounting holes (x, y), in the panel's
+    #: back frame like ``driver``.
+    driver_holes: tuple[tuple[float, float], ...] = ()
 
 
 def _centred_x(panel_w: float, active_w: float) -> float:
@@ -113,6 +120,10 @@ _CAR_7 = Monitor(
     window=(159, 86),
 )
 
+#: PCB800099 mounting holes: assumed one in from each corner by this much.
+_KIT_HOLE_INSET = 3.5
+_KIT_DRIVER = Box(37.0, 17.0, 0.0, 37.0 + 90.6, 17.0 + 65.7, 12.0, "PCB800099 driver board")
+
 _KIT = Monitor(
     key="kit-at070tn92",
     title="AT070TN92 7-inch 800x480 panel + PCB800099 driver board (bare kit)",
@@ -121,7 +132,7 @@ _KIT = Monitor(
     active=ACTIVE_7IN,
     active_offset=(_centred_x(165, ACTIVE_7IN[0]), round((100 - ACTIVE_7IN[1]) / 2, 2)),
     # board in the panel's back frame; 12 mm height is a placeholder
-    driver=Box(37.0, 17.0, 0.0, 37.0 + 90.6, 17.0 + 65.7, 12.0, "PCB800099 driver board"),
+    driver=_KIT_DRIVER,
     connector_exit="board",
     power_in="12V-boost",
     button=None,   # keypad is a separate board on a ribbon
@@ -132,8 +143,17 @@ _KIT = Monitor(
         Source("Placeholder: panel size, board position and height", _SURVEY,
                "Panel ~165 x 100 x 5.7 is unconfirmed, as are the board's offset, "
                "its height (12 mm) and the connector positions. Measure a real kit."),
+        Source("Placeholder: driver PCB thickness, face and mounting holes", _SURVEY,
+               "PCB assumed 1.6 mm, on the panel side of the board with its parts "
+               "rearward, and M3 holes 3.5 mm in from each corner. Measure a real "
+               "PCB800099."),
     ),
     confirmed=False,
+    driver_pcb_t=1.6,
+    driver_holes=tuple((x, y) for x in (_KIT_DRIVER.x0 + _KIT_HOLE_INSET,
+                                        _KIT_DRIVER.x1 - _KIT_HOLE_INSET)
+                       for y in (_KIT_DRIVER.y0 + _KIT_HOLE_INSET,
+                                 _KIT_DRIVER.y1 - _KIT_HOLE_INSET)),
 )
 
 MONITORS: dict[str, Monitor] = {m.key: m for m in (_TAOBAO_TIM, _CAR_7, _KIT)}
