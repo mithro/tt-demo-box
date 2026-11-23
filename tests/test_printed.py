@@ -419,3 +419,39 @@ def test_nothing_stands_below_the_printed_floor():
     items = B.assembly("printed", 0.0, 0.0)
     assert min(s.BoundingBox().zmin for _, s, _ in items) == pytest.approx(0.0, abs=1e-6)
     assert not [n for n, _, _ in items if n.startswith("hw:") and "foot" in n]
+
+
+# --- screws into heat-set inserts (review fix round 1) ---------------------------
+
+def test_insert_screw_is_the_longest_that_stops_short():
+    from demobox.shared import m3
+    # 1.2 mm bezel into a 5.7 mm hole: 6.4 allowed -> M3 x 6, 4.8 engaged
+    assert m3.insert_screw(1.2, L.HEATSET_DEPTH) == 6
+    # rounding up (stock_length) would give M3 x 8 for the 1.6 mm board: 6.4 > 5.2
+    assert m3.insert_screw(1.6, L.HEATSET_DEPTH) == 6
+    with pytest.raises(ValueError):
+        m3.insert_screw(1.2, 3.0)          # nothing engages 3 mm of a 3 mm hole
+
+
+def test_every_insert_screw_engages_and_stops_short(lay, parts, split):
+    """Every screw into a heat-set insert -- bezel, clip, hinge leaves, board,
+    deck corners and split joints (base and lid) -- engages at least 3 mm and
+    stops at least 0.5 mm short of the 5.7 mm hole's floor."""
+    from demobox.shared import m3
+    lid_pieces, _ = B.split_lid(lay, bed=(210.0, 220.0))
+    base_pieces, _ = split
+    heatsets = [h for group in (parts, base_pieces, lid_pieces)
+                for p in group.values() for h in p.heatsets]
+    screws = B.insert_screws(lay, heatsets)
+    labels = {s.what for s in screws}
+    assert {"bezel", "bezel clip", "hinge leaves", "board, MT2", "deck corners",
+            "split joints"} <= labels
+    for s in screws:
+        assert m3.MIN_ENGAGE <= s.engagement <= L.HEATSET_DEPTH - m3.INSERT_SHORT, s
+
+
+def test_hardware_lists_the_insert_screws(lay):
+    hw = B.hardware(lay)
+    assert hw["M3 x 6 pan-head (board, MT2)"] == 1
+    assert hw["M3 x 6 pan-head (deck corners)"] == 4
+    assert sum(n for k, n in hw.items() if k.startswith("M3 heat-set insert")) == 15

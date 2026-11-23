@@ -5,7 +5,7 @@ BLENDER := blender -b --factory-startup
 RENDERS := printed-closed printed-open-front printed-open-back printed-drawer-out \
 	laser-closed laser-open-front laser-open-back laser-drawer-out laser-flatpack
 
-.PHONY: test test-all verify outputs check tools fetch renders sheets
+.PHONY: test test-all verify outputs check check-sheets tools fetch renders sheets
 
 ## test: run the pytest suite, less the tests marked slow (R21)
 test:
@@ -24,9 +24,12 @@ outputs:
 	$(PY) python scripts/export_printed.py
 	$(PY) python scripts/export_laser.py
 
-## check: test + verify + sheet checks
-check: test verify
-	@echo "sheet checks: not implemented yet (Task 13)"; exit 1
+## check: test + verify + sheet checks (Task 11 adds: outputs are up to date)
+check: test verify check-sheets
+
+## check-sheets: text collisions, small text, out of frame, drawing names
+check-sheets:
+	$(PY) python scripts/check_sheets.py
 
 ## fetch: download upstream sources into tmp/src
 fetch:
@@ -44,9 +47,13 @@ renders:
 	  grep "rendered in" tmp/render-$$r.log; \
 	done
 
-## sheets: drawing sheets
+## sheets: drawing sheets -> output/sheets/*.svg, *.pdf, previews/*.png (log tmp/sheets.log)
 sheets:
-	@echo "sheets: not implemented yet (Task 13)"; exit 1
+	mkdir -p tmp
+	$(PY) python scripts/generate_sheets.py > tmp/sheets.log 2>&1 \
+	  || { tail -n 40 tmp/sheets.log; exit 1; }
+	cat tmp/sheets.log
+	$(PY) python scripts/check_sheets.py
 
 ## tools: check external tools (inkscape, blender)
 tools:

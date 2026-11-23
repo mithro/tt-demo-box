@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="297mm" height="210mm" viewBox="0 0 297 210">
+<rect width="100%" height="100%" fill="#ffffff"/>
+
+<rect x="5" y="5" width="287" height="200" fill="none" stroke="#888888" stroke-width="0.25"/>
+<rect x="20" y="12" width="265" height="186" fill="none" stroke="#000000" stroke-width="0.7"/>
+<text x="53.125" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">1</text>
+<text x="53.125" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">1</text>
+<line x1="86.25" y1="205" x2="86.25" y2="198" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="86.25" y1="12" x2="86.25" y2="5" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="119.375" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">2</text>
+<text x="119.375" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">2</text>
+<line x1="152.5" y1="205" x2="152.5" y2="198" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="152.5" y1="12" x2="152.5" y2="5" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="185.625" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">3</text>
+<text x="185.625" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">3</text>
+<line x1="218.75" y1="205" x2="218.75" y2="198" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="218.75" y1="12" x2="218.75" y2="5" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="251.875" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">4</text>
+<text x="251.875" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">4</text>
+<text x="12.5" y="168.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">C</text>
+<text x="288.5" y="168.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">C</text>
+<line x1="5" y1="136" x2="20" y2="136" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="285" y1="136" x2="292" y2="136" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="12.5" y="106.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">B</text>
+<text x="288.5" y="106.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">B</text>
+<line x1="5" y1="74" x2="20" y2="74" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="285" y1="74" x2="292" y2="74" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="12.5" y="44.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">A</text>
+<text x="288.5" y="44.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">A</text>
+<line x1="148.5" y1="210" x2="148.5" y2="193" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<line x1="148.5" y1="17" x2="148.5" y2="0" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<line x1="0" y1="105" x2="25" y2="105" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<line x1="280" y1="105" x2="297" y2="105" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<polyline points="46.5547,31.1 46.5547,25.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="46.5547,31.1 146.5547,31.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="146.5547,31.1 146.5547,25.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="46.5547,25.1 146.5547,25.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="46.5547,115.1 46.5547,57.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="46.5547,115.1 146.5547,115.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="46.5547,57.1 146.5547,57.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="146.5547,115.1 146.5547,57.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="75.5547,95.1 75.3562,93.273 74.7692,91.531 73.8217,89.956 72.5577,88.6215 71.0362,87.59 69.3287,86.91 67.5147,86.6125 65.6797,86.712 63.9087,87.2035 62.2847,88.0645 60.8837,89.2545 59.7712,90.718 58.9997,92.386 58.6047,94.181 58.6047,96.019 58.9997,97.814 59.7712,99.482 60.8837,100.9455 62.2847,102.1355 63.9087,102.9965 65.6797,103.488 67.5147,103.5875 69.3287,103.29 71.0362,102.61 72.5577,101.5785 73.8217,100.244 74.7692,98.669 75.3562,96.927 75.5547,95.1" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<line x1="56.9547" y1="95.1" x2="77.1547" y2="95.1" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="67.0547" y1="105.2" x2="67.0547" y2="85" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<circle cx="46.5547" cy="31.1" r="2" fill="none" stroke="#004c99" stroke-width="0.25"/>
+<path d="M 46.554663923182446 31.099999999999994 L 48.554663923182446 31.099999999999994 A 2.0 2.0 0 0 1 46.554663923182446 29.099999999999994 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M 46.554663923182446 31.099999999999994 L 44.554663923182446 31.099999999999994 A 2.0 2.0 0 0 1 46.554663923182446 33.099999999999994 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="46.5547" cy="115.1" r="2" fill="none" stroke="#004c99" stroke-width="0.25"/>
+<path d="M 46.554663923182446 115.1 L 48.554663923182446 115.1 A 2.0 2.0 0 0 1 46.554663923182446 113.1 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M 46.554663923182446 115.1 L 44.554663923182446 115.1 A 2.0 2.0 0 0 1 46.554663923182446 117.1 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="45.3547" y1="31.1" x2="39.5547" y2="31.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="45.3547" y1="25.1" x2="39.5547" y2="25.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="39.5547" y1="31.1" x2="39.5547" y2="25.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="39.5547,31.1 38.6547,34.1 40.4547,34.1" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="39.5547,25.1 40.4547,22.1 38.6547,22.1" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="39.5547" y1="37.7" x2="39.5547" y2="31.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="39.5547" y1="25.1" x2="39.5547" y2="18.5" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="37" y="28.1" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 37 28.1)">1.20</text>
+<line x1="46.5547" y1="116.3" x2="46.5547" y2="124.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="146.5547" y1="116.3" x2="146.5547" y2="124.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="46.5547" y1="122.1" x2="146.5547" y2="122.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="46.5547,122.1 49.5547,123 49.5547,121.2" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="146.5547,122.1 143.5547,121.2 143.5547,123" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="96.5547" y="120.3907" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle">20.00</text>
+<line x1="45.3547" y1="115.1" x2="37.5547" y2="115.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="45.3547" y1="57.1" x2="37.5547" y2="57.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="39.5547" y1="115.1" x2="39.5547" y2="57.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="39.5547,115.1 40.4547,112.1 38.6547,112.1" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="39.5547,57.1 38.6547,60.1 40.4547,60.1" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="37" y="86.1" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 37 86.1)">11.60</text>
+<line x1="46.5547" y1="55.9" x2="46.5547" y2="48.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="67.0547" y1="55.9" x2="67.0547" y2="48.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="46.5547" y1="50.1" x2="67.0547" y2="50.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="46.5547,50.1 49.5547,51 49.5547,49.2" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="67.0547,50.1 64.0547,49.2 64.0547,51" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="56.8047" y="48.3907" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle">4.10</text>
+<line x1="45.3547" y1="115.1" x2="29.5547" y2="115.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="45.3547" y1="95.1" x2="29.5547" y2="95.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="31.5547" y1="115.1" x2="31.5547" y2="95.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="31.5547,115.1 32.4547,112.1 30.6547,112.1" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="31.5547,95.1 30.6547,98.1 32.4547,98.1" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="29" y="105.1" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 29 105.1)">4.00</text>
+<polygon points="73.0047,89.15 74.6409,86.4793 72.9006,86.0196" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="73.0047" y1="89.15" x2="83.0547" y2="51.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="83.0547" y1="51.1" x2="88.0547" y2="51.1" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="89.2547" y="50.2" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="start">D3.40 THRU</text>
+<text x="96.5547" y="22.6" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="middle" font-weight="bold">FRONT</text>
+<text x="96.5547" y="44.2" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="middle" font-weight="bold">PLAN</text>
+<text x="150" y="18.5" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">NOTES</text>
+<line x1="150" y1="19.9" x2="279" y2="19.9" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="150" y="24.6" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
+<text x="154.542" y="24.6" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Datum (target): the clip&#x27;s front-left-bottom corner.</text>
+<text x="150" y="30.1267" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">2.</text>
+<text x="154.542" y="30.1267" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Bezel clip: print flat. Holds the bezel&#x27;s corner that has no screw; one M3 x 6</text>
+<text x="154.542" y="34.6535" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">pan-head screw into the lid&#x27;s heat-set insert. Fit after the bezel.</text>
+<text x="150" y="40.1802" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">3.</text>
+<text x="154.542" y="40.1802" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">UNCONFIRMED inputs (placeholders; make verify lists each): all 3 monitors.</text>
+<text x="150" y="46.707" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">SOURCES</text>
+<line x1="150" y1="48.107" x2="279" y2="48.107" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="150" y="52.807" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
+<text x="154.542" y="52.807" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/printed/body.py: bezel_clip, clip_screws</text>
+<rect x="151" y="150" width="134" height="48" fill="none" stroke="#000000" stroke-width="0.7"/>
+<line x1="151" y1="165" x2="285" y2="165" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="153.5" y="158.8" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="6.8587" fill="#000000" text-anchor="start" font-weight="bold">BEZEL CLIP</text>
+<text x="153.5" y="163.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#333333" text-anchor="start">Printed route: holds the bezel corner with no screw</text>
+<text x="152.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">DRAWN</text>
+<text x="152.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">generated</text>
+<line x1="184.5" y1="176" x2="184.5" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="186.1" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">VERSION</text>
+<text x="186.1" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">a239e9e</text>
+<line x1="218" y1="176" x2="218" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="219.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">UNITS</text>
+<text x="219.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">mm</text>
+<line x1="251.5" y1="176" x2="251.5" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="253.1" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">SCALE</text>
+<text x="253.1" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">5:1</text>
+<line x1="151" y1="176" x2="285" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="152.6" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">SIZE</text>
+<text x="152.6" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">A4</text>
+<line x1="169.76" y1="187" x2="169.76" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="171.36" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">SHEET</text>
+<text x="171.36" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">1 OF 1</text>
+<line x1="196.56" y1="187" x2="196.56" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="198.16" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">DRAWING NO</text>
+<text x="198.16" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">TDB-CLIP-P</text>
+<line x1="263.56" y1="187" x2="263.56" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="265.16" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">REV</text>
+<text x="265.16" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">A</text>
+<line x1="151" y1="187" x2="285" y2="187" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="152.6" y="190.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">MATERIAL</text>
+<text x="152.6" y="196.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">PETG or PLA</text>
+<line x1="188.52" y1="198" x2="188.52" y2="187" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="190.12" y="190.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">GENERAL TOLERANCE</text>
+<text x="190.12" y="196.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">+/-0.3 unless noted</text>
+<line x1="263.56" y1="198" x2="263.56" y2="187" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="265.16" y="190.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">PROJECTION</text>
+<line x1="267.46" y1="195.14" x2="281.1" y2="195.14" stroke="#666666" stroke-width="0.25" stroke-linecap="round" stroke-dasharray="3.2,1.2,0.6,1.2"/>
+<polygon points="268.7,194.396 273.66,193.652 273.66,196.628 268.7,195.884" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<circle cx="277.628" cy="195.14" r="1.488" fill="none" stroke="#000000" stroke-width="0.5"/>
+<circle cx="277.628" cy="195.14" r="0.744" fill="none" stroke="#000000" stroke-width="0.5"/>
+</svg>
