@@ -49,7 +49,7 @@ and `battery-survey.md` beside it). Read it first.
 
 ## Review Focus
 
-1. **A monitor whose data is incomplete** (e.g. ZJ050 driver board size unknown, Tim's Taobao unit
+1. **A monitor whose data is incomplete** (e.g. kit J's panel size unknown, Tim's 7"
    unmeasured): expected `verify.py` to report it UNCONFIRMED and still build its insert from the
    placeholder, not crash or silently drop it. Test in Task 3.
 2. **The lid swept from closed to 100 degrees**: expected no collision with the base, the board,
@@ -149,8 +149,10 @@ and `battery-survey.md` beside it). Read it first.
   `connector_exit: Literal["left","right","top","bottom","pigtail","board"]`,
   `power_in: Literal["5V","12V-boost"]`, `button: tuple[float,float] | None` (front-face
   position, None = on a separate keypad), `sources, confirmed`.
-  `MONITORS: dict[str, Monitor]` with keys `"kit-800050"`, `"kit-zj050"`, `"adafruit-1678"`,
-  `"eastrising-tftv050"`, `"miktver-5"`, `"generic-5-touch"`, `"taobao-tim"`.
+  `MONITORS: dict[str, Monitor]` with keys `"taobao-tim"` (Tim's 7" car monitor, the main
+  one), `"car-7-aliexpress"` (survey item H, 173 x 113 x 20 at the rim, AliExpress
+  1005004614276566) and `"kit-at070tn92"` (survey item J, 7" 800x480 panel + PCB800099 board,
+  board 90.6 x 65.7; panel ~165 x 100 x 5.7 unconfirmed). 7" only (Tim, 2026-11-23).
 - Produces `Battery`: `key, title, size: (L,W,H)`, `port_face: Literal["end","top","side"]`,
   `button: tuple[str, float, float] | None` (face, u, v), `sources, confirmed`.
   `BATTERIES` with keys `"iniu-p512"`, `"ugreen-pb505"`, `"xiaomi-pb2020"`,
@@ -160,9 +162,10 @@ and `battery-survey.md` beside it). Read it first.
   `"usb-12v-boost"` (Tim's adapter; body size placeholder, unconfirmed).
 
 - [ ] **Step 1: Failing tests** (`tests/test_parts_data.py`):
-  `MONITORS["kit-800050"].panel[:2] == (120.7, 76.3)`; `MONITORS["kit-zj050"].panel ==
-  (117.65, 88.43, 5.9)` and `.active == (101.76, 76.32)`; every 800x480 monitor's `active ==
-  (108.0, 64.8)`; no monitor has `connector_exit == "rear"` (spec excludes them);
+  `MONITORS["car-7-aliexpress"].panel == (173, 113, 20)`;
+  `MONITORS["kit-at070tn92"].driver` size is 90.6 x 65.7; every monitor's `active` is the 7"
+  16:9 class (width 150-160, height 85-90); no monitor has `connector_exit == "rear"` (spec
+  excludes them);
   `BATTERIES["iniu-p512"].size == (104, 70, 29)`, `["ugreen-pb505"].size == (116.22, 70.55,
   30.03)`, `["xiaomi-pb2020"].size == (128, 73, 32)`, `["anker-zolo-20k"].size == (119.9, 73.4,
   31.5)`; every entry has at least one `Source`; `MONITORS["taobao-tim"]` is the 7" car monitor with `panel` body 182 x 118 (the larger photo reading; listing 170 x 113 in its sources), window (159, 86), `connector_exit == "pigtail"` from its button-side long edge, and `confirmed is False`.
@@ -355,7 +358,7 @@ and `battery-survey.md` beside it). Read it first.
   `hidden: list[list[tuple[float,float]]]` polylines in model mm, using OCP
   `HLRBRep_Algo` + `HLRBRep_HLRToShape` and discretising edges at 0.1 mm chord tolerance.
 - Drawing names: prefix `TDB-` + short code (`TDB-GA-P`, `TDB-GA-L`, `TDB-LID-P`, ...,
-  `TDB-INS-800050`); `names.py` is the one answer, like the submodule's `tools/layout.py`.
+  `TDB-INS-T7`); `names.py` is the one answer, like the submodule's `tools/layout.py`.
 - Sheets are drawn with the submodule's `tools.drafting` (`Sheet`, `TitleBlock`, `View`,
   `dims`, `style`), first-angle, A3 for GA and A4 for parts and inserts, SVG to PDF via
   `tools.render_svg.to_pdf`. GA sheets: front, side (lid shown closed, and at 100 degrees in

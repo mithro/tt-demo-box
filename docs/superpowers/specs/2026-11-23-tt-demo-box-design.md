@@ -5,7 +5,7 @@ Status: approved by Tim, 2026-11-23.
 ## Intent
 
 A small box you carry to a meetup, put on a table and open: the lid swings up to just past
-90 degrees, the ~5" VGA monitor in the lid is already showing the board's VGA designs cycling,
+90 degrees, the 7" VGA monitor in the lid is already showing the board's VGA designs cycling,
 and the Tiny Tapeout dev board sits exposed on the deck in front of it. The flashing screen draws
 people to the table; the bare dev board in front of it is what starts the conversation.
 Nothing to plug in, nothing to set up: the board is already configured to cycle VGA designs at
@@ -25,8 +25,9 @@ monitor, a USB-C to DC adapter, a USB-A power brick and a dev board on the table
   window, no cover.
 - Battery removable in seconds via a slide-out drawer, with no cable to unplug inside the box
   except at the drawer's own connectors.
-- Fits as many small, cheap (~US$15-35) 5" VGA monitors as possible, both cased monitors and
-  bare panel + driver-board kits.
+- Built around a cheap 7" VGA car-style monitor (Tim's Shenzhen unit). Per-monitor inserts let
+  close variants of it (other sellers' 7" car monitors, a bare 7" panel + driver-board kit) fit
+  the same lid. 7" only (Tim, 2026-11-23: "Let's just use the 7inch rather than 5inch").
 - Two build routes from one design: 3D printed, and laser-cut flat panels.
 - Mechanical drawings in the style of `fpgas-online/fpgas.online-mechanical`, plus 3D renders.
 - Open-source tooling only.
@@ -58,7 +59,7 @@ monitor, a USB-C to DC adapter, a USB-A power brick and a dev board on the table
    - Separate per process: the 3D-printed body (shelled walls, printed hinge with integral stop,
      moulded drawer rails) and the laser-cut body (3 mm flat panels, finger joints / T-slot
      screws, separate hinge, cut stop and runners). Each exports, draws and renders on its own.
-2. **Monitors: fit as many as possible**, via a common lid pocket plus a per-monitor insert
+2. **Monitors: a 7" VGA car-style monitor (Tim's), and close 7" variants**, via a common lid pocket plus a per-monitor insert
    (front trim/bezel plate + rear retainer). Adding a monitor is adding a data entry; `verify.py`
    proves it fits.
 3. **Power: everything at 5 V.** Cheap power banks fall back to 5 V on every port as soon as two
@@ -74,8 +75,8 @@ monitor, a USB-C to DC adapter, a USB-A power brick and a dev board on the table
 Calls I made where Tim didn't answer (to correct if wrong):
 
 - **On/off**: no added switch. A finger hole in the drawer face reaches the bank's button, and
-  each monitor insert exposes that monitor's power button (or holds kit D's keypad board behind
-  a cutout). Opening means pressing two buttons; closing means pressing them again, so it doesn't
+  each monitor insert exposes that monitor's power button (or holds a kit's keypad board behind a
+  cutout). Opening means pressing two buttons; closing means pressing them again, so it doesn't
   drain the battery in a bag. `verify.py` proves each supported bank's button and each monitor's
   button can be reached.
 - **Machines**: printed parts fit a 220 x 220 mm bed (Ender/Prusa class; bigger beds are a bonus).
@@ -115,8 +116,8 @@ VGA plug shortens it.
 
 | Ref | What | Size | Notes |
 |---|---|---|---|
-| D | "800050" 5" 800x480 VGA/CVBS kit (bare) | panel 120.7 x 76.3, FPC 47; board 89 x 58 | VGA on a DE-15 pigtail; 12 V DC jack + included DC-to-USB 5 V cable; ~US$27 |
-| E | ZJ050NA-08C 640x480 4:3 kit (bare) | panel 117.65 x 88.43 x 5.9, active 101.76 x 76.32; board size unknown | VGA/HDMI/AV on board; cheapest (~US$16-20); native 640x480 = TT's VGA mode pixel-for-pixel |
+| H | 7" plastic car-style TFT monitor (AliExpress 1005004614276566) | 173 x 113 x 20 at the rim, plus a rear hump | VGA/HDMI/AV, 12 V; the same family as T |
+| J | AT070TN92 7" 800x480 panel + PCB800099 driver board (bare kit) | board 90.6 x 65.7; panel ~165 x 100 x 5.7 (unconfirmed) | HDMI/VGA/AV on the board, 12 V; ~US$15 |
 | T | **Tim's Shenzhen monitor: a 7" car-style "TFT color monitor"** (Taobao ~US$20; survey item H's family) | listing: 170 x 113 mm, 800x480 or 1024x600; Tim's photos: front ~176-181 x ~113, back ~182 x ~117-118, window ~159 x ~86; depth unmeasured | Hard-wired cable leaving the long edge on the button side near one corner, ending in VGA + DC barrel (12 V, via Tim's USB boost adapter) + composite (Tim will likely cut the composite off). Buttons on the front along that edge. Flat back with a stand clip. See `docs/measurements/2026-11-23-photo-measurements.md` |
 
 **Tim's 7" (T) is the main monitor** (found 2026-11-23 from his photos; it was thought to be a
@@ -128,13 +129,11 @@ a placeholder (25 mm, unconfirmed) until measured.
 
 **Monitors whose sockets face backwards are out of scope** (Tim: "Probably can ignore monitors
 who socket faces backwards"). That drops the Eyoyo S501H (124 x 79 x 18, VGA on the rear face).
-Also supported, via their own inserts in the same pocket: bare 5" panel + driver-board kits (D,
-E, and Adafruit 1678 / EastRising ER-TFTV050-3, same 800x480 panel class); cased 5" monitors with
-side sockets (Miktver 5", generic 5" touch 126 x 96 x 17) best-effort. Most 5" 800x480 panels
-share the 108 x 64.8 active area; the 4:3 ZJ050 is 101.8 x 76.3.
+Also supported, via their own inserts in the same pocket: H and J. The 5" monitors in the
+survey are out of scope (Tim, 2026-11-23).
 
 Lid pocket target: ~185 x 120 mm inside (Tim's 7" plus fit). Depth: the 7"'s body (placeholder
-25 mm); the 5" kits (panel ~3-6 mm plus driver board on standoffs) fit within it.
+25 mm); kit J (panel ~5.7 mm plus its driver board on standoffs) fits within it.
 
 ### Batteries (survey 2026-11-23, see `battery-survey.md` beside this file)
 
@@ -185,7 +184,7 @@ end; a per-model end-stop + packing insert puts each bank's port end against the
 1. **One parametric model, two outputs**: a single geometry from which both printed and
    laser files come. Least duplicated work, but forces the printed body into flat-panel shapes.
 2. **Two separate designs**: each process at its best, but every change twice and drift.
-3. **Single-monitor design**: simplest, but fails "as many monitors as possible".
+3. **Single-monitor design**: simplest, but every seller's 7" differs by a few mm, so inserts are kept.
 
 Chosen: **(1) + (2)**, data, layout and verification shared, the two bodies separate (see
 Decision 1).
