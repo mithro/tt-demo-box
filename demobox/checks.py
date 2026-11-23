@@ -331,7 +331,7 @@ def buttons_reachable(report: Report, lay: Layout) -> None:
         if b.button is None:
             continue
         face, u, v = b.button
-        L_, W_, _ = b.size
+        W_ = b.size[1]
         y = lay.bay.y0 + (lay.bay.size[1] - W_) / 2 + u
         if face == "end":
             z = lay.bay.z0 + v
