@@ -19,7 +19,10 @@ block in each corner.  The tub has:
 * the drawer detent: a groove in the front wall's inner face that the drawer's
   bump runs in, a ramped ridge that the bump clicks over into the closed
   position, and the groove's square far end, which the bump's square face
-  meets with the drawer out by ``drawer_travel`` (the end stop);
+  meets with the drawer out by ``drawer_travel`` (the end stop).  A pad
+  PAD_T proud on the wall's outer face behind the groove keeps the wall
+  ``wall`` thick there (the inner face is the drawer's running face, so the
+  pad cannot go inside);
 * a fence round ``boost_pocket`` on the floor behind the drawer (the left wall
   is its fourth side, the drawer its open front);
 * the hinge cable channel's base part (``channel_parts``): deck to the axis,
@@ -52,6 +55,31 @@ The lid outer box less the pocket and gutters (open on the screen side),
 less the hinge cable channel's lid part, the knuckle relief, a boss with a
 heat-set insert behind each lid leaf screw, and a corner boss with a heat-set
 insert under each of the bezel's screws (``inserts.bezel_screws``, R15).
+
+The band between the opening's front edge and the lid's front wall is hollow
+(R18, ``front_cavity``): ``wall`` all round, closed; printed back down, its
+screen-side skin bridges the cavity's 44 mm.  Nothing else in the lid is
+thicker than ``wall`` except the bosses and the lip.
+
+Bezel lip (R17).  The opening corner that has no bezel screw (the pocket's
+front-left corner: the panel leaves no room for a boss) is held by a lip
+(``lip_boxes``): a plate LIP_T thick on the lid's screen face, FIT in front of
+the bezel, overlapping the bezel's front edge by LIP_OVER, rooted in the face
+beyond.  Under it an undercut slot runs the opening's whole front edge,
+BEZEL_SLIDE deep and INSERT_MATERIAL + FIT high.  Fitting the bezel (lid on
+its back, screen side up, panel and retainer in): hold the bezel tilted a few
+degrees, slide its front edge forward (-Y) BEZEL_SLIDE into the undercut
+under the lip, lower its back edge into the opening, slide it back (+Y) onto
+the screw holes (its edge stays LIP_OVER under the lip), and screw the three
+corners.
+
+Thickness (R18)
+---------------
+No body is a solid lump: ``mean_thickness`` (2 V / A) of a shell of uniform
+thickness t is t (the two faces share the volume), and the bodies' bosses,
+ledges and ribs lift it a little (lid 1.09 x wall, base 1.00).  A solid
+region of any size lifts it a lot: the lid with its front band left solid
+scores 2.71 x wall.  ``MAX_MEAN_THICKNESS`` = 1.25 x wall sits between.
 
 Bed
 ---
@@ -124,6 +152,21 @@ GROOVE_D = 1.0
 RIDGE_H = 0.6
 #: The groove's end (the stop) stays this far in from the left wall.
 DETENT_MARGIN = 3.0
+#: Pad on the front wall's outer face behind the detent groove, so the wall
+#: there is still ``wall`` thick (GROOVE_D thick, PAD_MARGIN beyond the
+#: groove, 45 degree top and bottom).  It goes outside because the inner face
+#: is the drawer's running face (FIT from the drawer's side).
+PAD_T = GROOVE_D
+PAD_MARGIN = 3.0
+#: Bezel lip (R17) at an opening corner without a bezel screw: LIP_T thick,
+#: FIT in front of the bezel (screen side), overlapping it LIP_OVER, LIP_LEN
+#: along the edge, rooted LIP_ROOT into the lid's face beyond the undercut.
+#: The undercut slot takes the bezel's edge BEZEL_SLIDE in under the lip.
+LIP_T = 1.2
+LIP_OVER = 2.5
+LIP_LEN = 30.0
+LIP_ROOT = 3.0
+BEZEL_SLIDE = LIP_OVER + FIT
 #: Split joints: a block JOINT_B across the wall, JOINT_L each side of the
 #: plane; floor blocks JOINT_H tall, hanging (under-deck, under the lid's back
 #: plate) blocks JOINT_HANG tall with a 45 degree underside.  Steel dowels
@@ -362,6 +405,11 @@ def _tub(lay: Layout) -> tuple[cq.Solid, tuple[HeatSet, ...]]:
     bp = lay.boost_pocket
     adds.append(_box(w, bp.y1, w, bp.x1 + FENCE_T, bp.y1 + FENCE_T, w + FENCE_H))
     adds.append(_box(bp.x1, bp.y0, w, bp.x1 + FENCE_T, bp.y1 + FENCE_T, w + FENCE_H))
+    # pad outside the detent groove: the wall keeps ``wall`` behind it
+    zb, zt = det["bz0"] - FIT - PAD_MARGIN, det["bz1"] + FIT + PAD_MARGIN
+    adds.append(_prism_x([(0.0, zb - PAD_T), (-PAD_T, zb), (-PAD_T, zt), (0.0, zt + PAD_T),
+                          (0.1, zt + PAD_T), (0.1, zb - PAD_T)],
+                         det["g0"] - PAD_MARGIN, det["g1"] + PAD_MARGIN))
     tub = _fuse(shell, *adds)
 
     base_ch, _ = channel_parts(lay)
@@ -487,15 +535,66 @@ def _lid(lay: Layout) -> tuple[cq.Solid, tuple[HeatSet, ...]]:
         adds.append(_box(min(cx, ex), min(cy, ey), INSERT_MATERIAL, max(cx, ex), max(cy, ey),
                          p.z1))
         heatsets.append(HeatSet((x, y, INSERT_MATERIAL), (0.0, 0.0, 1.0), "bezel screw"))
+    adds += [_box(*b) for b in lip_boxes(lay)]
     body = _fuse(body, *adds)
     _, ch = channel_parts(lay)
+    y_slot = oy0 - BEZEL_SLIDE
     body = _cut(body, _box(ch.x0, ch.y0, -1.0, ch.x1, ch.y1 + 1.0, ch.z1),
-                *H.knuckle_relief(lay, (0.0, 0.0)), *(_heatset_hole(h) for h in heatsets))
+                *H.knuckle_relief(lay, (0.0, 0.0)), *(_heatset_hole(h) for h in heatsets),
+                # the undercut the bezel's front edge slides into, under the lip
+                _box(ox0, y_slot, -FIT, ox1, oy0, INSERT_MATERIAL + FIT),
+                # ... and FIT between each lip and the bezel's face
+                *(_box(x0 - 1.0, y_slot, -FIT, x1 + 1.0, y1 + 1.0, 0.0)
+                  for x0, _, _, x1, y1, _ in lip_boxes(lay)),
+                # R18: the band in front of the opening is a closed shell
+                _bx(front_cavity(lay)))
     return _one(body, "lid"), tuple(heatsets)
+
+
+def lip_boxes(lay: Layout) -> tuple[tuple[float, ...], ...]:
+    """(x0, y0, z0, x1, y1, z1) of each bezel lip, closed lid frame, before
+    the undercut is cut from it: one at each corner of the opening that has no
+    bezel screw.  Only the opening's front edge (lid y0) may take one -- the
+    hinge-end edge has the hinge wall behind it, too thin for the undercut."""
+    ox0, oy0, ox1, oy1 = I.lid_opening(lay)
+    screws = I.bezel_screws(lay)
+    near = 2 * I.BEZEL_SCREW_INSET
+    out = []
+    for cx in (ox0, ox1):
+        for cy in (oy0, oy1):
+            if any(abs(x - cx) <= near and abs(y - cy) <= near for x, y in screws):
+                continue
+            if cy != oy0:
+                raise ValueError(f"opening corner ({cx:.2f}, {cy:.2f}) has neither a bezel "
+                                 "screw nor room for a lip")
+            x0 = ox0 + FIT if cx == ox0 else ox1 - FIT - LIP_LEN
+            out.append((x0, oy0 - BEZEL_SLIDE - LIP_ROOT, -(FIT + LIP_T), x0 + LIP_LEN,
+                        oy0 + FIT + LIP_OVER, 0.0))
+    return tuple(out)
+
+
+def front_cavity(lay: Layout) -> Box:
+    """The hollow in the lid's band in front of the opening (R18), closed
+    lid frame: ``wall`` from the outside faces and from the bezel undercut."""
+    o, w = lay.lid_outer, lay.wall
+    _, oy0, _, _ = I.lid_opening(lay)
+    return Box(o.x0 + w, o.y0 + w, w, o.x1 - w, oy0 - BEZEL_SLIDE - w, lay.lid_pocket.z1,
+               "lid front band cavity")
 
 
 def lid(lay: Layout) -> cq.Solid:
     return _cached("lid", lay, lambda: _lid(lay))[0]
+
+
+# --- thickness ---------------------------------------------------------------------
+
+#: Bound on ``mean_thickness`` / wall for the bodies (see the module docstring).
+MAX_MEAN_THICKNESS = 1.25
+
+
+def mean_thickness(solid: cq.Shape) -> float:
+    """2 V / A: a shell's thickness; a solid lump's is much more."""
+    return 2 * solid.Volume() / solid.Area()
 
 
 # --- print orientation and the bed ------------------------------------------------------
@@ -821,7 +920,10 @@ def split_lid(lay: Layout, bed=PRINT_BED) -> tuple[dict[str, Printed], Split | N
     screws are reached through pockets from the screen side (under the bezel
     in the gutters, open beside the pocket otherwise)."""
     solid, hs = _cached("lid", lay, lambda: _lid(lay))
-    note = ("Lid: print on its back (screen side up), no supports. Heat-set M3 inserts: ")
+    note = ("Lid: print on its back (screen side up), no supports; the front band is "
+            "hollow, its screen-side skin bridges the cavity "
+            f"({front_cavity(lay).size[1]:.1f} mm). Fit the bezel's lip corner first "
+            "(see body.py). Heat-set M3 inserts: ")
     x, y = _footprint(solid)
     if x <= bed[0] + 1e-6 and y <= bed[1] + 1e-6:
         return {"lid": _printed("lid", solid, note + _count(hs), hs)}, None
@@ -866,10 +968,10 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
     parts["hinge-base"] = _printed("hinge-base", H.hinge_base_knuckles(lay).val(), (
         f"Hinge, base half, with the stop shelf. M3 x {H.hinge_bolt_length(lay)} bolt + "
         "nyloc per knuckle group; leaf screws M3 into the base's heat-set inserts. "
-        "Supports under the knuckles."))
+        "Prints standing on its leaf's 3 mm edge: use a brim. Supports under the knuckles."))
     parts["hinge-lid"] = _printed("hinge-lid", H.hinge_lid_knuckles(lay).val(), (
-        "Hinge, lid half. Leaf screws M3 into the lid's heat-set inserts. Supports under "
-        "the knuckles."))
+        "Hinge, lid half. Leaf screws M3 into the lid's heat-set inserts. Prints standing "
+        "on its leaf's 3 mm edge: use a brim. Supports under the knuckles."))
     for k, m in MONITORS.items():
         parts[f"bezel-{k}"] = _printed("bezel", I.monitor_bezel(m, lay).val(), (
             f"Bezel for {m.title}: print flat. Screwed to the lid's inserts by "

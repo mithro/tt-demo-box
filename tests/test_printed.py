@@ -6,6 +6,7 @@ import math
 import cadquery as cq
 import pytest
 
+from demobox import checks as C
 from demobox import layout as L
 from demobox.geom import BedOverflow
 from demobox.parts.batteries import BATTERIES
@@ -66,7 +67,7 @@ def test_print_orientation_puts_a_face_on_the_bed(parts):
     o = L.layout(2.4).outer
     assert B.posed(parts["base"]).BoundingBox().zlen == pytest.approx(o.size[2])   # floor down
     assert B.posed(parts["lid"]).BoundingBox().zlen == pytest.approx(
-        L.layout(2.4).lid_outer.size[2])                                          # back down
+        L.layout(2.4).lid_outer.size[2] + L.FIT + B.LIP_T)     # back down; the lip is proud
     lid = B.posed(parts["lid"])
     # back plate down: the pocket opens upwards, so its centre is empty high up
     bb = lid.BoundingBox()
@@ -85,7 +86,7 @@ def test_oversized_part_raises_bed_overflow_naming_part_and_size(lay):
 
 def test_unsplittable_body_raises_bed_overflow(lay):
     """Halves that still do not fit are a BedOverflow, not an unprintable STL."""
-    with pytest.raises(BedOverflow, match=r"base 214\.50 x 209\.25 mm"):
+    with pytest.raises(BedOverflow, match=r"base 214\.50 x 210\.25 mm"):
         B.split_base(lay, bed=(100.0, 220.0))
 
 
@@ -294,7 +295,16 @@ def test_assembly_each_bank(key):
 def test_assembly_lid_turns_about_the_axis(lay):
     closed = dict((n, s) for n, s, _ in B.assembly("printed", 0.0, 0.0))
     opened = dict((n, s) for n, s, _ in B.assembly("printed", L.LID_OPEN_DEG, 0.0))
-    assert closed["lid"].BoundingBox().zmin == pytest.approx(lay.outer.z1)
+    # the lid's face rests on the base's rim; only the bezel lip dips inside it
+    assert closed["lid"].BoundingBox().zmin == pytest.approx(lay.outer.z1 - L.FIT - B.LIP_T)
+    hy, hz = lay.hinge_axis
+    below = cq.Solid.makeBox(400, 400, lay.outer.z1 + 100, cq.Vector(-100, -100, -100))
+    dip = closed["lid"].intersect(below)
+    assert dip.Volume() > 0
+    for x0, y0, z0, x1, y1, z1 in B.lip_boxes(lay):
+        dip = dip.cut(cq.Solid.makeBox(x1 - x0, y1 - y0, z1 - z0,
+                                       cq.Vector(x0, y0 + hy, z0 + hz)))
+    assert dip.Volume() <= 1e-6
     assert opened["lid"].BoundingBox().zmax > lay.outer.z1 + 150.0
     assert closed["base"].BoundingBox().xlen == opened["base"].BoundingBox().xlen
 
@@ -315,3 +325,74 @@ def test_over_bed_lid_splits_with_joints(lay):
         assert bb.xlen <= 210.0 + 1e-6 and bb.ylen <= 220.0 + 1e-6, name
     best = B.section_area(B.lid(lay), "x", info.at)
     assert all(best <= B.section_area(B.lid(lay), "x", s) + 1e-6 for s in info.candidates)
+
+
+# --- R17: bezel lip; R18: no solid lumps; detent pad ---------------------------------
+
+def test_bezel_front_left_corner_is_held_by_a_lip(lay):
+    """R17: lid material in front of (screen side, -Z) the corner without a
+    screw, FIT clear of the bezel, and the bezel can slide in under it."""
+    lid = B.lid(lay)
+    x0, y0, x1, _ = I.lid_opening(lay)
+    corners = [(x, y0) for x in (x0, x1)
+               if not any(abs(sx - x) <= 2 * I.BEZEL_SCREW_INSET
+                          and abs(sy - y0) <= 2 * I.BEZEL_SCREW_INSET
+                          for sx, sy in I.bezel_screws(lay))]
+    assert corners == [(x0, y0)]                  # the pocket's front-left corner
+    assert len(B.lip_boxes(lay)) == 1
+    bx, by = x0 + L.FIT + 1.0, y0 + L.FIT + 1.0   # just inside the bezel's corner
+    assert _inside(lid, (bx, by, -(L.FIT + B.LIP_T / 2)))      # the lip, in front
+    assert not _inside(lid, (bx, by, -L.FIT / 2))              # FIT clear of the bezel
+    for m in MONITORS.values():
+        bezel = I.monitor_bezel(m, lay).val()
+        assert lid.intersect(bezel).Volume() <= 1e-3
+        # fitting: slid BEZEL_SLIDE forward into the undercut, it is clear too,
+        # and slid back home its edge stays LIP_OVER under the lip
+        slid = bezel.translate(cq.Vector(0, -B.BEZEL_SLIDE, 0))
+        assert lid.intersect(slid).Volume() <= 1e-3
+        lip_y1 = B.lip_boxes(lay)[0][4]
+        assert lip_y1 - bezel.BoundingBox().ymin == pytest.approx(B.LIP_OVER)
+
+
+def test_lip_covers_no_window(lay):
+    for m in MONITORS.values():
+        wx0, wy0, wx1, wy1 = I._panel_rect(m, lay, C.monitor_window(m))
+        for x0, y0, _, x1, y1, _ in B.lip_boxes(lay):
+            assert x1 <= wx0 or x0 >= wx1 or y1 <= wy0 or y0 >= wy1, m.key
+
+
+def test_lip_clears_the_base_as_the_lid_swings(lay):
+    """The lip stands proud of the lid's face: every 10 degrees from shut to
+    the stop it stays clear of the base tub (and inside its walls when shut)."""
+    tub, lid = B.base_tub(lay), B.lid(lay)
+    for a in range(0, int(L.LID_OPEN_DEG) + 1, 10):
+        assert tub.intersect(lid.moved(lay.lid_location(float(a)))).Volume() <= 1e-3, a
+
+
+def test_lid_front_band_is_hollow(lay):
+    """R18, direct: the band in front of the opening holds no more plastic
+    than its shell of ``wall``."""
+    lid, c, o = B.lid(lay), B.front_cavity(lay), lay.lid_outer
+    band = cq.Solid.makeBox(o.size[0], c.y1 + lay.wall - o.y0, o.size[2],
+                            cq.Vector(o.x0, o.y0, o.z0))
+    shell = band.Volume() - c.size[0] * c.size[1] * c.size[2]
+    assert lid.intersect(band).Volume() <= shell + 1.0
+
+
+def test_bodies_have_no_solid_lumps(lay):
+    """R18, every body: mean thickness 2V/A at most MAX_MEAN_THICKNESS x wall
+    (justified in body's docstring)."""
+    for name, f in (("base", B.base_tub), ("deck", B.deck), ("drawer", B.drawer),
+                    ("lid", B.lid)):
+        t = B.mean_thickness(f(lay)) / lay.wall
+        assert t <= B.MAX_MEAN_THICKNESS, (name, t)
+
+
+def test_detent_groove_leaves_a_full_wall(lay):
+    """The front wall behind the detent groove is at least ``wall`` thick."""
+    tub = B.base_tub(lay)
+    det = B._detent(lay)
+    x, z = (det["g0"] + det["g1"]) / 2, (det["bz0"] + det["bz1"]) / 2
+    groove_bottom = lay.wall - B.GROOVE_D
+    assert not _inside(tub, (x, groove_bottom + 0.05, z))
+    assert _inside(tub, (x, groove_bottom - lay.wall + 0.05, z))
