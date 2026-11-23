@@ -130,7 +130,7 @@ def test_split_joints_have_heatset_screws_and_pins(split):
         px, py, pz = j.pin
         for piece, x in ((left, px - 1.0), (right, px + 1.0)):
             assert not _inside(piece, (x, py, pz))
-            assert _inside(piece, (x, py + B.PIN_HOLE_D / 2 + 0.2, pz))
+            assert _inside(piece, (x, py + B.DOWEL_HOLE_D / 2 + 0.2, pz))
     assert any(h.what.startswith("joint") for h in pieces["base-right"].heatsets)
 
 

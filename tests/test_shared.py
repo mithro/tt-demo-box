@@ -406,6 +406,31 @@ def test_locating_pin_is_one_valid_solid_of_peg_dia(lay):
 
 
 
+@pytest.mark.parametrize("route", sorted(L.ROUTES))
+def test_peg_holes_clear_the_pin(route):
+    """The MT1 boss's pin holes are PEG_HOLE_D, a slip fit over the PEG_DIA
+    pin, in both routes: a ring just outside the pin is all air."""
+    assert L.PEG_HOLE_D > L.PEG_DIA
+    lay = L.layout(L.ROUTES[route])
+    if route == "printed":
+        from demobox.printed import body as PB
+        boss = PB.deck(lay)
+    else:
+        from demobox.laser import fittings as F
+        boss = F._mounts(lay)["mt1-boss"][1]
+    b = lay.mt1_boss
+    for p in lay.pegs.values():
+        ring = cq.Solid.makeCylinder(L.PEG_DIA / 2 + 0.05, b.z1 - b.z0 - 0.2,
+                                     cq.Vector(p.cx, p.cy, b.z0 + 0.1)).cut(
+            cq.Solid.makeCylinder(L.PEG_DIA / 2, b.z1 - b.z0, cq.Vector(p.cx, p.cy, b.z0)))
+        assert _common(boss, ring) <= 1e-6, (route, p.what)
+        wall = cq.Solid.makeCylinder(L.PEG_HOLE_D / 2 + 0.05, b.z1 - b.z0 - 0.2,
+                                     cq.Vector(p.cx, p.cy, b.z0 + 0.1)).cut(
+            cq.Solid.makeCylinder(L.PEG_HOLE_D / 2 + 0.01, b.z1 - b.z0,
+                                  cq.Vector(p.cx, p.cy, b.z0)))
+        assert _common(boss, wall) > 0.0, (route, p.what)
+
+
 def test_verify_reports_the_driver_placeholders(capsys):
     import verify
     assert verify.main() == 0

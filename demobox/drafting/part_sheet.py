@@ -31,8 +31,8 @@ from tools.drafting import dims, style
 from demobox.drafting import names
 from demobox.drafting import sheetkit as K
 from demobox.drafting.hlr import project, to_view, view_bbox
-from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, PEG_DIA, PEG_HEIGHT, ROUTES,
-                            layout)
+from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, PEG_DIA, PEG_HEIGHT, PEG_HOLE_D,
+                            ROUTES, layout)
 from demobox.parts.batteries import BATTERIES
 from demobox.printed import body as B
 from demobox.shared import hinge as H
@@ -300,7 +300,7 @@ def deck_part(defn) -> Part:
     b = lay.mt1_boss
     for k, pg in lay.pegs.items():
         x, y, _ = P((pg.cx, pg.cy, 0))
-        rows.append([f"MT1 boss, peg hole {k}", F(x), F(y), f"D{F(PEG_DIA)}", F(b.z1 - z0)])
+        rows.append([f"MT1 boss, peg hole {k}", F(x), F(y), f"D{F(PEG_HOLE_D)}", F(b.z1 - z0)])
     for c in lay.supports:
         x, y, _ = P((c.cx, c.cy, 0))
         rows.append([c.what.replace("edge support", "Support"), F(x), F(y),

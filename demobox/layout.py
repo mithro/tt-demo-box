@@ -107,6 +107,9 @@ STANDOFF_MIN = float(math.ceil(HEATSET_DEPTH))
 #: MT1 locating peg: into the board's 3.2 mm hole, below the PCB's top face.
 PEG_DIA = 3.0
 PEG_HEIGHT = 1.2
+#: The boss's hole for the loose pin: PEG_DIA plus a slip clearance, so the
+#: pin pushes in by hand and comes out again for the other revision.
+PEG_HOLE_D = PEG_DIA + 0.2
 #: Finger hole in the drawer face, around the bank's end button.
 FINGER_HOLE_D = 20.0
 
@@ -360,7 +363,7 @@ def layout(wall: float) -> Layout:
     #  * ``pegs``: a locating peg per revision rising from the boss into that
     #    revision's MT1 hole.  Each revision's peg sits under the other
     #    revision's PCB, so a fixed pair would lift either board: the boss has a
-    #    PEG_DIA hole at each MT1 and only the fitted revision's peg (a loose
+    #    PEG_HOLE_D hole at each MT1 and only the fitted revision's peg (a loose
     #    printed pin) is pushed in;
     #  * ``supports``: plain pads at the other two corners of the hole
     #    rectangle (clear of J1), so two fixings do not let the board rock.

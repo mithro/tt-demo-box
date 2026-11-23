@@ -41,7 +41,7 @@ Deck (``deck``)
 The plate FIT inside the walls, with the USB-C slot, the hinge channel's
 footprint (so the boost cable's DC lead comes up from the converter below),
 notches round the leaf-screw bosses, the MT2 standoff with its heat-set
-insert, the MT1 boss with a PEG_DIA hole per revision for the loose pin, and
+insert, the MT1 boss with a PEG_HOLE_D hole per revision for the loose pin, and
 the plain supports.
 
 Drawer (``drawer``)
@@ -108,7 +108,7 @@ import cadquery as cq
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.checks import MIN_BOSS_WALL, panel_in_lid
 from demobox.geom import BedOverflow, Box
-from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, INSERT_MATERIAL, PEG_DIA,
+from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, INSERT_MATERIAL, PEG_HOLE_D,
                             PRINT_BED, ROUTES, Layout, layout)
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.board import board_spec
@@ -178,13 +178,13 @@ OPENING_PITCH = 10.0
 #: Split joints: a block JOINT_B across the wall, JOINT_L each side of the
 #: plane; floor blocks JOINT_H tall, hanging (under-deck, under the lid's back
 #: plate) blocks JOINT_HANG tall with a 45 degree underside.  Steel dowels
-#: PIN_D x 2 PIN_DEPTH in PIN_HOLE_D holes.
+#: PIN_D x 2 PIN_DEPTH in DOWEL_HOLE_D holes.
 JOINT_B = 10.0
 JOINT_L = 8.0
 JOINT_H = 18.0
 JOINT_HANG = 23.0
 PIN_D = 3.0
-PIN_HOLE_D = 3.2
+DOWEL_HOLE_D = 3.2
 PIN_DEPTH = 5.0
 SCREW_CLEAR_D = m3.CLEARANCE_D
 #: Head access pocket behind a lid joint screw (length along the screw).
@@ -504,7 +504,7 @@ def _deck(lay: Layout) -> tuple[cq.Solid, tuple[HeatSet, ...]]:
                top + 1.0) for x, _ in H.base_leaf_screws(lay)),
         *(_cyl((x, y, deck_bot - 1.0), (0, 0, 1), SCREW_CLEAR_D / 2, w + 2.0)
           for x, y in _deck_corners(lay)),
-        *(_cyl((p.cx, p.cy, b.z0), (0, 0, 1), PEG_DIA / 2, b.z1 - b.z0 + 1.0)
+        *(_cyl((p.cx, p.cy, b.z0), (0, 0, 1), PEG_HOLE_D / 2, b.z1 - b.z0 + 1.0)
           for p in lay.pegs.values()),
         *(_heatset_hole(h) for h in heatsets),
     ]
@@ -841,7 +841,7 @@ def _cut_pieces(name, solid, heatsets, axis, at, sites, access_z=None):
         for piece_cuts, direc in ((low_cuts, nd), (high_cuts, d)):
             # from 0.5 outside the piece's cut face to PIN_DEPTH into it
             piece_cuts.append(_cyl(_map(axis, at - 0.5 * direc["xy".index(axis)], pa, pz),
-                                   direc, PIN_HOLE_D / 2, PIN_DEPTH + 0.5))
+                                   direc, DOWEL_HOLE_D / 2, PIN_DEPTH + 0.5))
         if access_z is not None:
             r = m3.HEAD_R + FIT
             p0 = _map(axis, at - JOINT_L - ACCESS_L, sa - r, access_z)

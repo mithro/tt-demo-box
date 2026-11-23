@@ -16,7 +16,7 @@ route puts into heat-set inserts go into M3 square nuts in pockets in them:
   through ``standoff-mt2`` and the deck into its nut;
 * ``standoff-mt2``, ``deck-support`` (2) and ``mt1-boss``: the board's mounts
   (``Layout.standoffs``/``supports``/``mt1_boss``), glued on the deck's
-  engraved outlines; the boss has a PEG_DIA hole per revision for the loose
+  engraved outlines; the boss has a PEG_HOLE_D hole per revision for the loose
   ``mt1-pin``;
 * ``magnet-block`` (2): the latch, one in the drawer's front corner (magnet
   up), one over it in the base's front corner (the same part upside down).
@@ -34,7 +34,7 @@ import cadquery as cq
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.geom import Box
-from demobox.layout import FIT, INSERT_MATERIAL, PEG_DIA, PRINT_BED, ROUTES, Layout, layout
+from demobox.layout import FIT, INSERT_MATERIAL, PEG_HOLE_D, PRINT_BED, ROUTES, Layout, layout
 from demobox.laser import joints as J
 from demobox.laser import panels as P
 from demobox.parts.batteries import BATTERIES
@@ -159,7 +159,7 @@ def _mounts(lay: Layout) -> dict:
     boss = (cq.Workplane("XY", origin=((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, b.z0))
             .slot2D(length + 2 * b.r, 2 * b.r, angle).extrude(b.z1 - b.z0).val())
     for pg in lay.pegs.values():
-        boss = boss.cut(_cyl((pg.cx, pg.cy, b.z0 - 1), (0, 0, 1), PEG_DIA / 2, b.z1 - b.z0 + 2))
+        boss = boss.cut(_cyl((pg.cx, pg.cy, b.z0 - 1), (0, 0, 1), PEG_HOLE_D / 2, b.z1 - b.z0 + 2))
     out["mt1-boss"] = ("mt1-boss", boss.clean())
     return out
 
