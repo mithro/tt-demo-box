@@ -64,8 +64,8 @@ def write_assembly(path: Path) -> None:
     reproducible.normalise_step(path, name=path.stem)
 
 
-def main(out: Path = out) -> int:
-    lay = layout(RoutES["printed"])
+def main(out: Path = OUT) -> int:
+    lay = layout(ROUTES["printed"])
     parts = body.printed_parts(lay)          # raises BedOverflow before writing
     out.mkdir(parents=True, exist_ok=True)
     keep = {f"{n}.{ext}" for n in parts for ext in ("step", "stl")} | {"assembly.step"}
