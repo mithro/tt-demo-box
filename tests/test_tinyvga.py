@@ -55,3 +55,12 @@ def test_geometry_sanity():
     assert straight.y0 < angled.y0 < t.de15.y0   # keepouts continue outward from the face
     assert straight.y1 == angled.y1 == t.de15.y0
     assert straight.size[1] - angled.size[1] == pytest.approx(20.0)
+
+
+def test_reach_from_host_edge_is_socket_overhang_plus_pcb_to_face():
+    from demobox.parts.board import board_spec
+    for key in ("v3.2", "v3.3"):
+        pmod = board_spec(key).pmods[2]
+        expect = -pmod.body_y0 + (-tinyvga.TINYVGA.de15.y0)
+        assert tinyvga.reach_from_host_edge(key) == pytest.approx(expect)
+        assert 55 < expect < 65   # ~59.8 mm; photo estimate ~53 +/- 5
