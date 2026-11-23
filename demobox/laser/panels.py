@@ -471,10 +471,11 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
         "Drawer front side.")
     add("drawer-side-back", "drawer", "y", Box(d.x0, d.y1 - t, d.z0, d.x1, d.y1, d.z1), 3,
         "Drawer back side.")
-    fh = lay.drawer_face_hole
-    r = (fh.y1 - fh.y0) / 2
-    hole = LineString([((fh.y0 + fh.y1) / 2, fh.z0 + r), ((fh.y0 + fh.y1) / 2, fh.z1 - r)])
-    face.polys.append(list(hole.buffer(r, 16).exterior.coords)[:-1])
+    fh = lay.drawer_face_hole              # a Stadium along X: centres (y, z) = (u, v)
+    if fh.axis != face.normal:
+        raise ValueError(f"{fh.what} runs along {fh.axis}, the face's normal is {face.normal}")
+    hole = LineString([(fh.x0, fh.y0), (fh.x1, fh.y1)]).buffer(fh.r, 16)
+    face.polys.append(list(hole.exterior.coords)[:-1])
     dback.adds.append(ear)
 
     # --- lid ----------------------------------------------------------------------------

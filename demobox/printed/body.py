@@ -107,7 +107,7 @@ import cadquery as cq
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.checks import MIN_BOSS_WALL, panel_in_lid
-from demobox.geom import BedOverflow, Box
+from demobox.geom import BedOverflow, Box, Stadium
 from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, INSERT_MATERIAL, PEG_HOLE_D,
                             PRINT_BED, ROUTES, Layout, layout)
 from demobox.parts.batteries import BATTERIES
@@ -523,8 +523,7 @@ def _drawer(lay: Layout) -> cq.Solid:
     body = _cut(_bx(d), _box(lay.cable_bay.x0, lay.bay.y0, lay.bay.z0, lay.bay.x1, lay.bay.y1,
                              d.z1 + 1.0))
     body = _fuse(body, _prism_x(_drawer_face_profile(lay), d.x0, d.x0 + w))
-    fh = lay.drawer_face_hole
-    cuts: list[cq.Shape] = [_box(fh.x0 - 1.0, fh.y0, fh.z0, fh.x1 + 1.0, fh.y1, fh.z1)]
+    cuts: list[cq.Shape] = [finger_slot(lay.drawer_face_hole)]
     for yc in _rails(lay):
         half = RAIL_W / 2 + FIT
         cuts.append(_box(d.x0 - 1.0, yc - half, d.z0 - 1.0, d.x1 + 1.0, yc + half,
@@ -542,6 +541,16 @@ def _drawer(lay: Layout) -> cq.Solid:
     bump = _prism_z([(bx0, d.y0 + 0.1), (bx0, tip), (bx1, tip), (bx1 + BUMP_H, d.y0),
                      (bx1 + BUMP_H, d.y0 + 0.1)], det["bz0"], det["bz1"])
     return _one(_fuse(body, bump), "drawer")
+
+
+def finger_slot(s: Stadium) -> cq.Solid:
+    """The drawer face's finger hole (a Stadium along X), 1 mm proud each side."""
+    if s.axis != "x":
+        raise ValueError(f"{s.what}: a finger slot runs along X, not {s.axis}")
+    length = math.hypot(s.x1 - s.x0, s.y1 - s.y0)
+    angle = math.degrees(math.atan2(s.y1 - s.y0, s.x1 - s.x0))
+    return (cq.Workplane("YZ", origin=(s.z0 - 1.0, (s.x0 + s.x1) / 2, (s.y0 + s.y1) / 2))
+            .slot2D(length + 2 * s.r, 2 * s.r, angle).extrude(s.z1 - s.z0 + 2.0).val())
 
 
 def drawer(lay: Layout) -> cq.Solid:

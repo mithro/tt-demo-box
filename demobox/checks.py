@@ -335,10 +335,11 @@ def buttons_reachable(report: Report, lay: Layout) -> None:
             z = lay.bay.z0 + v
             behind = lay.bay.x0 - out
             open_end = lay.cable_bay.x1 - travel
-            report.check(hole.y0 < y < hole.y1 and hole.z0 < z < hole.z1,
+            report.check(hole.axis == "x" and hole.covers(y, z),
                          f"{b.key}: end button under the drawer-face finger hole",
-                         f"button (y {_f(y)}, z {_f(z)}) in hole y {_f(hole.y0)}..{_f(hole.y1)}, "
-                         f"z {_f(hole.z0)}..{_f(hole.z1)}")
+                         f"button (y {_f(y)}, z {_f(z)}) in the {_f(hole.width)} x "
+                         f"{_f(hole.length)} slot (centres y, z ({_f(hole.x0)}, {_f(hole.y0)})"
+                         f" .. ({_f(hole.x1)}, {_f(hole.y1)}))")
             report.check(open_end <= out + EPS,
                          f"{b.key}: end button reachable with the drawer out",
                          f"{_f(behind)} mm behind the drawer face when shut; drawer out "

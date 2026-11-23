@@ -398,25 +398,27 @@ def drawer_part(defn) -> Part:
     fh = lay.drawer_face_hole
     det = B._detent(lay)
     rails = B._rails(lay)
-    cy, cz = (fh.y0 + fh.y1) / 2, (fh.z0 + fh.z1) / 2
+    cy, cz = (fh.x0 + fh.x1) / 2, (fh.y0 + fh.y1) / 2     # the slot (along X): (y, z)
     part = Part(defn, parts["drawer"].solid, "Printed route: slides out of the base's "
                 "left side; prints floor down", "the drawer's front-left-bottom corner "
                 "(face, front side, floor)", [], [f"{SRC_BODY}: drawer, _detent", SRC_LAYOUT],
                 MID, shift=(-d.x0, -d.y0, -d.z0),
                 captions={"front": "FRONT (DETENT SIDE)", "side": "FROM LEFT (FACE)"},
-                centres=[("side", (d.x0, cy, cz), (fh.y1 - fh.y0) / 2)])
+                centres=[("side", (d.x0, cy, cz), fh.r)])
 
     def ann(pt: Part, v):
         f, s, p = v["front"], v["side"], v["plan"]
         sd = lambda y, z: pt.V("side", (d.x0, y, z))    # noqa: E731
         fr = lambda x, z: pt.V("front", (x, d.y0, z))   # noqa: E731
         q = lambda x, y: pt.V("plan", (x, y, d.z1))     # noqa: E731
-        tip = sd(fh.y1, (fh.z0 + fh.z1) / 2 + 3.0)
+        # on the slot's edge, up and back from its upper centre
+        ey, ez = max(((fh.x0, fh.y0), (fh.x1, fh.y1)), key=lambda c: c[1])
+        tip = sd(ey + fh.r * math.sqrt(0.5), ez + fh.r * math.sqrt(0.5))
         return [
             K.Dim(s, sd(d.y0, d.z0), sd(cy, d.z0), "bottom", 0, text_side="high"),
             K.Dim(s, sd(d.y1, d.z0), sd(d.y1, cz), "left", 0),
             K.Leader(s, tip, (s.x(tip[0]) - 4.0, s.rect.y - 16.0),
-                     f"FINGER HOLE {F(fh.y1 - fh.y0)} SQ"),
+                     f"FINGER SLOT {F(fh.width)} x {F(fh.length)}"),
             # detent tongue on the front side
             K.Dim(f, fr(d.x0, det["tz0"]), fr(det["tx0"], det["tz0"]), "bottom", 0,
                   text_side="low"),

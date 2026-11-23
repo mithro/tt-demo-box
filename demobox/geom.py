@@ -62,10 +62,18 @@ class Cyl:
     what: str = ""
 
 
+#: The in-plane axes of a prism along each axis, in order.
+PLANE_OF = {"z": ("x", "y"), "x": ("y", "z"), "y": ("x", "z")}
+
+
 @dataclass(frozen=True)
 class Stadium:
-    """A stadium (slot) prism along Z: the hull of two radius-``r`` circles
-    centred at (x0, y0) and (x1, y1)."""
+    """A stadium (slot) prism along ``axis``: the hull of two radius-``r``
+    circles centred at (x0, y0) and (x1, y1), from z0 to z1 along the axis.
+
+    The field names are the Z-prism's (the default).  For another axis the
+    centres are in that axis's plane, ``PLANE_OF[axis]`` order -- (y, z) for
+    a prism along X -- and z0..z1 is the extent along the axis."""
 
     x0: float
     y0: float
@@ -75,6 +83,20 @@ class Stadium:
     z0: float
     z1: float
     what: str = ""
+    axis: str = "z"
+
+    def __post_init__(self) -> None:
+        if self.axis not in PLANE_OF:
+            raise ValueError(f"Stadium {self.what!r}: axis {self.axis!r} is not x, y or z")
+
+    @property
+    def length(self) -> float:
+        """Overall length of the slot, end to end."""
+        return ((self.x1 - self.x0) ** 2 + (self.y1 - self.y0) ** 2) ** 0.5 + 2 * self.r
+
+    @property
+    def width(self) -> float:
+        return 2 * self.r
 
     def covers(self, x: float, y: float) -> bool:
         """True when (x, y) lies inside the stadium's outline."""

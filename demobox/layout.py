@@ -110,7 +110,8 @@ PEG_HEIGHT = 1.2
 #: The boss's hole for the loose pin: PEG_DIA plus a slip clearance, so the
 #: pin pushes in by hand and comes out again for the other revision.
 PEG_HOLE_D = PEG_DIA + 0.2
-#: Finger hole in the drawer face, around the bank's end button.
+#: Finger hole in the drawer face: a slot this wide round the banks' end
+#: buttons (``Layout.drawer_face_hole``, a stadium through the face).
 FINGER_HOLE_D = 20.0
 
 # --- placeholders for part heights not in any source (UNCONFIRMED) -----------
@@ -267,6 +268,18 @@ def _base_depth(wall: float, straight: bool) -> float:
                _lid_inner_xy()[1] + 2 * wall)
 
 
+def _finger_slot(buttons: list[tuple[float, float]], wall: float) -> Stadium:
+    """The drawer face's finger hole: a FINGER_HOLE_D slot along X through the
+    face (0 .. wall), its centres the two end buttons (y, z) furthest apart.
+    Raises if a third button falls outside it."""
+    a, b = max(((p, q) for p in buttons for q in buttons), key=lambda pq: math.dist(*pq))
+    slot = Stadium(*a, *b, FINGER_HOLE_D / 2, 0.0, wall, "drawer face finger hole", axis="x")
+    for y, z in buttons:
+        if not slot.covers(y, z):
+            raise ValueError(f"end button at (y {y:.2f}, z {z:.2f}) is outside the finger slot")
+    return slot
+
+
 # --- the layout --------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -283,7 +296,7 @@ class Layout:
     usb_slot: Box
     bay: Box
     cable_bay: Box
-    drawer_face_hole: Box
+    drawer_face_hole: Stadium        # along X through the face: centres (y, z)
     drawer_out: tuple[float, float, float]
     drawer_travel: float
     boost_pocket: Box
@@ -334,10 +347,7 @@ def layout(wall: float) -> Layout:
 
     buttons = [(bay.y0 + (BAY_INSIDE[1] - b.size[1]) / 2 + b.button[1], bay.z0 + b.button[2])
                for b in BATTERIES.values() if b.button is not None and b.button[0] == "end"]
-    r = FINGER_HOLE_D / 2
-    drawer_face_hole = Box(0.0, min(y for y, _ in buttons) - r, min(z for _, z in buttons) - r,
-                           wall, max(y for y, _ in buttons) + r, max(z for _, z in buttons) + r,
-                           "drawer face finger hole")
+    drawer_face_hole = _finger_slot(buttons, wall)
 
     # --- deck: over the drawer and the USB-C cable's drop --------------------
     cavity = _USB.min_bend_r + _USB.dia      # right-angle drop turning flat
