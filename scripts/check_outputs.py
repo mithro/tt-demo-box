@@ -15,6 +15,7 @@ Run: make check-outputs
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -32,18 +33,20 @@ NOT_REBUILT = {"renders"}
 
 
 def rebuild() -> None:
-    import export_laser
-    import export_printed
+    """Each exporter in a process of its own, as ``make outputs`` runs them:
+    cadquery numbers an assembly's STEP occurrences from a counter that lives
+    in the process, so a second assembly written in the same process would
+    differ from the committed file."""
     import generate_sheets
     if WORK.exists():
         shutil.rmtree(WORK)
-    names.OUT = WORK / "sheets"          # svg_path / preview_path read this
     (WORK / "sheets" / "previews").mkdir(parents=True)
-    for step in (lambda: export_printed.main(WORK / "printed"),
-                 lambda: export_laser.main(["--out", str(WORK / "laser")]),
-                 lambda: generate_sheets.main([])):
-        if step() != 0:
-            raise SystemExit("a rebuild step failed")
+    for script, out in (("export_printed.py", "printed"), ("export_laser.py", "laser")):
+        subprocess.run([sys.executable, str(ROOT / "scripts" / script),
+                        "--out", str(WORK / out)], check=True)
+    names.OUT = WORK / "sheets"          # svg_path / preview_path read this
+    if generate_sheets.main([]) != 0:
+        raise SystemExit("generate_sheets failed")
 
 
 def files(base: Path) -> dict[str, Path]:
