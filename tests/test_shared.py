@@ -150,13 +150,25 @@ def _panel_rect_in_lid(m, lay, rect):
     return (pb.x0 + x, pb.y1 - y - h, pb.x0 + x + w, pb.y1 - y)
 
 
-def _inner_rects(wp):
+def _inner_wires(wp):
     face = wp.faces("<Z").val()
     out = []
     for wire in face.innerWires():
         bb = wire.BoundingBox()
         out.append((bb.xmin, bb.ymin, bb.xmax, bb.ymax))
     return out
+
+
+def _is_screw_hole(r, lay):
+    d = I.BEZEL_SCREW_D
+    return any(abs(r[0] - (x - d / 2)) < 1e-3 and abs(r[1] - (y - d / 2)) < 1e-3
+               and abs(r[2] - r[0] - d) < 1e-3 and abs(r[3] - r[1] - d) < 1e-3
+               for x, y in I.bezel_screws(lay))
+
+
+def _inner_rects(wp, lay):
+    """The bezel's window and cut-out outlines (the screw holes left out)."""
+    return [r for r in _inner_wires(wp) if not _is_screw_hole(r, lay)]
 
 
 def _has_rect(rects, want):
@@ -172,7 +184,7 @@ def test_bezel_is_one_valid_solid(lay, key):
 def test_bezel_window_is_the_verify_rule_window(lay, key):
     m = MONITORS[key]
     wp = I.monitor_bezel(m, lay)
-    rects = _inner_rects(wp)
+    rects = _inner_rects(wp, lay)
     want = _panel_rect_in_lid(m, lay, C.monitor_window(m))
     assert _has_rect(rects, want), (rects, want)
     w, h, _, _ = C.monitor_window(m)
@@ -182,7 +194,7 @@ def test_bezel_window_is_the_verify_rule_window(lay, key):
 @pytest.mark.parametrize("key", sorted(MONITORS))
 def test_bezel_button_cutout(lay, key):
     m = MONITORS[key]
-    rects = _inner_rects(I.monitor_bezel(m, lay))
+    rects = _inner_rects(I.monitor_bezel(m, lay), lay)
     cut = C.button_cutout(m)
     assert len(rects) == (1 if cut is None else 2)
     if cut is not None:
@@ -206,8 +218,23 @@ def test_bezel_covers_pocket_and_gutters(lay, key):
     s = I.monitor_bezel(MONITORS[key], lay).val()
     area = s.Volume() / L.INSERT_MATERIAL
     holes = sum((r[2] - r[0]) * (r[3] - r[1]) for r in _inner_rects(I.monitor_bezel(
-        MONITORS[key], lay)))
-    assert area + holes == pytest.approx((bb.xmax - bb.xmin) * (bb.ymax - bb.ymin))
+        MONITORS[key], lay), lay))
+    screws = len(I.bezel_screws(lay)) * math.pi * (I.BEZEL_SCREW_D / 2) ** 2
+    assert area + holes + screws == pytest.approx((bb.xmax - bb.xmin) * (bb.ymax - bb.ymin),
+                                                  rel=1e-5)
+
+
+@pytest.mark.parametrize("key", sorted(MONITORS))
+def test_bezel_has_its_screw_holes(lay, key):
+    """R15: a clearance hole at each bezel_screws corner, and every corner of
+    the opening that is a cable-gutter corner has one."""
+    wires = _inner_wires(I.monitor_bezel(MONITORS[key], lay))
+    screws = I.bezel_screws(lay)
+    assert len(screws) >= 3
+    assert sum(_is_screw_hole(r, lay) for r in wires) == len(screws)
+    p = lay.lid_pocket
+    for x, y in screws:   # never in the pocket, where the panel is
+        assert not (p.x0 <= x <= p.x1 and p.y0 <= y <= p.y1)
 
 
 # --- monitor retainer ------------------------------------------------------------------

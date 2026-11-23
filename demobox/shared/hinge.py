@@ -139,6 +139,30 @@ def _shelf_bottom_v() -> float:
     return _stop_plane_v(STOP_REACH) - STOP_T - STOP_REACH
 
 
+def _base_hole_v() -> float:
+    """v of the base leaf's screw holes: below the stop shelf, clear of its
+    underside by a screw head and 2 FIT."""
+    return _shelf_bottom_v() - SCREW_HEAD_R - 2 * FIT
+
+
+def base_leaf_screws(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """(x, z) of the base leaf's screws, base frame: one per base knuckle,
+    through the leaf along Y into the base's back face (Y = hinge y)."""
+    hz = lay.hinge_axis[1]
+    return tuple(((k0 + k1) / 2, hz + _base_hole_v()) for k0, k1 in _knuckles(lay, "base"))
+
+
+def lid_leaf_screws(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """(x, z) of the lid leaf's screws, lid frame (closed): one per lid
+    knuckle, through the leaf along Y into the lid's hinge-end face (y = 0),
+    half-way between the shelf's reach (plus a head and FIT) and the lid top."""
+    top = lay.lid_outer.z1
+    z = (_stop_reach_z() + SCREW_HEAD_R + FIT + top) / 2
+    if top - z < SCREW_HEAD_R + FIT:
+        raise ValueError(f"lid {top} mm deep leaves no room for the hinge leaf screws")
+    return tuple(((k0 + k1) / 2, z) for k0, k1 in _knuckles(lay, "lid"))
+
+
 def hinge_base_knuckles(lay: Layout) -> cq.Workplane:
     """The base half: leaf down the base's back face, stop shelf, and the two
     outer knuckles of each group.  Base frame."""
@@ -146,7 +170,7 @@ def hinge_base_knuckles(lay: Layout) -> cq.Workplane:
     o = (0.0, hy, hz)
     groups = hinge_groups(lay)
     xa, xb = groups[0][0], groups[-1][1]
-    hole_v = _shelf_bottom_v() - SCREW_HEAD_R - 2 * FIT
+    hole_v = _base_hole_v()
     depth = -hole_v + SCREW_HOLE_D / 2 + 2 * LEAF_T          # leaf bottom below the axis
 
     part = _prism(o, xa, xb, _rect(0.0, -depth, LEAF_T, -_CLEAR_R))
@@ -159,8 +183,8 @@ def hinge_base_knuckles(lay: Layout) -> cq.Workplane:
         part = part.union(_prism(o, k0, k1, r=KNUCKLE_R))
         part = part.union(_prism(o, k0, k1, _rect(0.0, -_CLEAR_R - 0.1, LEAF_T, 0.0)))
     part = part.cut(_axis_hole(o, xa, xb, PIN_HOLE_D))
-    for k0, k1 in _knuckles(lay, "base"):
-        hole = (cq.Workplane("XZ", origin=((k0 + k1) / 2, 0.0, hz + hole_v))
+    for x, z in base_leaf_screws(lay):
+        hole = (cq.Workplane("XZ", origin=(x, 0.0, z))
                 .circle(SCREW_HOLE_D / 2).extrude(-(hy + LEAF_T + 1.0)))
         part = part.cut(hole)
     return part
@@ -173,17 +197,14 @@ def hinge_lid_knuckles(lay: Layout) -> cq.Workplane:
     groups = hinge_groups(lay)
     xa, xb = groups[0][0], groups[-1][1]
     top = lay.lid_outer.z1
-    hole_z = (_stop_reach_z() + SCREW_HEAD_R + FIT + top) / 2
-    if top - hole_z < SCREW_HEAD_R + FIT:
-        raise ValueError(f"lid {top} mm deep leaves no room for the hinge leaf screws")
 
     part = _prism(o, xa, xb, _rect(0.0, _CLEAR_R, LEAF_T, top))
     for k0, k1 in _knuckles(lay, "lid"):
         part = part.union(_prism(o, k0, k1, r=KNUCKLE_R))
         part = part.union(_prism(o, k0, k1, _rect(0.0, 0.0, LEAF_T, _CLEAR_R + 0.1)))
     part = part.cut(_axis_hole(o, xa, xb, PIN_HOLE_D))
-    for k0, k1 in _knuckles(lay, "lid"):
-        hole = (cq.Workplane("XZ", origin=((k0 + k1) / 2, 0.0, hole_z))
+    for x, z in lid_leaf_screws(lay):
+        hole = (cq.Workplane("XZ", origin=(x, 0.0, z))
                 .circle(SCREW_HOLE_D / 2).extrude(-(LEAF_T + 1.0)))
         part = part.cut(hole.translate((0, -1.0, 0)))
     return part
