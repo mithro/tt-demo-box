@@ -33,7 +33,7 @@ and `battery-survey.md` beside it). Read it first.
   `confirmed: bool`. `confirmed=False` figures are reported by `verify.py` as UNCONFIRMED, never
   silently trusted, never a failure on their own.
 - Spec values, verbatim: lid open angle **100 degrees** (just past 90); battery bay **158 x 82 x
-  34 mm** inside plus **35 mm** cable bay; lid pocket **~130 x 100 mm**; boards **v3.2 (85 x 80)
+  34 mm** inside plus **35 mm** cable bay; lid pocket **~185 x 120 mm** (Tim's 7" is the main monitor); boards **v3.2 (85 x 80)
   and v3.3 (85 x 85)** only; print bed **220 x 220 mm**; laser bed **300 x 200 mm**, **3 mm
   plywood**, M3 T-slot screws with captured nuts; no monitors with rear-facing sockets; all power
   at 5 V; no custom electronics; off-the-shelf cables, slim VGA **<= 0.5 m**.
@@ -165,7 +165,7 @@ and `battery-survey.md` beside it). Read it first.
   (108.0, 64.8)`; no monitor has `connector_exit == "rear"` (spec excludes them);
   `BATTERIES["iniu-p512"].size == (104, 70, 29)`, `["ugreen-pb505"].size == (116.22, 70.55,
   30.03)`, `["xiaomi-pb2020"].size == (128, 73, 32)`, `["anker-zolo-20k"].size == (119.9, 73.4,
-  31.5)`; every entry has at least one `Source`; `MONITORS["taobao-tim"].confirmed is False`.
+  31.5)`; every entry has at least one `Source`; `MONITORS["taobao-tim"]` is the 7" car monitor with `panel` body 182 x 118 (the larger photo reading; listing 170 x 113 in its sources), window (159, 86), `connector_exit == "pigtail"` from its button-side long edge, and `confirmed is False`.
 - [ ] **Step 2:** Run; FAIL.
 - [ ] **Step 3:** Implement the three modules from the spec's survey files. Sources quote the
   survey line and listing URL. Placeholders (unknown driver boards, Tim's unit, button
@@ -181,7 +181,7 @@ and `battery-survey.md` beside it). Read it first.
 **Interfaces:**
 - Consumes: `geom`, `parts.*`.
 - Produces constants `LID_OPEN_DEG = 100.0`, `BAY_INSIDE = (158.0, 82.0, 34.0)`,
-  `CABLE_BAY = 35.0`, `LID_POCKET_MIN = (130.0, 100.0)`, `FIT = 0.5` (insert/slide clearance),
+  `CABLE_BAY = 35.0`, `LID_POCKET_MIN = (185.0, 120.0)`, `FIT = 0.5` (insert/slide clearance),
   `CLOSED_CLEARANCE = 2.0` (lid above tallest board part), and
   `Layout` (frozen dataclass) built by `layout(wall: float) -> Layout` with:
   `outer: Box` (base), `deck_z: float`, `board_origin: tuple[float,float,float]` (where board

@@ -38,8 +38,7 @@ monitor, a USB-C to DC adapter, a USB-A power brick and a dev board on the table
 - No mains power inside the box; the battery is the only source. (Running it from a USB charger
   instead of the battery is fine and needs nothing special: the drawer cable just plugs into a
   charger.)
-- 7" monitors are not a target (they would set a much bigger box). The data model shouldn't
-  preclude them, but nothing is designed for them.
+- Monitors bigger than 7" are not a target.
 
 ## Anti-goals (a failure even if it "works")
 
@@ -118,18 +117,24 @@ VGA plug shortens it.
 |---|---|---|---|
 | D | "800050" 5" 800x480 VGA/CVBS kit (bare) | panel 120.7 x 76.3, FPC 47; board 89 x 58 | VGA on a DE-15 pigtail; 12 V DC jack + included DC-to-USB 5 V cable; ~US$27 |
 | E | ZJ050NA-08C 640x480 4:3 kit (bare) | panel 117.65 x 88.43 x 5.9, active 101.76 x 76.32; board size unknown | VGA/HDMI/AV on board; cheapest (~US$16-20); native 640x480 = TT's VGA mode pixel-for-pixel |
-| T | Tim's Taobao ~US$20 cased 5" | unknown | Measure it; it is the unit already owned |
+| T | **Tim's Shenzhen monitor: a 7" car-style "TFT color monitor"** (Taobao ~US$20; survey item H's family) | listing: 170 x 113 mm, 800x480 or 1024x600; Tim's photos: front ~176-181 x ~113, back ~182 x ~117-118, window ~159 x ~86; depth unmeasured | Hard-wired cable leaving the long edge on the button side near one corner, ending in VGA + DC barrel (12 V, via Tim's USB boost adapter) + composite (Tim will likely cut the composite off). Buttons on the front along that edge. Flat back with a stand clip. See `docs/measurements/2026-11-23-photo-measurements.md` |
+
+**Tim's 7" (T) is the main monitor** (found 2026-11-23 from his photos; it was thought to be a
+5"). It costs almost nothing in size: its ~182 x 118 mm body fits inside the ~205 x 160 mm base
+footprint that the drawer and the board already set. Mount it buttons-down, so the cable leaves
+next to the hinge and the buttons face the visitor below the screen. Its pocket is sized for
+the largest reading (182 x 118) and the insert takes up the listing's smaller figure; depth is
+a placeholder (25 mm, unconfirmed) until measured.
 
 **Monitors whose sockets face backwards are out of scope** (Tim: "Probably can ignore monitors
-who socket faces backwards"). That drops the Eyoyo S501H (124 x 79 x 18, VGA on the rear face)
-and lets the lid stay thin. Supported: bare panel + driver-board kits (D, E, and Adafruit 1678 /
-EastRising ER-TFTV050-3, same 800x480 panel class) as the main targets; cased monitors with side
-sockets (Miktver 5", generic 5" touch 126 x 96 x 17) best-effort; T once measured. Most 5"
-800x480 panels share the 108 x 64.8 active area; the 4:3 ZJ050 is 101.8 x 76.3.
+who socket faces backwards"). That drops the Eyoyo S501H (124 x 79 x 18, VGA on the rear face).
+Also supported, via their own inserts in the same pocket: bare 5" panel + driver-board kits (D,
+E, and Adafruit 1678 / EastRising ER-TFTV050-3, same 800x480 panel class); cased 5" monitors with
+side sockets (Miktver 5", generic 5" touch 126 x 96 x 17) best-effort. Most 5" 800x480 panels
+share the 108 x 64.8 active area; the 4:3 ZJ050 is 101.8 x 76.3.
 
-Lid pocket target: ~130 x 100 mm inside. Depth: bare panel (~3-6 mm) plus its driver board on
-standoffs behind it, with the VGA cable leaving sideways or along the lid; side-socket cased
-monitors (<= 20 mm) with the plug exiting through the lid's side wall.
+Lid pocket target: ~185 x 120 mm inside (Tim's 7" plus fit). Depth: the 7"'s body (placeholder
+25 mm); the 5" kits (panel ~3-6 mm plus driver board on standoffs) fit within it.
 
 ### Batteries (survey 2026-11-23, see `battery-survey.md` beside this file)
 
@@ -203,7 +208,7 @@ by an internal 12 V to 5 V buck (needs custom electronics, rejected); (c) dual-c
 
 ## Open items (need measurements Tim can provide)
 
-- Tim's Taobao monitor: dimensions, connector positions, power input.
+- Tim's 7" monitor: depth, and a caliper check of width (listing 170 vs photos 176-182).
 - Tim's USB to 12 V DC boost adapter: body size (so the box can hold it).
 - TinyVGA Pmod outline and DE-15 position.
 - Board top-side tallest component height (chip carrier, 7-seg), for lid clearance.
