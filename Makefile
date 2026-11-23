@@ -9,7 +9,7 @@ test:
 
 ## verify: check dimensions and report UNCONFIRMED figures
 verify:
-	@echo "verify: not implemented yet (Task 3)"; exit 1
+	$(PY) python verify.py
 
 ## outputs: regenerate everything under output/
 outputs:

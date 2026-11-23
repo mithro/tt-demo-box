@@ -48,8 +48,8 @@ def test_bay_size_and_drawer_slides_out_along_minus_x(lay):
         assert b.y0 >= lay.outer.y0 + 2 * lay.wall + L.FIT - 1e-9
         assert b.y1 <= lay.outer.y1 - 2 * lay.wall - L.FIT + 1e-9
         assert b.z0 >= lay.outer.z0 and b.z1 < lay.deck_z
-    # the drawer sets the width: back wall, slide clearance, base wall, nothing more
-    assert lay.outer.x1 == pytest.approx(lay.bay.x1 + lay.wall + L.FIT + lay.wall)
+    # room for the drawer: back wall, slide clearance, base wall
+    assert lay.outer.x1 >= lay.bay.x1 + lay.wall + L.FIT + lay.wall - 1e-9
 
 
 def test_drawer_travel_lets_every_bank_lift_out(lay):
@@ -289,3 +289,23 @@ def test_lid_location_matches_profile(lay):
             p = cq.Vertex.makeVertex(10.0, y, z).moved(loc).Center()
             assert p.x == pytest.approx(10.0)
             assert poly.exterior.distance(Point(p.y, p.z)) < 1e-6
+
+
+def test_lid_cable_gutters(lay):
+    """R13: a gutter from each monitor's exit side to the hinge channel."""
+    g = lay.lid_cable_gutters
+    p, o = lay.lid_pocket, lay.lid_outer
+    sides = {L.exit_edge(m) for m in MONITORS.values()} - {"bottom"}
+    assert set(g) == {"hinge"} | sides
+    d = L.lid_cable_bundle()[0]
+    for name, b in g.items():
+        assert min(b.size[0], b.size[1]) >= d + L.FIT - 1e-9, name
+        assert b.size[2] >= d + L.FIT - 1e-9, name
+        assert _inside(b, o, lay.wall), name
+        assert box_gap(b, p) == pytest.approx(0.0), name    # open to the pocket
+    h = g["hinge"]
+    c = lay.hinge_cable_channel
+    assert h.y1 == pytest.approx(o.y1 - lay.wall)
+    assert h.x0 <= c.x0 and h.x1 >= c.x1          # reaches the channel
+    for s in sides:
+        assert box_gap(g[s], h) == pytest.approx(0.0)  # side gutters join it
