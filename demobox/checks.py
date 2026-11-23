@@ -42,7 +42,7 @@ from shapely.geometry import Point, box as sbox
 
 from demobox import layout as L
 from demobox.geom import Box
-from demobox.layout import FIT, INSERT_MATERIAL, Layout
+from demobox.layout import FIT, INSERT_MATERIAL, Layout, exit_edge
 from demobox.parts import board as board_mod
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.board import BOARD_KEYS, board_spec
@@ -146,9 +146,15 @@ def panel_in_lid(m: Monitor, lay: Layout) -> Box:
     """The panel body in the closed lid frame (see the module docstring)."""
     p = lay.lid_pocket
     w, h, t = m.panel
-    cx = (p.x0 + p.x1) / 2
+    edge = exit_edge(m)
+    if edge == "right":                      # pushed away from its exit side
+        x0 = p.x0 + FIT + INSERT_MATERIAL
+    elif edge == "left":
+        x0 = p.x1 - FIT - INSERT_MATERIAL - w
+    else:
+        x0 = (p.x0 + p.x1) / 2 - w / 2
     bottom = p.y1 - FIT - INSERT_MATERIAL
-    return Box(cx - w / 2, bottom - h, INSERT_MATERIAL, cx + w / 2, bottom,
+    return Box(x0, bottom - h, INSERT_MATERIAL, x0 + w, bottom,
                INSERT_MATERIAL + t, f"{m.key} panel")
 
 
@@ -158,42 +164,25 @@ def _panel_point(m: Monitor, lay: Layout, u: float, v: float) -> tuple[float, fl
     return pb.x0 + u, pb.y1 - v
 
 
-def exit_edge(m: Monitor) -> str:
-    """The panel edge the monitor's cable or plug leaves by.  A bare kit's
-    connectors are on its driver board; its cable is taken out at the hinge
-    end ("bottom"), the shortest way to the hinge channel."""
-    if m.cable_edge is not None:
-        return m.cable_edge
-    if m.connector_exit in ("left", "right", "top", "bottom"):
-        return m.connector_exit
-    return "bottom"
-
-
-def connector_opening(m: Monitor, lay: Layout) -> Box:
-    """The opening in the lid wall (closed lid frame) the monitor's cable and
-    plug pass: the hinge cable channel for the hinge-end (bottom) edge, else a
-    hole through that side wall, plug cross-section + FIT each side, centred on
-    the panel edge and on the pocket depth."""
+def connector_opening(m: Monitor, lay: Layout) -> Box | None:
+    """Where the monitor's cables and plugs go as they leave it (closed lid
+    frame): for the hinge-end (bottom) edge, the hinge cable channel's crossing
+    of the lid's hinge-end wall; for a side edge, the space from the panel edge
+    to the far side of that side's cable gutter (R13: the cable stays in the
+    lid).  None when the lid has no gutter on that side (a top exit)."""
     lid, pocket = lay.lid_outer, lay.lid_pocket
     edge = exit_edge(m)
     if edge == "bottom":
         c = lay.hinge_cable_channel
         hz = lay.hinge_axis[1]
-        return Box(c.x0, pocket.y1, 0.0, c.x1, lid.y1, min(c.z1 - hz, pocket.z1),
+        return Box(c.x0, lid.y1 - lay.wall, 0.0, c.x1, lid.y1, min(c.z1 - hz, pocket.z1),
                    f"{m.key} cable opening (hinge channel)")
-    _, pw, ph = VGA_PLUG
-    span, tall = pw + 2 * FIT, ph + 2 * FIT
-    zc = (pocket.z0 + pocket.z1) / 2
-    z0, z1 = zc - tall / 2, zc + tall / 2
+    g = lay.lid_cable_gutters.get(edge)
+    if g is None:
+        return None
     pb = panel_in_lid(m, lay)
-    if edge == "top":
-        xc = (pb.x0 + pb.x1) / 2
-        return Box(xc - span / 2, lid.y0, z0, xc + span / 2, pocket.y0, z1,
-                   f"{m.key} cable opening (front wall)")
-    yc = (pb.y0 + pb.y1) / 2
-    x0, x1 = (lid.x0, pocket.x0) if edge == "left" else (pocket.x1, lid.x1)
-    return Box(x0, yc - span / 2, z0, x1, yc + span / 2, z1,
-               f"{m.key} cable opening ({edge} wall)")
+    x0, x1 = (pb.x1, g.x1) if edge == "right" else (g.x0, pb.x0)
+    return Box(x0, g.y0, g.z0, x1, g.y1, g.z1, f"{m.key} cable space ({edge} gutter)")
 
 
 def lid_point_open(lay: Layout, y: float, z: float, angle_deg: float) -> tuple[float, float]:
@@ -261,24 +250,23 @@ def _connector_opening_fits(report: Report, lay: Layout, m: Monitor) -> None:
     o = connector_opening(m, lay)
     _, pw, ph = VGA_PLUG
     edge = exit_edge(m)
+    if o is None:
+        report.check(False, f"{m.key}: lid opening passes the VGA plug",
+                     f"no cable gutter on the {edge} edge")
+        return
+    across, tall = o.size[0], o.size[2]
     if edge == "bottom":
-        across, tall = o.size[0], o.size[2]
         into = o.x0 >= pocket.x0 - EPS and o.x1 <= pocket.x1 + EPS
         where = "hinge channel"
-    elif edge == "top":
-        across, tall = o.size[0], o.size[2]
-        into = o.x0 >= pocket.x0 - EPS and o.x1 <= pocket.x1 + EPS
-        where = "front wall"
     else:
-        across, tall = o.size[1], o.size[2]
-        into = o.y0 >= pocket.y0 - EPS and o.y1 <= pocket.y1 + EPS
-        where = f"{edge} wall"
+        into = True
+        where = f"{edge} gutter"
     in_depth = o.z0 >= pocket.z0 - EPS and o.z1 <= pocket.z1 + EPS
     ok = across >= pw + 2 * FIT - EPS and tall >= ph + 2 * FIT - EPS and into and in_depth
     report.check(ok, f"{m.key}: lid {where} opening passes the VGA plug",
                  f"exit {m.connector_exit}/{edge}: opening {_f(across)} x {_f(tall)} "
                  f"(z {_f(o.z0)}..{_f(o.z1)}, pocket depth {_f(pocket.z1)}) for a "
-                 f"{pw} x {ph} plug + FIT {FIT} each side; opens into the pocket: {into}")
+                 f"{pw} x {ph} plug + FIT {FIT} each side; within the pocket's span: {into}")
     if m.connector_exit == "board":
         report.unconfirmed(f"{m.key} connector exit",
                            "driver-board connector positions unmeasured; the cable is "
@@ -594,6 +582,9 @@ def cables_route(report: Report, lay: Layout) -> None:
         if not c.confirmed:
             report.unconfirmed(f"cable {c.key}", _placeholders(c.sources))
 
+    for m in MONITORS.values():
+        _in_lid_route(report, lay, m)
+
     run = TINYVGA.plug_keepout(L.VGA_PLUG_STRAIGHT).size[1]
     p1 = ((ch.x0 + ch.x1) / 2, hy, hz)
     for m in MONITORS.values():
@@ -610,6 +601,80 @@ def cables_route(report: Report, lay: Layout) -> None:
                      f"plug run {_f(run)} + deck to hinge {_f(base_leg)} + lid to the "
                      f"{exit_edge(m)} exit {_f(lid_leg)} + plug {VGA_PLUG[0]} = {_f(total)} "
                      f"<= {VGA_MAX_LEN:g} mm")
+
+
+def _in_lid_route(report: Report, lay: Layout, m: Monitor) -> None:
+    """R13: the monitor's cable bundle (``lid_cable_bundle``: width d, bend r)
+    goes exit -> gutter -> hinge channel inside the lid.
+
+    * Every gutter on the way is open to the pocket (or to the gutter before
+      it) and at least d + FIT wide and deep.
+    * Leaving a panel edge square into a gutter and turning along it, the
+      bundle needs r + d/2 + FIT from the panel edge to the gutter's far side.
+      A bottom exit over the channel's X span goes straight in, no turn.
+    * A side gutter runs from the exit to the hinge gutter.  The corner into
+      the hinge gutter needs nothing more: with r + d/2 of room on the side,
+      the turn's centre lies beyond the inner corner, so a d-wide hinge gutter
+      takes it.  The hinge gutter spans the channel's X range and reaches the
+      hinge-end wall, where the channel takes the bundle down into the base
+      (that bend is the hinge-channel check above).
+    """
+    d, r = L.lid_cable_bundle()
+    run, turn = d + FIT, r + d / 2 + FIT
+    edge = exit_edge(m)
+    g = lay.lid_cable_gutters
+    h = g.get("hinge")
+    pb = panel_in_lid(m, lay)
+    ch = lay.hinge_cable_channel
+    pocket = lay.lid_pocket
+    what = f"{m.key}: in-lid cable route to the hinge channel"
+    problems: list[str] = []
+    notes: list[str] = [f"bundle {_f(d)} mm, bend r {r}"]
+    if h is None:
+        report.check(False, what, "no hinge-end gutter")
+        return
+    if h.size[1] < run - EPS or h.size[2] < run - EPS:
+        problems.append(f"hinge gutter {_f(h.size[1])} x {_f(h.size[2])} < {_f(run)}")
+    if h.y0 > pocket.y1 + EPS:
+        problems.append(f"hinge gutter (y0 {_f(h.y0)}) not open to the pocket (y1 {_f(pocket.y1)})")
+    if h.x0 > ch.x0 + EPS or h.x1 < ch.x1 - EPS or h.y1 < lay.lid_outer.y1 - lay.wall - EPS:
+        problems.append("hinge gutter does not reach the hinge channel")
+    if edge == "bottom":
+        x = (pb.x0 + pb.x1) / 2
+        if m.connector_exit == "board" and m.driver is not None:
+            x = pb.x0 + m.panel[0] - (m.driver.x0 + m.driver.x1) / 2
+        if ch.x0 + d / 2 <= x <= ch.x1 - d / 2:
+            notes.append(f"exit at x {_f(x)} straight into the channel")
+        else:
+            room = h.y1 - pb.y1
+            notes.append(f"turn into the hinge gutter: {_f(room)} >= {_f(turn)} mm")
+            if room < turn - EPS:
+                problems.append(f"turn room {_f(room)} < {_f(turn)}")
+    elif edge in ("left", "right"):
+        s = g.get(edge)
+        if s is None:
+            problems.append(f"no {edge} gutter")
+        else:
+            room = s.x1 - pb.x1 if edge == "right" else pb.x0 - s.x0
+            opens = (s.x0 <= pocket.x1 + EPS) if edge == "right" else (s.x1 >= pocket.x0 - EPS)
+            yc = (pb.y0 + pb.y1) / 2
+            notes.append(f"{edge} gutter {_f(s.size[0])} wide; turn {_f(room)} >= {_f(turn)} mm")
+            if s.size[0] < run - EPS or s.size[2] < run - EPS:
+                problems.append(f"{edge} gutter {_f(s.size[0])} x {_f(s.size[2])} < {_f(run)}")
+            if not opens:
+                problems.append(f"{edge} gutter not open to the pocket")
+            if room < turn - EPS:
+                problems.append(f"turn room {_f(room)} < {_f(turn)}")
+            if s.y0 > yc - d / 2 + EPS or s.y1 < h.y0 - EPS:
+                problems.append(f"{edge} gutter does not run from the exit to the hinge gutter")
+            if (edge == "right" and h.x1 < s.x1 - EPS) or (edge == "left" and h.x0 > s.x0 + EPS):
+                problems.append(f"hinge gutter does not reach the {edge} gutter")
+        report.unconfirmed(f"{m.key} side connectors",
+                           "plug bodies assumed within the rim's footprint (on the rear hump); "
+                           "the cable's turn is counted from the panel edge")
+    else:
+        problems.append(f"no gutter route from the {edge} edge")
+    report.check(not problems, what, "; ".join(problems or notes))
 
 
 def _exit_point(m: Monitor, lay: Layout) -> tuple[float, float, float]:

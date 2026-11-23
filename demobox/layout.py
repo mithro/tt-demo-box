@@ -47,9 +47,20 @@ and pay out from a slack loop in the deck cavity above the drawer.
 Lid
 ---
 The common pocket is the largest monitor insert (panel + INSERT_MATERIAL each
-side + FIT each side) and at least LID_POCKET_MIN; it sits against the lid's
-hinge-end wall, since Tim's monitor mounts buttons-down with its cable leaving
-next to the hinge.  Its depth is the deepest insert stack plus FIT.
+side + FIT each side) and at least LID_POCKET_MIN.  Its depth is the deepest
+insert stack plus FIT.  Monitors mount buttons-down, so a panel's bottom edge
+faces the hinge end.
+
+Cable gutters (R13) give every monitor's cables an in-lid route to the hinge
+cable channel: ``lid_cable_gutters["hinge"]`` runs across the lid between the
+pocket and the hinge-end wall, and a side gutter (``"left"``/``"right"``) runs
+beside the pocket on each side some monitor's cable leaves by, joining the
+hinge gutter.  They are as deep as the pocket and open to it.  Each is at
+least the monitor-side cable bundle (``lid_cable_bundle``: VGA + DC lead, side
+by side) + FIT wide; where a cable leaves a panel edge square into a gutter
+and must turn along it, the gutter is widened so the turn keeps the bundle's
+bend radius, counting the room the insert leaves beside the panel (a side-exit
+monitor's insert pushes its panel to the far side: ``checks.panel_in_lid``).
 """
 
 from __future__ import annotations
@@ -89,8 +100,9 @@ VGA_PLUG_STRAIGHT = False
 INSERT_MATERIAL = 1.2
 #: Bare-kit driver board standoff height above the panel's back.
 DRIVER_STANDOFF = 5.0
-#: Deck standoff minimum: takes an M3 heat-set insert (5.7 deep) from the top.
-STANDOFF_MIN = 6.0
+#: Deck standoff minimum: an M3 heat-set insert (HEATSET_DEPTH) from the top,
+#: rounded up to the whole millimetre (a floor under the insert).
+STANDOFF_MIN = float(math.ceil(HEATSET_DEPTH))
 #: MT1 locating peg: into the board's 3.2 mm hole, below the PCB's top face.
 PEG_DIA = 3.0
 PEG_HEIGHT = 1.2
@@ -187,6 +199,49 @@ def _pocket_xy() -> tuple[float, float]:
     return px, py
 
 
+def exit_edge(m: Monitor) -> str:
+    """The panel edge (front view, upright) the monitor's cables leave by.  A
+    bare kit's connectors are on its driver board; its cables are taken out at
+    the hinge end ("bottom"), the shortest way to the hinge channel."""
+    if m.cable_edge is not None:
+        return m.cable_edge
+    if m.connector_exit in ("left", "right", "top", "bottom"):
+        return m.connector_exit
+    return "bottom"
+
+
+def lid_cable_bundle() -> tuple[float, float]:
+    """(width, bend radius) of the monitor-side cables in the lid, side by
+    side: the VGA cable plus, for 12 V monitors, the boost cable's DC lead."""
+    cables = [_VGA] + ([_BOOST] if any(m.power_in == "12V-boost" for m in MONITORS.values())
+                       else [])
+    return sum(c.dia for c in cables), max(c.min_bend_r for c in cables)
+
+
+def _gutter_widths() -> dict[str, float]:
+    """Width of each lid cable gutter (see the module docstring)."""
+    px, _ = _pocket_xy()
+    d, r = lid_cable_bundle()
+    run = d + FIT
+    turn = r + d / 2 + FIT             # panel edge to the gutter's far side
+    edges = {exit_edge(m) for m in MONITORS.values()}
+    # a bottom exit's panel sits FIT + INSERT_MATERIAL off the pocket's hinge end
+    widths = {"hinge": max(run, turn - (FIT + INSERT_MATERIAL)) if "bottom" in edges else run}
+    for m in MONITORS.values():
+        e = exit_edge(m)
+        if e in ("left", "right"):
+            room = px - FIT - INSERT_MATERIAL - m.panel[0]   # panel pushed to the far side
+            widths[e] = max(widths.get(e, run), turn - room)
+    return widths
+
+
+def _lid_inner_xy() -> tuple[float, float]:
+    """Pocket plus cable gutters, the lid's inside footprint."""
+    px, py = _pocket_xy()
+    g = _gutter_widths()
+    return px + g.get("left", 0.0) + g.get("right", 0.0), py + g["hinge"]
+
+
 def _drawer_depth(wall: float) -> float:
     """Base Y the drawer needs: base wall, FIT, drawer wall, bay, and back."""
     return BAY_INSIDE[1] + 2 * (2 * wall + FIT)
@@ -198,14 +253,14 @@ def _base_width(wall: float, straight: bool) -> float:
                # drawer face (it is the base's left wall there), cable bay, bay,
                # drawer back wall, FIT, base right wall
                CABLE_BAY + BAY_INSIDE[0] + 3 * wall + FIT,
-               _pocket_xy()[0] + 2 * wall)
+               _lid_inner_xy()[0] + 2 * wall)
 
 
 def _base_depth(wall: float, straight: bool) -> float:
     u = _all_board_frame(straight)
     return max(u.size[1] + 2 * (wall + FIT),
                _drawer_depth(wall),
-               _pocket_xy()[1] + 2 * wall)
+               _lid_inner_xy()[1] + 2 * wall)
 
 
 # --- the layout --------------------------------------------------------------
@@ -232,6 +287,7 @@ class Layout:
     hinge_cable_channel: Box
     lid_outer: Box                   # lid frame, closed
     lid_pocket: Box                  # lid frame, closed
+    lid_cable_gutters: dict[str, Box]  # lid frame, closed: "hinge", and "left"/"right"
 
     def _open_yz(self, y: float, z: float, angle_deg: float) -> tuple[float, float]:
         """Lid-frame (y, z) to base-frame (Y, Z) with the lid ``angle_deg`` open:
@@ -352,8 +408,20 @@ def layout(wall: float) -> Layout:
     pocket_depth = max(insert_stack(m) for m in MONITORS.values()) + FIT
     lid_depth = pocket_depth + wall
     lid_outer = Box(0.0, -depth, 0.0, width, 0.0, lid_depth, "lid")
-    lid_pocket = Box((width - px) / 2, -wall - py, 0.0, (width + px) / 2, -wall, pocket_depth,
-                     "lid pocket")
+    gw = _gutter_widths()
+    inner_x = _lid_inner_xy()[0]
+    in_x0 = (width - inner_x) / 2
+    p_x0 = in_x0 + gw.get("left", 0.0)
+    p_y1 = -wall - gw["hinge"]
+    lid_pocket = Box(p_x0, p_y1 - py, 0.0, p_x0 + px, p_y1, pocket_depth, "lid pocket")
+    gutters = {"hinge": Box(in_x0, p_y1, 0.0, in_x0 + inner_x, -wall, pocket_depth,
+                            "lid hinge-end cable gutter")}
+    if "left" in gw:
+        gutters["left"] = Box(in_x0, lid_pocket.y0, 0.0, p_x0, p_y1, pocket_depth,
+                              "lid left cable gutter")
+    if "right" in gw:
+        gutters["right"] = Box(lid_pocket.x1, lid_pocket.y0, 0.0, lid_pocket.x1 + gw["right"],
+                               p_y1, pocket_depth, "lid right cable gutter")
 
     vga = keepouts[f"{BOARD_KEYS[0]}/tinyvga"]
     cx = (vga.x0 + vga.x1) / 2
@@ -371,4 +439,4 @@ def layout(wall: float) -> Layout:
         drawer_out=(-1.0, 0.0, 0.0), drawer_travel=drawer_travel,
         boost_pocket=boost_pocket, hinge_axis=hinge,
         hinge_cable_channel=hinge_cable_channel,
-        lid_outer=lid_outer, lid_pocket=lid_pocket)
+        lid_outer=lid_outer, lid_pocket=lid_pocket, lid_cable_gutters=gutters)

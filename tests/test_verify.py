@@ -139,7 +139,11 @@ def test_bank_button_covered_with_drawer_out_fails(monkeypatch, lay):
 def test_monitor_button_against_the_base_fails(monkeypatch, lay):
     base = MONITORS["taobao-tim"]
     monkeypatch.setitem(MONITORS, "low-btn", replace(base, key="low-btn", button=(60.0, 0.5)))
-    failed = _failed(_run(C.buttons_reachable, lay))
+    # the hinge gutter keeps real panels well off the hinge; put the pocket
+    # back against the hinge-end wall so a button at the very edge meets the base
+    p = lay.lid_pocket
+    tight = replace(lay, lid_pocket=p.moved(0.0, -lay.wall - p.y1, 0.0))
+    failed = _failed(_run(C.buttons_reachable, tight))
     assert failed and all("low-btn" in f for f in failed), failed
 
 
@@ -221,3 +225,37 @@ def test_tight_channel_fails_bend(lay):
     tight = replace(lay, hinge_cable_channel=replace(c, y0=c.y1 - 10.0))
     failed = _failed(_run(C.cables_route, tight))
     assert any("bend" in f for f in failed), failed
+
+
+# --- R13: in-lid cable route --------------------------------------------------------
+
+def test_every_monitor_has_an_in_lid_route(lay):
+    r = _run(C.cables_route, lay)
+    for m in MONITORS.values():
+        mine = [(ok, w) for ok, w, _ in r.results if m.key in w and "in-lid" in w]
+        assert mine and all(ok for ok, _ in mine), (m.key, mine)
+
+
+def test_too_narrow_side_gutter_fails_naming_the_monitor(lay):
+    g = lay.lid_cable_gutters["right"]
+    narrow = replace(lay, lid_cable_gutters={**lay.lid_cable_gutters,
+                                             "right": replace(g, x1=g.x0 + 5.0)})
+    failed = _failed(_run(C.cables_route, narrow))
+    assert failed and any("car-7-aliexpress" in f and "in-lid" in f for f in failed), failed
+    assert not any("taobao-tim" in f for f in failed), failed
+
+
+def test_too_shallow_hinge_gutter_fails(lay):
+    g = lay.lid_cable_gutters["hinge"]
+    shallow = replace(lay, lid_cable_gutters={**lay.lid_cable_gutters,
+                                              "hinge": replace(g, y0=g.y1 - 5.0)})
+    failed = _failed(_run(C.cables_route, shallow))
+    assert any("taobao-tim" in f and "in-lid" in f for f in failed), failed
+
+
+def test_top_exit_has_no_route(monkeypatch, lay):
+    base = MONITORS["car-7-aliexpress"]
+    monkeypatch.setitem(MONITORS, "top-exit", replace(base, key="top-exit",
+                                                       connector_exit="top", cable_edge="top"))
+    failed = _failed(_run(C.cables_route, lay))
+    assert any("top-exit" in f and "in-lid" in f for f in failed), failed
