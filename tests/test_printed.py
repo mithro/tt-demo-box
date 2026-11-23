@@ -1,6 +1,5 @@
 """The 3D-printed body (route "printed", ``layout(2.4)``) and its assembly."""
 
-import itertools
 import math
 
 import cadquery as cq
@@ -8,16 +7,13 @@ import pytest
 
 from demobox import checks as C
 from demobox import layout as L
+from demobox.clash import clashes
 from demobox.geom import BedOverflow
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.monitors import MONITORS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
 from demobox.shared import inserts as I
-
-#: Pairwise interpenetration allowed between assembled solids (mm^3).
-VOL_TOL = 1.0
-
 
 @pytest.fixture(scope="module")
 def lay():
@@ -251,18 +247,7 @@ def test_boost_pocket_is_clear(parts, lay):
 # --- assembly ----------------------------------------------------------------------
 
 def _clashes(items):
-    bad = []
-    for (na, a, _), (nb, b, _) in itertools.combinations(items, 2):
-        if frozenset((na, nb)) in B.DECLARED_OVERLAPS:
-            continue
-        ba, bb = a.BoundingBox(), b.BoundingBox()
-        if (ba.xmax < bb.xmin or bb.xmax < ba.xmin or ba.ymax < bb.ymin or bb.ymax < ba.ymin
-                or ba.zmax < bb.zmin or bb.zmax < ba.zmin):
-            continue
-        v = a.intersect(b).Volume()
-        if v > VOL_TOL:
-            bad.append((na, nb, round(v, 3)))
-    return bad
+    return clashes(items, B.DECLARED_OVERLAPS)
 
 
 @pytest.mark.parametrize("angle", [0.0, L.LID_OPEN_DEG])
@@ -300,9 +285,9 @@ def test_assembly_lid_turns_about_the_axis(lay):
     assert closed["base"].BoundingBox().xlen == opened["base"].BoundingBox().xlen
 
 
-def test_assembly_laser_is_task_8():
-    with pytest.raises(NotImplementedError, match="Task 8"):
-        B.assembly("laser", 0.0, 0.0)
+def test_assembly_unknown_route():
+    with pytest.raises(ValueError, match="unknown route"):
+        B.assembly("cnc", 0.0, 0.0)
 
 
 def test_over_bed_lid_splits_with_joints(lay):

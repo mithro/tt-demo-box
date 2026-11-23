@@ -11,9 +11,10 @@ test:
 verify:
 	$(PY) python verify.py
 
-## outputs: regenerate everything under output/ (printed route; Task 8 adds laser)
+## outputs: regenerate everything under output/ (printed and laser routes)
 outputs:
 	$(PY) python scripts/export_printed.py
+	$(PY) python scripts/export_laser.py
 
 ## check: test + verify + sheet checks
 check: test verify
