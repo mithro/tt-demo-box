@@ -30,7 +30,6 @@ import sys
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox import checks
 from demobox import layout as L
-from demobox.shared import inserts
 
 
 def _print(report: checks.Report) -> None:
@@ -55,9 +54,6 @@ def main() -> int:
         tested += len(report.results)
         for item in report.unconfirmed:
             unconfirmed(*item)
-    # placeholders the made parts are built on
-    for name, value, src in inserts.UNCONFIRMED:
-        unconfirmed(name, f"{value}: {src.note}")
 
     print(f"UNCONFIRMED ({len(unconfirmed)} placeholder figures; measure and confirm)\n")
     for what, detail in unconfirmed:

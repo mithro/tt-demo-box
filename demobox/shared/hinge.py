@@ -49,6 +49,7 @@ import math
 import cadquery as cq
 
 from demobox.layout import FIT, LID_OPEN_DEG, Layout
+from demobox.shared import m3
 
 #: Knuckle radius round the axis and length along it.
 KNUCKLE_R = 4.0
@@ -56,15 +57,12 @@ KNUCKLE_LEN = 10.0
 #: Leaf plate thickness.
 LEAF_T = 3.0
 #: M3 clearance: the pin hole along the axis and the leaves' screw holes.
-PIN_HOLE_D = 3.4
-SCREW_HOLE_D = 3.4
-#: M3 socket / pan screw head radius, for keeping heads clear of the stop.
-SCREW_HEAD_R = 2.75
-#: M3 nyloc nut height, and the thread to leave past it.
-NYLOC_H = 4.0
-THREAD_PAST = 1.0
-#: Stock M3 bolt lengths (mm).
-M3_LENGTHS = (6, 8, 10, 12, 16, 20, 25, 30, 35, 40, 45, 50, 60)
+PIN_HOLE_D = m3.CLEARANCE_D
+SCREW_HOLE_D = m3.CLEARANCE_D
+SCREW_HEAD_R = m3.HEAD_R
+NYLOC_H = m3.NYLOC_H
+THREAD_PAST = m3.THREAD_PAST
+M3_LENGTHS = m3.LENGTHS
 #: The stop shelf: how far it reaches behind the base leaf, and its thickness
 #: under the stop face at its outer edge; a 45 degree gusset carries it back
 #: to the leaf.  Its face starts STOP_R0 from the axis, so a degree short of
@@ -103,11 +101,8 @@ def _knuckles(lay: Layout, which: str) -> list[tuple[float, float]]:
 
 def hinge_bolt_length(lay: Layout) -> float:
     """The stock M3 bolt that passes a group and its nyloc with thread to spare."""
-    need = max(x1 - x0 for x0, x1 in hinge_groups(lay)) + NYLOC_H + THREAD_PAST
-    for n in M3_LENGTHS:
-        if n >= need:
-            return n
-    raise ValueError(f"no stock M3 bolt of {need:.1f} mm")
+    return m3.stock_length(max(x1 - x0 for x0, x1 in hinge_groups(lay)) + NYLOC_H
+                           + THREAD_PAST)
 
 
 def _prism(origin: tuple[float, float, float], x0: float, x1: float,

@@ -258,22 +258,32 @@ def test_kit_retainer_holds_the_driver_on_standoffs(lay):
     for m in kits:
         s = I.monitor_retainer(m, lay).val()
         pb = C.panel_in_lid(m, lay)
-        pcb_z = pb.z1 + L.DRIVER_STANDOFF       # driver board's panel-side face
+        pcb_z = pb.z1 + L.DRIVER_STANDOFF       # driver PCB's panel-side face
+        env = I.driver_envelope(m, lay)
+        assert env.z0 == pytest.approx(pcb_z)
+        assert env.z1 == pytest.approx(L.insert_stack(m) - L.INSERT_MATERIAL)
         posts = I.driver_posts(m, lay)
-        assert len(posts) == 4
+        assert len(posts) == len(m.driver_holes) == 4
         for p in posts:
-            assert p.z0 == pytest.approx(pcb_z)
-            assert p.z1 == pytest.approx(L.insert_stack(m) - L.INSERT_MATERIAL)
-            assert p.r - L.HEATSET_HOLE_D / 2 >= C.MIN_BOSS_WALL - EPS
-            assert p.z1 - p.z0 >= L.HEATSET_DEPTH
-            # the post's tip is part of the retainer, with an insert hole in it
-            tip = cq.Solid.makeCylinder(p.r, 0.2, cq.Vector(p.cx, p.cy, p.z0))
-            hole = cq.Solid.makeCylinder(L.HEATSET_HOLE_D / 2 - 0.1, L.HEATSET_DEPTH - 0.1,
-                                         cq.Vector(p.cx, p.cy, p.z0))
-            assert _common(s, tip) > 0
-            assert _common(s, hole) <= VOL_TOL
-        # nothing of the retainer between the panel and the driver board
-        assert _common(s, _box(pb.x0, pb.y0, pb.z1, pb.x1, pb.y1, pcb_z)) <= VOL_TOL
+            assert p.z0 == pytest.approx(pb.z1) and p.z1 == pytest.approx(pcb_z)
+            assert env.x0 < p.cx < env.x1 and env.y0 < p.cy < env.y1
+            assert p.r - I.COUNTERBORE_D / 2 >= C.MIN_BOSS_WALL - EPS
+            # the post's top carries the PCB; screw clearance and head
+            # counterbore are empty
+            top = cq.Solid.makeCylinder(p.r - 0.1, 0.2, cq.Vector(p.cx, p.cy, p.z1 - 0.2))
+            shank = cq.Solid.makeCylinder(1.5, p.z1 - p.z0, cq.Vector(p.cx, p.cy, p.z0))
+            head = cq.Solid.makeCylinder(2.75, I.COUNTERBORE_H, cq.Vector(p.cx, p.cy, p.z0))
+            assert _common(s, top) > 0
+            assert _common(s, shank) <= VOL_TOL
+            assert _common(s, head) <= VOL_TOL
+        # nothing of the retainer in the board's envelope; the posts reach it
+        e = _box(env.x0, env.y0, env.z0, env.x1, env.y1, env.z1)
+        assert _common(s, e) <= VOL_TOL
+        assert _dist(s, e) < TOUCH
+        n = I.driver_screw_length(m)
+        assert n in H.M3_LENGTHS
+        assert n >= (L.DRIVER_STANDOFF - I.COUNTERBORE_H + m.driver_pcb_t + H.NYLOC_H
+                     + H.THREAD_PAST)
 
 
 def test_cased_retainer_has_no_posts(lay):
@@ -356,9 +366,9 @@ def test_locating_pin_is_one_valid_solid_of_peg_dia(lay):
                         rel_tol=0.05)
 
 
-def test_verify_reports_the_insert_placeholders(capsys):
+
+def test_verify_reports_the_driver_placeholders(capsys):
     import verify
     assert verify.main() == 0
     out = capsys.readouterr().out
-    for name, _, _ in I.UNCONFIRMED:
-        assert name in out
+    assert "driver PCB thickness, face and mounting holes" in out

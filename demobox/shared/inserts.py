@@ -22,40 +22,46 @@ INSERT_MATERIAL walls round the panel's edges from the bezel to the plate that
 locate the panel.  Along the edge the cables leave by (``layout.exit_edge``)
 the wall is cut away but for EXIT_TAB at each corner, so the cable is free to
 leave into its gutter.  The plate covers the pocket only, not the gutters,
-so the cables run past it.  For a bare kit the plate also carries four posts
-that hold the driver board DRIVER_STANDOFF behind the panel's back: each post
-runs from the plate to the board and takes an M3 heat-set insert in its tip,
-the board screwed on from the panel side (the screw heads sit in the
-DRIVER_STANDOFF gap).
+so the cables run past it.
+
+A bare kit's driver board (``Monitor.driver``) has its PCB on the panel side,
+``driver_pcb_t`` thick, its parts standing rearward.  The retainer carries
+it on four posts, one under each mounting hole (``Monitor.driver_holes``), in
+the DRIVER_STANDOFF gap between the panel's back and the PCB: each post runs
+from the panel's back to the PCB's panel-side face and nothing of the
+retainer enters the board's envelope.  Two carrier bars on the panel's back,
+CARRIER_T thick, tie each pair of posts to the side walls.  An M3 screw
+(``driver_screw_length``) goes up from the panel side, its head in a
+counterbore in the post's foot, through the post and the PCB's hole, into a
+nyloc on the component side; fit the board before the panel.  (The 5 mm gap
+is too short for a 5.7 mm heat-set insert, hence the nut.)
 """
 
 from __future__ import annotations
 
 import cadquery as cq
-from tools.schema import Source
 
 from demobox.checks import MIN_BOSS_WALL, button_cutout, monitor_window, panel_in_lid
 from demobox.geom import Box, Cyl
-from demobox.layout import (DRIVER_STANDOFF, FIT, HEATSET_DEPTH, HEATSET_HOLE_D,
-                            INSERT_MATERIAL, Layout, exit_edge, insert_stack)
+from demobox.layout import (DRIVER_STANDOFF, FIT, INSERT_MATERIAL, Layout, exit_edge,
+                            insert_stack)
 from demobox.parts.monitors import Monitor
+from demobox.shared import m3
 
 #: Wall left at each end of the cable-exit edge to locate the panel there.
 EXIT_TAB = 15.0
-#: Plastic round a driver post's heat-set insert.
+#: Plastic round a driver post's screw counterbore.
 POST_WALL = 1.5
-#: Driver board mounting holes: inset from each corner of the board.
-DRIVER_HOLE_INSET = 3.5
-
-#: (name, value, source) for verify.py to report as UNCONFIRMED.
-UNCONFIRMED: tuple[tuple[str, float, Source], ...] = (
-    ("DRIVER_HOLE_INSET", DRIVER_HOLE_INSET, Source(
-        "Placeholder: driver board mounting holes", "demobox/shared/inserts.py",
-        "PCB800099 holes assumed M3, 3.5 mm in from each corner; measure a real board.")),
-)
+#: Counterbore for the M3 screw head in a driver post's foot.
+COUNTERBORE_D = 2 * m3.HEAD_R + FIT
+COUNTERBORE_H = m3.HEAD_H
+#: Carrier bars on the panel's back, tying the driver posts to the walls.
+CARRIER_T = 2.0
 
 if POST_WALL < MIN_BOSS_WALL:
     raise ValueError(f"POST_WALL {POST_WALL} < MIN_BOSS_WALL {MIN_BOSS_WALL}")
+if COUNTERBORE_H >= DRIVER_STANDOFF:
+    raise ValueError("the driver posts are too short for the screw-head counterbore")
 
 
 def _solid(x0, y0, z0, x1, y1, z1) -> cq.Workplane:
@@ -94,22 +100,38 @@ def monitor_bezel(m: Monitor, lay: Layout) -> cq.Workplane:
 
 
 def driver_posts(m: Monitor, lay: Layout) -> tuple[Cyl, ...]:
-    """The kit's driver-board posts (closed lid frame), from the board's
-    panel-side face to the retainer plate; () for a cased monitor."""
+    """The kit's driver-board posts (closed lid frame), from the panel's back
+    to the PCB's panel-side face, one under each mounting hole; () for a
+    cased monitor."""
     if m.driver is None:
         return ()
+    if m.driver_pcb_t is None or not m.driver_holes:
+        raise ValueError(f"{m.key}: driver board without PCB thickness or mounting holes")
+    W = m.panel[0]
+    pb = panel_in_lid(m, lay)
+    r = COUNTERBORE_D / 2 + POST_WALL
+    # driver holes are in the panel's back frame: u = W - x in the front frame
+    return tuple(Cyl(pb.x0 + W - x, pb.y1 - y, pb.z1, pb.z1 + DRIVER_STANDOFF, r,
+                     f"{m.key} driver post") for x, y in m.driver_holes)
+
+
+def driver_envelope(m: Monitor, lay: Layout) -> Box | None:
+    """The driver board's envelope (PCB + parts) in the closed lid frame."""
+    if m.driver is None:
+        return None
     d, W = m.driver, m.panel[0]
     pb = panel_in_lid(m, lay)
     z0 = pb.z1 + DRIVER_STANDOFF
-    z1 = insert_stack(m) - INSERT_MATERIAL
-    r = HEATSET_HOLE_D / 2 + POST_WALL
-    i = DRIVER_HOLE_INSET
-    posts = []
-    for bx in (d.x0 + i, d.x1 - i):          # driver: the panel's back frame
-        for by in (d.y0 + i, d.y1 - i):
-            u, v = W - bx, by                  # back frame -> front frame
-            posts.append(Cyl(pb.x0 + u, pb.y1 - v, z0, z1, r, f"{m.key} driver post"))
-    return tuple(posts)
+    return Box(pb.x0 + W - d.x1, pb.y1 - d.y1, z0 + d.z0, pb.x0 + W - d.x0, pb.y1 - d.y0,
+               z0 + d.z1, f"{m.key} driver board")
+
+
+def driver_screw_length(m: Monitor) -> int | None:
+    """Stock M3 screw through a driver post and the PCB into its nyloc."""
+    if m.driver is None:
+        return None
+    return m3.stock_length(DRIVER_STANDOFF - COUNTERBORE_H + m.driver_pcb_t + m3.NYLOC_H
+                           + m3.THREAD_PAST)
 
 
 def _exit_slot(m: Monitor, pb: Box, z0: float, z1: float) -> cq.Workplane:
@@ -144,11 +166,16 @@ def monitor_retainer(m: Monitor, lay: Layout) -> cq.Workplane:
     ring = ring.cut(_exit_slot(m, pb, t - 1.0, stack - t))
     part = part.union(ring)
 
-    for c in driver_posts(m, lay):
-        post = (cq.Workplane("XY", origin=(c.cx, c.cy, c.z0)).circle(c.r)
-                .extrude(c.z1 - c.z0 + t / 2))
-        part = part.union(post)
-        hole = (cq.Workplane("XY", origin=(c.cx, c.cy, c.z0 - 1.0))
-                .circle(HEATSET_HOLE_D / 2).extrude(HEATSET_DEPTH + 1.0))
-        part = part.cut(hole)
+    posts = driver_posts(m, lay)
+    for y in sorted({c.cy for c in posts}):
+        r = posts[0].r
+        part = part.union(_solid(pb.x0 - t / 2, y - r, pb.z1, pb.x1 + t / 2, y + r,
+                                 pb.z1 + CARRIER_T))
+    for c in posts:
+        part = part.union(cq.Workplane("XY", origin=(c.cx, c.cy, c.z0)).circle(c.r)
+                          .extrude(c.z1 - c.z0))
+        part = part.cut(cq.Workplane("XY", origin=(c.cx, c.cy, c.z0 - 1.0))
+                        .circle(m3.CLEARANCE_D / 2).extrude(c.z1 - c.z0 + 2.0))
+        part = part.cut(cq.Workplane("XY", origin=(c.cx, c.cy, c.z0 - 1.0))
+                        .circle(COUNTERBORE_D / 2).extrude(COUNTERBORE_H + 1.0))
     return part
