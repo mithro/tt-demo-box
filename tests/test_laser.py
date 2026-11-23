@@ -152,6 +152,7 @@ def test_t_must_match_the_layout(lay):
         P.panels(lay, t=2.7)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("which", ["body", "thin"])
 def test_every_joint_is_complementary(which, body, thin):
     """Every jointed pair: the segments tile the zone, ownership alternates
@@ -328,6 +329,7 @@ def test_magnet_latch(body, lay):
 
 @pytest.mark.parametrize("angle, out", [(0.0, 0.0), (L.LID_OPEN_DEG, 0.0), (0.0, "travel"),
                                         (0.0, "half")])
+@pytest.mark.slow
 def test_laser_assembly_has_no_intersections(angle, out, lay):
     d = {"travel": lay.drawer_travel, "half": lay.drawer_travel / 2}.get(out, out)
     items = B.assembly("laser", angle, d)
@@ -337,11 +339,13 @@ def test_laser_assembly_has_no_intersections(angle, out, lay):
     assert clashes(items, P.DECLARED_OVERLAPS) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("key", sorted(MONITORS))
 def test_laser_assembly_each_monitor(key):
     assert clashes(B.assembly("laser", 0.0, 0.0, monitor=key), P.DECLARED_OVERLAPS) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("key", sorted(BATTERIES))
 def test_laser_assembly_each_bank(key):
     assert clashes(B.assembly("laser", 0.0, 0.0, bank=key), P.DECLARED_OVERLAPS) == []
@@ -383,6 +387,7 @@ def _export(out: Path, *args: str) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, cwd=ROOT)
 
 
+@pytest.mark.slow
 def test_export_writes_reproducible_dxf_per_panel(tmp_path, body):
     import ezdxf
     a, b = tmp_path / "a", tmp_path / "b"
@@ -408,6 +413,7 @@ def test_export_writes_reproducible_dxf_per_panel(tmp_path, body):
         assert max(xs) <= L.LASER_BED[0] and max(ys) <= L.LASER_BED[1], f
 
 
+@pytest.mark.slow
 def test_export_thickness_and_kerf_override(tmp_path):
     r = _export(tmp_path, "--thickness", "2.7", "--kerf", "0.2")
     assert r.returncode == 0, r.stderr
@@ -417,3 +423,52 @@ def test_export_thickness_and_kerf_override(tmp_path):
 
 def test_assembly_laser_registered():
     assert B.assembly("laser", 0.0, 0.0)
+
+
+# --- R19 feet, R20 nuts ----------------------------------------------------------------
+
+def test_feet_stand_below_the_floor_screw_heads(lay, body):
+    """R19: the box stands on four rubber feet; every screw head under the
+    floor is above the feet's contact plane, and nothing else reaches it."""
+    items = P.assembly(0.0, 0.0)
+    feet = [s for n, s, _ in items if n.startswith("hw:foot-")]
+    assert len(feet) == 4
+    plane = min(s.BoundingBox().zmin for s in feet)
+    assert plane == pytest.approx(-P.FOOT_H)
+    heads = [s for n, s, _ in items if n.startswith("hw:head-base")]
+    low = min(s.BoundingBox().zmin for s in heads)
+    assert low < 0.0                                       # there are heads under the floor
+    assert low >= plane + P.FOOT_CLEAR - 1e-9
+    for n, s, _ in items:
+        if not n.startswith("hw:foot-"):
+            assert s.BoundingBox().zmin > plane + 1e-6, n
+    # engraved locating circles on the floor, one per foot
+    floor = [p for n, p in body.panels.items() if n.startswith("base-floor-")]
+    for x, y in P.feet(lay):
+        assert any(any(abs(sum(u for u, _ in m[:-1]) / (len(m) - 1) - x) < 1e-6
+                       and abs(sum(v for _, v in m[:-1]) / (len(m) - 1) - y) < 1e-6
+                       for m in p.marks) for p in floor), (x, y)
+    hw = P.hardware(lay, WALL)
+    assert hw[f"{P.FOOT_D:g} x {P.FOOT_H:g} mm self-adhesive rubber foot"] == 4
+    assert any(k.startswith("hook-and-loop tape") for k in hw)
+
+
+def test_every_tslot_nut_is_a_keepout_in_the_assembly(body):
+    """R20: each T-slot's square nut is in the assembly as an ``hw:nut``
+    solid of its real size, standing (NUT_W - t) / 2 proud of each face of the
+    panel it is in, so the clash tests check it against the drawer, the
+    runners and everything else."""
+    items = P.assembly(0.0, 0.0)
+    nuts = {tuple(round(v, 6) for v in s.BoundingBox().center.toTuple())
+            for n, s, _ in items if n.startswith("hw:nut-")}
+    assert len(nuts) == len(body.screws)
+    proud = (J.NUT_W - WALL) / 2
+    for sc in body.screws:
+        b = sc.nut
+        c = ((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2)
+        if sc.frame == "base":                    # base items are not moved
+            assert tuple(round(v, 6) for v in c) in nuts
+        assert sorted(b.size) == pytest.approx([J.NUT_T, J.NUT_W, J.NUT_W])
+        into = body.panel_at(sc.into, sc.at)
+        lo, hi = {"x": (b.x0, b.x1), "y": (b.y0, b.y1), "z": (b.z0, b.z1)}[into.normal]
+        assert into.z0 - lo == pytest.approx(proud) and hi - (into.z0 + WALL) == pytest.approx(proud)

@@ -190,6 +190,9 @@ def keepouts(lay: Layout, t: float) -> list[tuple[str, Box]]:
            ("base", Box(us.x0, us.y0, op.z1, us.x1, us.y1, lay.deck_z - t, "USB-C cable drop")),
            ("base", Box(ch.x0, ch.y0, lay.deck_z, ch.x1, ch.y1, hz, "hinge channel"))]
     out += [("base", b) for b in lay.board_keepouts.values()]
+    r = P.FOOT_D / 2
+    out += [("base", Box(x - r, y - r, -P.FOOT_H, x + r, y + r, 0.0, "foot"))
+            for x, y in P.feet(lay)]
     out.append(("base", Box(*P._bb(H.hinge_base_knuckles(lay).val()), "hinge-base")))
     out.append(("lid", Box(*P._bb(H.hinge_lid_knuckles(lay).val()), "hinge-lid")))
     out.append(("lid", lay.lid_pocket))
@@ -287,6 +290,10 @@ def hardware(lay: Layout, t: float) -> dict[str, int]:
     add(f"M3 x {H.hinge_bolt_length(lay)} bolt (hinge)", len(H.hinge_groups(lay)))
     add("M3 nyloc nut (hinge)", len(H.hinge_groups(lay)))
     add("6 x 3 mm disc magnet", len(_magnets(lay, t)))
+    add(f"{P.FOOT_D:g} x {P.FOOT_H:g} mm self-adhesive rubber foot", len(P.feet(lay)))
+    bp = lay.boost_pocket
+    add(f"hook-and-loop tape, {math.floor(bp.size[0] - 10):g} x "
+        f"{math.floor(bp.size[1] - 5):g} mm pair (boost converter)", 1)
     return dict(sorted(hw.items()))
 
 
@@ -314,6 +321,9 @@ def assembly(angle_deg: float, drawer_out: float, monitor: str = PB.ASSEMBLY_MON
     for inst, (frame, _b, mg, _f) in _magnets(lay, t).items():
         items[frame].append((f"hw:magnet-{frame}", _cyl(mg, (0, 0, 1), P.MAGNET_D / 2,
                                                          P.MAGNET_T), COLOURS["magnet"]))
+    for i, (x, y) in enumerate(P.feet(lay)):
+        items["base"].append((f"hw:foot-{i + 1}", _cyl((x, y, -P.FOOT_H), (0, 0, 1),
+                                                       P.FOOT_D / 2, P.FOOT_H), (0.1, 0.1, 0.1)))
     peg = lay.pegs[board]
     pin = locating_pin(lay).val().translate(cq.Vector(peg.cx, peg.cy, lay.mt1_boss.z0))
     items["base"] += [("hinge-base", H.hinge_base_knuckles(lay).val(), PB.COLOURS["hinge-base"]),

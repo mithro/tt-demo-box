@@ -265,12 +265,14 @@ def test_assembly_drawer_out_has_no_intersections(lay):
     assert _clashes(items) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("key", sorted(MONITORS))
 def test_assembly_each_monitor(key):
     items = B.assembly("printed", 0.0, 0.0, monitor=key)
     assert _clashes(items) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("key", sorted(BATTERIES))
 def test_assembly_each_bank(key):
     items = B.assembly("printed", 0.0, 0.0, bank=key)
@@ -408,3 +410,12 @@ def test_detent_groove_leaves_a_full_wall(lay):
     groove_bottom = lay.wall - B.GROOVE_D
     assert not _inside(tub, (x, groove_bottom + 0.05, z))
     assert _inside(tub, (x, groove_bottom - lay.wall + 0.05, z))
+
+
+def test_nothing_stands_below_the_printed_floor():
+    """R19, printed route: no screw goes through the tub's floor (its screws go
+    into heat-set inserts from inside or from the sides), so nothing stands
+    below Z = 0 and the box needs no feet."""
+    items = B.assembly("printed", 0.0, 0.0)
+    assert min(s.BoundingBox().zmin for _, s, _ in items) == pytest.approx(0.0, abs=1e-6)
+    assert not [n for n, _, _ in items if n.startswith("hw:") and "foot" in n]

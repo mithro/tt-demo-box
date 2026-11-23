@@ -81,8 +81,13 @@ Functions (the printed route's, ``demobox.printed.body``)
   it (magnet down): FIT apart when shut, they hold it by their shear pull.
   The drawer is captive (runner-back is tabbed into both side walls): at the
   stop the bank and its packing lift out, which is what the travel is for.
+  To take the drawer out the floor comes off (``DRAWER_REMOVAL``), so the
+  guide's tabs are not glued into the floor.
 * The boost converter sits on the floor behind the drawer in an engraved
-  outline (fix with double-sided tape; the guide is its front fence).
+  outline, held by hook-and-loop tape (the guide is its front fence).
+* Feet (R19): the floor's screw heads stand m3.HEAD_H below it, so the box
+  stands on four self-adhesive rubber feet FOOT_H tall (>= HEAD_H + FOOT_CLEAR)
+  on engraved circles FOOT_INSET in from the floor's corners.
 """
 
 from __future__ import annotations
@@ -129,6 +134,26 @@ CUP_H = NUT_DEPTH[1] + 2.0
 TWO_SCREWS = 80.0
 #: Engraved label height.
 LABEL_H = 4.0
+#: Self-adhesive rubber feet (bought; R19): diameter, height, centre in from
+#: the floor's outside corners; they must stand FOOT_CLEAR below the heads.
+FOOT_D = 12.0
+FOOT_H = 4.0
+FOOT_INSET = 12.0
+FOOT_CLEAR = 1.0
+if FOOT_H < m3.HEAD_H + FOOT_CLEAR:
+    raise ValueError(f"feet {FOOT_H} mm do not clear the floor's {m3.HEAD_H} mm screw heads")
+#: How to take the drawer out (its note and the docstring).
+DRAWER_REMOVAL = ("To take the drawer out: empty it, stand the box on the table edge, unscrew "
+                  "the floor's T-slot screws from below and lower the floor out of the walls "
+                  "(its fingers and the guide's tabs slide straight out downward) with the "
+                  "drawer on it. Do not glue the guide's tabs into the floor.")
+
+
+def feet(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """(x, y) of the four feet under the base floor, base frame."""
+    o, i = lay.outer, FOOT_INSET
+    return ((o.x0 + i, o.y0 + i), (o.x1 - i, o.y0 + i), (o.x0 + i, o.y1 - i),
+            (o.x1 - i, o.y1 - i))
 
 AXES = "xyz"
 #: In-plane axes (u, v) of a panel by its normal.
@@ -389,9 +414,11 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
 
     # --- base -------------------------------------------------------------------------
     floor = add("base-floor", "base", "z", Box(0, 0, 0, W, D, t), 5,
-                "Base floor. T-slot screws up through it into the walls.")
+                "Base floor. T-slot screws up through it into the walls; rubber feet on the "
+                "engraved circles underneath. Comes off to take the drawer out.")
     bp = lay.boost_pocket
     floor.marks.append(tuple(sbox(bp.x0, bp.y0, bp.x1, bp.y1).exterior.coords))
+    floor.marks += [_circle(x, y, FOOT_D / 2) for x, y in feet(lay)]
     add("base-front", "base", "y", Box(0, 0, 0, W, t, Hh), 4, "Base front wall.")
     back = add("base-back", "base", "y", Box(0, D - t, 0, W, D, Hh), 4,
                "Base back wall: hinge leaf screws into nut blocks behind it.")
@@ -401,7 +428,8 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
     deck = add("deck", "base", "z", Box(0, 0, dz - t, W, D, dz), 1,
                "Deck: board mounts glued on the engraved outlines.")
     guide = add("drawer-guide", "base", "y", Box(bp.x1 + FIT, gy0, 0, W, gy0 + t, rz1), 1,
-                "Drawer guide: the drawer's back side runs along it.")
+                "Drawer guide: the drawer's back side runs along it. Glue it to runner-back "
+                "and the right wall, not to the floor.")
     rb = add("runner-back", "base", "z", Box(0, ear.y0 - FIT - RUNNER_LIP, rz0, W, gy0 + t, rz1),
              1, "Runner over the drawer's back side; its slot takes the drawer's ear (the "
                 "stops). Screwed down to the guide; the drawer is captive.")
@@ -434,7 +462,7 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
 
     # --- drawer -----------------------------------------------------------------------
     add("drawer-floor", "drawer", "z", Box(d.x0, d.y0, d.z0, d.x1, d.y1, d.z0 + t), 5,
-        "Drawer floor.")
+        "Drawer floor. " + DRAWER_REMOVAL)
     face = add("drawer-face", "drawer", "x", Box(d.x0, d.y0, d.z0, d.x0 + t, d.y1, d.z1), 4,
                "Drawer face, with the finger hole over the bank's button.")
     dback = add("drawer-back", "drawer", "x", Box(d.x1 - t, d.y0, d.z0, d.x1, d.y1, d.z1), 4,
