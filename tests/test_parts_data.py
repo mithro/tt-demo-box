@@ -101,3 +101,11 @@ def test_cable_data():
         assert c.sources and all(isinstance(s, Source) for s in c.sources)
         assert c.dia > 0 and c.min_bend_r > 0 and all(p > 0 for p in c.plug)
     assert CABLES["usb-12v-boost"].confirmed is False
+
+
+def test_ugreen_ports_on_the_end():
+    """R14: the survey's "all on top face" is read as the short top end."""
+    b = BATTERIES["ugreen-pb505"]
+    assert b.port_face == "end" and b.button[0] == "end"
+    assert any("read as the short top end" in s.note for s in b.sources)
+    assert b.confirmed is False
