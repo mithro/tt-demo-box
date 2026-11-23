@@ -34,7 +34,9 @@ from pathlib import Path
 from typing import Literal
 
 import cadquery as cq
+from OCP.Bnd import Bnd_Box
 from OCP.BRepAdaptor import BRepAdaptor_Curve
+from OCP.BRepBndLib import BRepBndLib
 from OCP.GCPnts import GCPnts_QuasiUniformDeflection
 from OCP.GeomAbs import GeomAbs_Line
 from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
@@ -76,6 +78,27 @@ class Projection:
         xs = [x for pl in self.visible for x, _ in pl]
         ys = [y for pl in self.visible for _, y in pl]
         return min(xs), min(ys), max(xs), max(ys)
+
+
+def exact_bbox(shape: cq.Shape) -> tuple[float, float, float, float, float, float]:
+    """(xmin, ymin, zmin, xmax, ymax, zmax) from the geometry itself, with no
+    triangulation and no tolerance gap (``BRepBndLib.AddOptimal``):
+    ``Shape.BoundingBox`` pads by the shape's tolerance."""
+    box = Bnd_Box()
+    BRepBndLib.AddOptimal_s(shape.wrapped, box, False, False)
+    return box.Get()
+
+
+def view_bbox(shape: cq.Shape, view: View) -> tuple[float, float, float, float]:
+    """(x0, y0, x1, y1) of the solid's exact bounding box in ``view``'s axes.
+
+    The overall sizes are dimensioned from this, not from the projected
+    polylines: those are discretised, and a circle's chords fall inside it
+    (a 16.00 hinge profile measured 15.98 off its knuckle's polygon)."""
+    x0, y0, z0, x1, y1, z1 = exact_bbox(shape)
+    corners = [to_view(view, (x, y, z)) for x in (x0, x1) for y in (y0, y1) for z in (z0, z1)]
+    xs, ys = [c[0] for c in corners], [c[1] for c in corners]
+    return (round(min(xs), 4), round(min(ys), 4), round(max(xs), 4), round(max(ys), 4))
 
 
 def to_view(view: View, p: tuple[float, float, float]) -> tuple[float, float]:

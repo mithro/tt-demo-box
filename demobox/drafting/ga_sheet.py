@@ -29,16 +29,13 @@ from tools.drafting import style
 from demobox.drafting import names
 from demobox.drafting import sheetkit as K
 from demobox.drafting.hlr import project, to_view
-from demobox.layout import (HEATSET_DEPTH, INSERT_MATERIAL, LASER_BED, LID_OPEN_DEG, ROUTES,
-                            layout)
+from demobox.layout import LASER_BED, LID_OPEN_DEG, ROUTES, layout
 from demobox.parts.batteries import BATTERIES
-from demobox.parts.board import BOARD_KEYS, board_spec
 from demobox.parts.cables import CABLES
 from demobox.parts.monitors import MONITORS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
 from demobox.shared import inserts as I
-from demobox.shared import m3
 
 F = K.fmt
 #: Room in the parts list's PART column, mm.
@@ -61,31 +58,13 @@ def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
 
 
 def printed_hardware(lay) -> dict[str, int]:
-    """Bought hardware for the printed route (name -> count), from the parts'
-    own records: every heat-set insert the bodies carry, the screw into each,
-    the hinge bolts, and the board's screw."""
-    parts = B.printed_parts(lay)
-    w = lay.wall
-    hw: Counter = Counter()
-    inserts = [h for p in parts.values() for h in p.heatsets]
-    hw["M3 heat-set insert, D4.0 x 5.7"] += len(inserts)
-    into = HEATSET_DEPTH - 1.0
-    whats = Counter(h.what for h in inserts)
-    hw[f"M3 x {m3.stock_length(w + into)} pan-head (deck corners)"] += whats["deck corner screw"]
-    hw[f"M3 x {m3.stock_length(H.LEAF_T + into)} pan-head (hinge leaves)"] += \
-        whats["hinge leaf screw"]
-    hw[f"M3 x {m3.stock_length(INSERT_MATERIAL + into)} pan-head (bezel)"] += \
-        len(I.bezel_screws(lay))
-    hw[f"M3 x {m3.stock_length(B.CLIP_T + into)} pan-head (bezel clip)"] += \
-        len(B.clip_screws(lay))
-    pcb = max(board_spec(k).outline.thickness for k in BOARD_KEYS)
-    hw[f"M3 x {m3.stock_length(pcb + into)} pan-head (board, MT2)"] += len(lay.standoffs)
-    hw[f"M3 x {H.hinge_bolt_length(lay)} bolt + nyloc (hinge pin)"] += len(H.hinge_groups(lay))
-    # the assembly's screw-head keep-outs are the bezel's and the clip's
+    """The printed route's bought hardware (``body.hardware``), plus the
+    board's screw check: the assembly's screw-head ``hw:`` solids are the
+    bezel's and the clip's, and must agree with them."""
     heads = [n for n, _, _ in B.assembly("printed", 0.0, 0.0) if n.startswith("hw:")]
     if len(heads) != len(I.bezel_screws(lay)) + len(B.clip_screws(lay)):
         raise ValueError(f"hw: solids {heads} disagree with the bezel and clip screws")
-    return dict(sorted(hw.items()))
+    return B.hardware(lay)
 
 
 def _parts_rows(route: str, lay) -> tuple[list[list[str]], dict[str, int]]:

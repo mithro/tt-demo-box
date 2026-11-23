@@ -30,7 +30,7 @@ from tools.drafting import dims, style
 
 from demobox.drafting import names
 from demobox.drafting import sheetkit as K
-from demobox.drafting.hlr import project, to_view
+from demobox.drafting.hlr import project, to_view, view_bbox
 from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, PEG_DIA, PEG_HEIGHT, ROUTES,
                             layout)
 from demobox.parts.batteries import BATTERIES
@@ -134,9 +134,25 @@ def _overall(views: dict[str, K.PView], text: dict) -> list:
     return out
 
 
+def part_bbs(part: Part) -> dict[str, tuple[float, float, float, float]]:
+    """Each view's extent: the drawn solid's exact bounding box in its axes."""
+    shape = part.shape()
+    return {v: view_bbox(shape, v) for v in part.views}
+
+
+def overall_dims(part: Part) -> list:
+    """The overall dimension records a sheet draws, placed at 1:1 (for the
+    tests: their values are the solid's sizes)."""
+    projs = {v: project(part.shape(), v, chord=part.chord) for v in part.views}
+    views = K.first_angle(projs, 1.0, 0.0, 0.0, bbs=part_bbs(part))
+    return _overall(views, part.overall_text)
+
+
 def render_part(part: Part):
     shape = part.shape()
     projs = {v: project(shape, v, chord=part.chord) for v in part.views}
+    # the views' extents, and so the overall dimensions, are the solid's own
+    bbs = part_bbs(part)
     caps = {k: v for k, v in {**CAPTIONS, **part.captions}.items() if k in part.views}
     entries = [K.L_VISIBLE] + ([K.L_HIDDEN] if part.hidden else []) + list(part.legend)
     entries.append(K.L_DIM)
@@ -148,7 +164,7 @@ def render_part(part: Part):
         return K.captioned(views, ann, caps)
 
     def build(sheet, s):
-        views, ann = K.solve(projs, s, make_ann, sheet.frame)
+        views, ann = K.solve(projs, s, make_ann, sheet.frame, bbs=bbs)
         lay = K.Layout(views, ann)
 
         def draw(sh):

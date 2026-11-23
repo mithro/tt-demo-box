@@ -117,6 +117,9 @@ def test_check_sheets_flags_collision_small_text_and_outside():
     assert any("under" in p for p in cs.sheet_problems(tiny))
     out = _SVG.format(_text(293, 50, "OUTSIDE"))
     assert any("outside" in p for p in cs.sheet_problems(out))
+    # A4 frame: x 20..285; "PROJECTION" ran across its right-hand line
+    across = _SVG.format(_text(276, 150, "PROJECTION"))
+    assert any("crosses the drawing frame" in p for p in cs.sheet_problems(across))
     geo = _SVG.format(_text(50, 50, "CROSSED") +
                       '<polyline points="40,49 80,49" fill="none" stroke="#000000" '
                       'stroke-width="0.5"/>')
@@ -139,3 +142,40 @@ def test_every_sheet_is_generated():
 def test_generated_sheets_pass_the_check():
     cs = _check_sheets()
     assert cs.main() == 0
+
+
+# --- overall dimensions are the solid's (review fix round 1) ---------------------
+
+def _part_records():
+    from demobox.drafting import part_sheet as PS
+    for n, s in names.SHEETS.items():
+        if s.kind == "packing":
+            yield n, PS.packing_part(s)
+        elif s.kind == "part":
+            yield n, PS.BUILDERS[s.subject](s)
+
+
+def test_part_overall_dims_are_the_solid_bbox():
+    """Every part sheet's overall dimensions read the solid's exact bounding
+    box (to 0.01), not the discretised outline's: the hinge profiles read
+    15.98 and 7.95 for 16.00 and 8.00 when they came off the polylines."""
+    from demobox.drafting import part_sheet as PS
+    for n, part in _part_records():
+        from demobox.drafting.hlr import exact_bbox
+        x0, y0, z0, x1, y1, z1 = exact_bbox(part.shape())
+        sizes = (x1 - x0, y1 - y0, z1 - z0)
+        dims = [d for d in PS.overall_dims(part) if d.text is None]
+        assert dims, n
+        for d in dims:
+            horizontal = d.side in ("top", "bottom")
+            value = abs(d.b[0] - d.a[0]) if horizontal else abs(d.b[1] - d.a[1])
+            assert min(abs(value - s) for s in sizes) < 0.01, (n, value, sizes)
+
+
+def test_hinge_profiles_read_their_true_depth():
+    from demobox.drafting import part_sheet as PS
+    for n, want in (("TDB-HGB-P", 16.0), ("TDB-HGL-P", 8.0)):
+        part = PS.BUILDERS[names.SHEETS[n].subject](names.SHEETS[n])
+        values = [abs(d.b[0] - d.a[0]) for d in PS.overall_dims(part) if d.side == "bottom"]
+        assert any(abs(v - want) < 0.005 for v in values), (n, values)
+        assert f">{want:.2f}</text>" in names.svg_path(n).read_text(), n

@@ -491,8 +491,12 @@ def subtract(free: list[Box4], used: Box4, pad: float = 0.0) -> list[Box4]:
 
 # --- the sheet ------------------------------------------------------------------------------
 
-#: Title block width on an A4 sheet; A3 keeps the submodule's 165 mm.
-A4_TITLE_W = 120.0
+#: Title block width on an A4 sheet; A3 keeps the submodule's 165 mm.  Wide
+#: enough for the PROJECTION cell (0.16 of the block) to hold its label, drawn
+#: 1.6 in, with 0.8 to spare: 120 mm put "PROJECTION" across the cell's rule
+#: and the frame line.  No wider, or the block reaches the bottom centring
+#: mark at the sheet's middle (148.5 mm): 139 mm put it through MATERIAL.
+A4_TITLE_W = math.ceil((style.text_width("PROJECTION", style.T_TINY) + 1.6 + 0.8) / 0.16)
 
 
 def new_sheet(defn: names.SheetDef, *, subtitle: str, material: str, tolerance: str,
@@ -601,7 +605,7 @@ class Layout:
 #: The least a free rectangle must offer to take a column of notes: a
 #: sliver between two views would split a note from its heading's column.
 COL_MIN_W = 80.0
-COL_MIN_H = 30.0
+COL_MIN_H = 18.0
 #: Wider than this, a free rectangle takes two columns of notes.
 COL_MAX_W = 170.0
 

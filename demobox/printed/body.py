@@ -965,7 +965,7 @@ def split_base(lay: Layout, bed=PRINT_BED) -> tuple[dict[str, Printed], Split | 
 
 
 def _joint_screw() -> int:
-    return m3.stock_length(JOINT_L + HEATSET_DEPTH - 1.0)
+    return m3.insert_screw(JOINT_L, HEATSET_DEPTH)
 
 
 def _count(hs) -> str:
@@ -1044,7 +1044,7 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
         parts[f"bezel-{k}"] = _printed("bezel", I.monitor_bezel(m, lay).val(), (
             f"Bezel for {m.title}: print flat. Screwed to the lid's inserts by "
             f"{len(I.bezel_screws(lay))} M3 x "
-            f"{m3.stock_length(INSERT_MATERIAL + HEATSET_DEPTH - 1.0)} pan-head screws."))
+            f"{m3.insert_screw(INSERT_MATERIAL, HEATSET_DEPTH)} pan-head screws."))
         parts[f"retainer-{k}"] = _printed("retainer", I.monitor_retainer(m, lay).val(), (
             f"Retainer for {m.title}: print back plate down."))
     for k, b in BATTERIES.items():
@@ -1053,7 +1053,7 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
     for i, (x, y) in enumerate(clip_screws(lay)):
         parts[f"bezel-clip-{i + 1}" if i else "bezel-clip"] = _printed("bezel-clip", bezel_clip(
             lay, x, y), (f"Bezel clip: print flat. Holds the bezel's corner that has no screw; "
-                         f"one M3 x {m3.stock_length(CLIP_T + HEATSET_DEPTH - 1.0)} pan-head "
+                         f"one M3 x {m3.insert_screw(CLIP_T, HEATSET_DEPTH)} pan-head "
                          "screw into the lid's heat-set insert. Fit after the bezel."))
     parts["mt1-pin"] = _printed("mt1-pin", locating_pin(lay).val(), (
         "MT1 locating pin: print standing; print spares, it is loose."))
@@ -1063,6 +1063,75 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
     lid_parts, _ = split_lid(lay, bed)
     out = {**base, **lid_parts, **parts}
     return dict(sorted(out.items()))
+
+
+@dataclass(frozen=True)
+class InsertScrew:
+    """M3 screws of one use into the printed route's heat-set inserts: what
+    they clamp (mm of parts above the insert's mouth), their stock length and
+    how many."""
+
+    what: str
+    clamp: float
+    length: int
+    count: int
+
+    @property
+    def engagement(self) -> float:
+        """Thread inside the insert hole."""
+        return self.length - self.clamp
+
+
+def screw_clamp(lay: Layout, what: str) -> tuple[str, float]:
+    """(label, clamp) of the screw into a heat-set insert of kind ``what``
+    (a ``HeatSet.what``): the mm of parts its head clamps above the insert's
+    mouth."""
+    from demobox.parts.board import BOARD_KEYS
+    if what == "deck corner screw" or what.startswith("joint deck screw"):
+        return ("deck corners" if what == "deck corner screw" else "deck at a joint"), lay.wall
+    if what == "hinge leaf screw":
+        return "hinge leaves", H.LEAF_T
+    if what == "bezel screw":
+        return "bezel", INSERT_MATERIAL
+    if what == "clip screw (bezel corner)":
+        return "bezel clip", CLIP_T
+    if what.startswith("joint screw"):
+        return "split joints", JOINT_L
+    if what.startswith("standoff"):
+        return "board, MT2", max(board_spec(k).outline.thickness for k in BOARD_KEYS)
+    raise ValueError(f"no screw known for the heat-set insert {what!r}")
+
+
+def insert_screws(lay: Layout, heatsets=None) -> tuple[InsertScrew, ...]:
+    """Every screw that goes into a heat-set insert of the printed route (or
+    of ``heatsets``), sized by ``m3.insert_screw``: the longest stock length
+    that stops short of the hole's floor.  Counts come from the parts' own
+    HeatSet records."""
+    if heatsets is None:
+        heatsets = [h for p in printed_parts(lay).values() for h in p.heatsets]
+    groups: dict[tuple[str, float], int] = {}
+    for h in heatsets:
+        key = screw_clamp(lay, h.what)
+        groups[key] = groups.get(key, 0) + 1
+    return tuple(InsertScrew(label, clamp, m3.insert_screw(clamp, HEATSET_DEPTH), n)
+                 for (label, clamp), n in sorted(groups.items()))
+
+
+def hardware(lay: Layout) -> dict[str, int]:
+    """Bought hardware for the printed route (name -> count): the heat-set
+    inserts, the screw into each, and the hinge bolts and nylocs."""
+    parts = printed_parts(lay)
+    hw: dict[str, int] = {}
+
+    def add(k, n):
+        hw[k] = hw.get(k, 0) + n
+
+    add(f"M3 heat-set insert, D{HEATSET_HOLE_D:.1f} x {HEATSET_DEPTH:.1f}",
+        sum(len(p.heatsets) for p in parts.values()))
+    for s in insert_screws(lay):
+        add(f"M3 x {s.length} pan-head ({s.what})", s.count)
+    add(f"M3 x {H.hinge_bolt_length(lay)} bolt + nyloc (hinge pin)", len(H.hinge_groups(lay)))
+    return dict(sorted(hw.items()))
 
 
 # --- assembly ------------------------------------------------------------------------

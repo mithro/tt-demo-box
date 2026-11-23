@@ -73,7 +73,15 @@ def sheet_problems(svg: str) -> list[str]:
     rules = T.vertical_rules(T.all_lines(svg))
     segs = list(T.lines(svg)) + list(_segments(svg)) + _centring(svg, page_w, page_h)
     out: list[str] = []
+    # the drawing frame, SVG y-down; text is inside it, or (the zone marks)
+    # wholly in the strip outside it, never across its line
+    fx0, fy0 = style.FILING_MARGIN, style.FRAME_MARGIN
+    fx1, fy1 = page_w - style.FRAME_MARGIN, page_h - style.FRAME_MARGIN
     for i, a in enumerate(items):
+        inside = a[0] >= fx0 and a[2] <= fx1 and a[1] >= fy0 and a[3] <= fy1
+        outside = a[2] <= fx0 or a[0] >= fx1 or a[3] <= fy0 or a[1] >= fy1
+        if not inside and not outside:
+            out.append(f"text {a[4]!r} at ({a[0]:.1f},{a[1]:.1f}) crosses the drawing frame")
         if a[5] < T.MIN_TEXT_MM:
             out.append(f"text {a[4]!r} is {a[5]:.2f} mm, under the {T.MIN_TEXT_MM} mm floor")
         if a[0] < trim or a[2] > page_w - trim or a[1] < trim or a[3] > page_h - trim:
