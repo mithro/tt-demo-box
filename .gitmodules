@@ -1,0 +1,3 @@
+[submodule "vendor/fpgas.online-mechanical"]
+	path = vendor/fpgas.online-mechanical
+	url = https://github.com/fpgas-online/fpgas.online-mechanical
