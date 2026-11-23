@@ -220,8 +220,19 @@ def test_bezel_covers_pocket_and_gutters(lay, key):
     holes = sum((r[2] - r[0]) * (r[3] - r[1]) for r in _inner_rects(I.monitor_bezel(
         MONITORS[key], lay), lay))
     screws = len(I.bezel_screws(lay)) * math.pi * (I.BEZEL_SCREW_D / 2) ** 2
-    assert area + holes + screws == pytest.approx((bb.xmax - bb.xmin) * (bb.ymax - bb.ymin),
-                                                  rel=1e-5)
+    plate = _box(bb.xmin, bb.ymin, 0.0, bb.xmax, bb.ymax, L.INSERT_MATERIAL)
+    relief = sum(plate.intersect(r).Volume() for r in H.knuckle_relief(lay, (0.0, 0.0)))
+    assert relief > 0
+    assert area + holes + screws + relief / L.INSERT_MATERIAL == pytest.approx(
+        (bb.xmax - bb.xmin) * (bb.ymax - bb.ymin), rel=1e-5)
+
+
+def test_bezel_clears_the_base_knuckles(lay):
+    """Closed, the base knuckles sit in the lid's corner by the axis, where
+    the bezel's hinge edge is: it is relieved round them."""
+    knuckles = H.hinge_base_knuckles(lay).val().moved(lay.lid_location(0.0).inverse)
+    for m in MONITORS.values():
+        assert _common(I.monitor_bezel(m, lay).val(), knuckles) <= VOL_TOL
 
 
 @pytest.mark.parametrize("key", sorted(MONITORS))

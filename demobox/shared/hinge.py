@@ -37,9 +37,10 @@ lowers y), so the lid leaf lands flat on the shelf exactly at LID_OPEN_DEG
 and the shelf meets nothing before.  The lid leaf's screw heads sit above the
 shelf's reach.
 
-The base and lid bodies (later tasks) relieve their back-top edges by a
-radius KNUCKLE_R + FIT round the axis along each group: closed, each part's
-knuckles sit in the other body's corner.
+The base and lid bodies relieve their back-top edges by
+``knuckle_relief``, a radius KNUCKLE_R + FIT round the axis along each group:
+closed, each part's knuckles sit in the other body's corner.  So does the
+monitor bezel, whose hinge-end edge is nearer the axis than KNUCKLE_R.
 """
 
 from __future__ import annotations
@@ -137,6 +138,17 @@ def _stop_reach_z() -> float:
 
 def _shelf_bottom_v() -> float:
     return _stop_plane_v(STOP_REACH) - STOP_T - STOP_REACH
+
+
+def knuckle_relief(lay: Layout, axis_yz: tuple[float, float]) -> list[cq.Solid]:
+    """What a body (or anything else beside the axis) must give up so the
+    knuckles turn: a radius KNUCKLE_R + FIT cylinder round the hinge axis at
+    ``axis_yz`` (the frame's (y, z) of it), along each knuckle group, FIT
+    beyond its ends."""
+    r = _CLEAR_R
+    return [cq.Solid.makeCylinder(r, x1 - x0 + 2 * FIT, cq.Vector(x0 - FIT, *axis_yz),
+                                  cq.Vector(1, 0, 0))
+            for x0, x1 in hinge_groups(lay)]
 
 
 def _base_hole_v() -> float:

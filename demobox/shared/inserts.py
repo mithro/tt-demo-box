@@ -13,7 +13,9 @@ cable gutter (they are open on the screen side like the pocket), FIT inside
 the opening all round so it drops in.  It has the window
 ``checks.monitor_window(m)`` (R4) and, where the window does not expose the
 front button, the cut-out ``checks.button_cutout(m)``; nothing else of the
-pocket or the gutters shows, so cables do not show round the picture.
+pocket or the gutters shows, so cables do not show round the picture.  Its
+hinge-end edge is closer to the hinge axis than the knuckles' radius, so it is
+cut back by ``hinge.knuckle_relief`` along the knuckle groups, like the lid.
 
 It is screwed to the lid (R15) at ``bezel_screws(lay)``: an M3 clearance
 hole at each corner of the opening that lies in a cable gutter, where the lid
@@ -52,7 +54,7 @@ from demobox.geom import Box, Cyl
 from demobox.layout import (DRIVER_STANDOFF, FIT, INSERT_MATERIAL, Layout, exit_edge,
                             insert_stack)
 from demobox.parts.monitors import Monitor
-from demobox.shared import m3
+from demobox.shared import hinge, m3
 
 #: Wall left at each end of the cable-exit edge to locate the panel there.
 EXIT_TAB = 15.0
@@ -111,6 +113,8 @@ def monitor_bezel(m: Monitor, lay: Layout) -> cq.Workplane:
     for x, y in bezel_screws(lay):
         plate = plate.cut(cq.Workplane("XY", origin=(x, y, -1.0)).circle(BEZEL_SCREW_D / 2)
                           .extrude(t + 2.0))
+    for r in hinge.knuckle_relief(lay, (0.0, 0.0)):   # its hinge edge is by the axis
+        plate = plate.cut(cq.Workplane("XY").add(r))
     return plate
 
 
