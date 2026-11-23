@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="297mm" height="210mm" viewBox="0 0 297 210">
+<rect width="100%" height="100%" fill="#ffffff"/>
+
+<rect x="5" y="5" width="287" height="200" fill="none" stroke="#888888" stroke-width="0.25"/>
+<rect x="20" y="12" width="265" height="186" fill="none" stroke="#000000" stroke-width="0.7"/>
+<text x="53.125" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">1</text>
+<text x="53.125" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">1</text>
+<line x1="86.25" y1="205" x2="86.25" y2="198" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="86.25" y1="12" x2="86.25" y2="5" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="119.375" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">2</text>
+<text x="119.375" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">2</text>
+<line x1="152.5" y1="205" x2="152.5" y2="198" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="152.5" y1="12" x2="152.5" y2="5" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="185.625" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">3</text>
+<text x="185.625" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">3</text>
+<line x1="218.75" y1="205" x2="218.75" y2="198" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="218.75" y1="12" x2="218.75" y2="5" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="251.875" y="202.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">4</text>
+<text x="251.875" y="9.75" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">4</text>
+<text x="12.5" y="168.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">C</text>
+<text x="288.5" y="168.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">C</text>
+<line x1="5" y1="136" x2="20" y2="136" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="285" y1="136" x2="292" y2="136" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="12.5" y="106.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">B</text>
+<text x="288.5" y="106.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">B</text>
+<line x1="5" y1="74" x2="20" y2="74" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="285" y1="74" x2="292" y2="74" stroke="#888888" stroke-width="0.25" stroke-linecap="round"/>
+<text x="12.5" y="44.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">A</text>
+<text x="288.5" y="44.25" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="middle">A</text>
+<line x1="148.5" y1="210" x2="148.5" y2="193" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<line x1="148.5" y1="17" x2="148.5" y2="0" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<line x1="0" y1="105" x2="25" y2="105" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<line x1="280" y1="105" x2="297" y2="105" stroke="#000000" stroke-width="0.7" stroke-linecap="round"/>
+<polyline points="38.5547,47.5295 38.5547,29.1831" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,29.1831 38.5547,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,47.5295 137.4547,47.5295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="137.4547,47.5295 137.4547,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,29.1831 39.7547,29.1831" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,29.3295 137.4547,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,29.3295 39.7547,29.1831" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="125.8547,40.3295 125.8547,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="123.2047,34.8295 134.7047,34.8295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="123.2047,41.8295 123.2047,34.8295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="134.7047,34.8295 134.7047,35.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="123.2047,41.8295 134.7047,41.8295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="123.7047,35.3295 134.7047,35.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="134.7047,41.3295 134.7047,41.8295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="123.7047,35.3295 123.7047,41.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="123.7047,41.3295 134.7047,41.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,26.9942 39.7547,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,29.1831 39.7547,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="136.2547,29.3295 39.7547,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="125.2047,40.3295 125.8547,40.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="124.2047,40.3295 125.2047,40.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="124.2047,40.3295 124.2047,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="125.2047,36.3295 125.8547,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="124.2047,36.3295 125.2047,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="125.2047,40.3295 125.2047,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="259.9494,47.5295 259.9494,29.1831" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="259.9494,29.1831 257.7605,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="257.7605,26.9942 255.4252,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="255.4252,29.3295 255.218,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="255.218,29.3295 252.8827,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="252.8827,26.9942 250.5474,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="250.5474,29.3295 250.3403,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="250.3403,29.3295 248.0049,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="248.0049,26.9942 245.6696,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="245.6696,29.3295 245.4625,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="245.4625,29.3295 243.1272,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="243.1272,26.9942 240.7918,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="240.7918,29.3295 240.5847,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="240.5847,29.3295 238.2494,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="238.2494,26.9942 235.914,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="235.914,29.3295 235.7069,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="235.7069,29.3295 233.3716,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="233.3716,26.9942 231.0363,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="231.0363,29.3295 230.8292,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="230.8292,29.3295 228.4938,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="228.4938,26.9942 226.1585,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="226.1585,29.3295 225.9514,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="225.9514,29.3295 223.616,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="223.616,26.9942 221.2807,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="221.2807,29.3295 221.0736,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="221.0736,29.3295 218.7383,26.9942" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="218.7383,26.9942 216.5494,29.1831" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="216.5494,29.1831 216.5494,47.5295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="221.7494,47.5295 216.5494,47.5295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="221.7494,47.5295 221.7494,46.9295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="221.7494,46.9295 223.7494,46.9295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="223.7494,47.5295 223.7494,46.9295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="252.7494,47.5295 223.7494,47.5295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="252.7494,47.5295 252.7494,46.9295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="252.7494,46.9295 254.7494,46.9295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="254.7494,47.5295 254.7494,46.9295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="259.9494,47.5295 254.7494,47.5295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="233.2494,44.0795 243.2494,44.0795" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="233.2494,44.0795 233.2494,33.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="233.2494,33.3295 243.2494,33.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="243.2494,44.0795 243.2494,33.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="255.4252,29.3295 255.218,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="250.5474,29.3295 250.3403,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="245.6696,29.3295 245.4625,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="240.7918,29.3295 240.5847,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="235.914,29.3295 235.7069,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="231.0363,29.3295 230.8292,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="226.1585,29.3295 225.9514,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="221.2807,29.3295 221.0736,29.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="259.9494,40.3295 260.5994,40.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="260.5994,40.3295 260.5994,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="259.9494,36.3295 260.5994,36.3295" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,127.1388 38.5547,124.9499" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,124.9499 38.5547,122.6146" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,122.6146 38.5547,122.4075" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,122.4075 38.5547,120.0722" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,120.0722 38.5547,117.7368" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,117.7368 38.5547,117.5297" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,117.5297 38.5547,115.1944" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,115.1944 38.5547,112.859" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,112.859 38.5547,112.6519" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,112.6519 38.5547,110.3166" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,110.3166 38.5547,107.9813" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,107.9813 38.5547,107.7742" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,107.7742 38.5547,105.4388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,105.4388 38.5547,103.1035" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,103.1035 38.5547,102.8964" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,102.8964 38.5547,100.561" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,100.561 38.5547,98.2257" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,98.2257 38.5547,98.0186" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,98.0186 38.5547,95.6833" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,95.6833 38.5547,93.3479" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,93.3479 38.5547,93.1408" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,93.1408 38.5547,90.8055" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,90.8055 38.5547,88.4702" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,88.4702 38.5547,88.263" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,88.263 38.5547,85.9277" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,85.9277 38.5547,83.7388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,127.1388 39.7547,127.1388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,127.1388 137.4547,127.1388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,124.9499 39.7547,124.9499" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,127.1388 39.7547,124.9499" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,122.6146 39.7547,122.6146" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,124.9499 39.7547,122.6146" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,122.4075 39.7547,122.4075" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,122.6146 39.7547,122.4075" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,120.0722 39.7547,120.0722" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,122.4075 39.7547,120.0722" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,117.7368 39.7547,117.7368" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,120.0722 39.7547,117.7368" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,117.5297 39.7547,117.5297" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,117.7368 39.7547,117.5297" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,115.1944 39.7547,115.1944" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,117.5297 39.7547,115.1944" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,112.859 39.7547,112.859" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,115.1944 39.7547,112.859" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,112.6519 39.7547,112.6519" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,112.859 39.7547,112.6519" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,110.3166 39.7547,110.3166" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,112.6519 39.7547,110.3166" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,107.9813 39.7547,107.9813" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,110.3166 39.7547,107.9813" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,107.7742 39.7547,107.7742" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,107.9813 39.7547,107.7742" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,105.4388 39.7547,105.4388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,107.7742 39.7547,105.4388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,103.1035 39.7547,103.1035" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,105.4388 39.7547,103.1035" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,102.8964 39.7547,102.8964" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,103.1035 39.7547,102.8964" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,100.561 39.7547,100.561" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,102.8964 39.7547,100.561" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,98.2257 39.7547,98.2257" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,100.561 39.7547,98.2257" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,98.0186 39.7547,98.0186" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,98.2257 39.7547,98.0186" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,95.6833 39.7547,95.6833" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,98.0186 39.7547,95.6833" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,93.3479 39.7547,93.3479" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,95.6833 39.7547,93.3479" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,93.1408 39.7547,93.1408" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,93.3479 39.7547,93.1408" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,90.8055 39.7547,90.8055" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,93.1408 39.7547,90.8055" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,88.4702 39.7547,88.4702" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,90.8055 39.7547,88.4702" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,88.263 39.7547,88.263" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,88.4702 39.7547,88.263" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,85.9277 39.7547,85.9277" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,88.263 39.7547,85.9277" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="38.5547,83.7388 39.7547,83.7388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,85.9277 39.7547,83.7388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="39.7547,83.7388 137.4547,83.7388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="137.4547,127.1388 137.4547,83.7388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="136.2547,125.9388 39.7547,125.9388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="136.2547,125.9388 136.2547,84.9388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="136.2547,84.9388 39.7547,84.9388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="124.2047,127.1388 124.2047,127.7888" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="125.2047,127.7888 125.8547,127.1388" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="124.2047,127.7888 125.2047,127.7888" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<line x1="231.6494" y1="38.7045" x2="244.8494" y2="38.7045" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="238.2494" y1="45.3045" x2="238.2494" y2="32.1045" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<circle cx="38.5547" cy="47.5295" r="2" fill="none" stroke="#004c99" stroke-width="0.25"/>
+<path d="M 38.554663923182446 47.52951817558298 L 40.554663923182446 47.52951817558298 A 2.0 2.0 0 0 1 38.554663923182446 45.52951817558298 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M 38.554663923182446 47.52951817558298 L 36.554663923182446 47.52951817558298 A 2.0 2.0 0 0 1 38.554663923182446 49.52951817558298 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="259.9494" cy="47.5295" r="2" fill="none" stroke="#004c99" stroke-width="0.25"/>
+<path d="M 259.9493569958848 47.52951817558298 L 261.9493569958848 47.52951817558298 A 2.0 2.0 0 0 1 259.9493569958848 45.52951817558298 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M 259.9493569958848 47.52951817558298 L 257.9493569958848 47.52951817558298 A 2.0 2.0 0 0 1 259.9493569958848 49.52951817558298 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="38.5547" cy="127.1388" r="2" fill="none" stroke="#004c99" stroke-width="0.25"/>
+<path d="M 38.554663923182446 127.13884602194787 L 40.554663923182446 127.13884602194787 A 2.0 2.0 0 0 1 38.554663923182446 125.13884602194787 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M 38.554663923182446 127.13884602194787 L 36.554663923182446 127.13884602194787 A 2.0 2.0 0 0 1 38.554663923182446 129.13884602194787 Z" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="37.3547" y1="47.5295" x2="29.5547" y2="47.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="37.3547" y1="26.9942" x2="29.5547" y2="26.9942" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="31.5547" y1="47.5295" x2="31.5547" y2="26.9942" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="31.5547,47.5295 32.4547,44.5295 30.6547,44.5295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="31.5547,26.9942 30.6547,29.9942 32.4547,29.9942" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="29" y="37.2618" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 29 37.2618)">41.07</text>
+<line x1="38.5547" y1="128.9888" x2="38.5547" y2="136.7888" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="137.4547" y1="128.9888" x2="137.4547" y2="136.7888" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="38.5547" y1="134.7888" x2="137.4547" y2="134.7888" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="38.5547,134.7888 41.5547,135.6888 41.5547,133.8888" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="137.4547,134.7888 134.4547,133.8888 134.4547,135.6888" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="88.0047" y="133.0795" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle">197.80</text>
+<line x1="37.3547" y1="127.7888" x2="29.5547" y2="127.7888" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="37.3547" y1="83.7388" x2="29.5547" y2="83.7388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="31.5547" y1="127.7888" x2="31.5547" y2="83.7388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="31.5547,127.7888 32.4547,124.7888 30.6547,124.7888" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="31.5547,83.7388 30.6547,86.7388 32.4547,86.7388" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="29" y="105.7638" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 29 105.7638)">88.10</text>
+<line x1="259.9494" y1="48.7295" x2="259.9494" y2="56.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="238.2494" y1="48.7295" x2="238.2494" y2="56.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="238.2494" y1="54.5295" x2="259.9494" y2="54.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="238.2494,54.5295 241.2494,55.4295 241.2494,53.6295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="259.9494,54.5295 256.9494,53.6295 256.9494,55.4295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="249.0994" y="52.8202" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle">43.40</text>
+<line x1="215.3494" y1="47.5295" x2="209.5494" y2="47.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="215.3494" y1="38.7045" x2="209.5494" y2="38.7045" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="209.5494" y1="47.5295" x2="209.5494" y2="38.7045" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="209.5494,47.5295 208.6494,50.5295 210.4494,50.5295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="209.5494,38.7045 210.4494,35.7045 208.6494,35.7045" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="209.5494" y1="54.1295" x2="209.5494" y2="47.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="209.5494" y1="38.7045" x2="209.5494" y2="32.1045" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="206.9947" y="43.117" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 206.9947 43.117)">17.65</text>
+<polygon points="233.2494,37.2045 231.9089,40.0353 233.6885,40.3057" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="233.2494" y1="37.2045" x2="229.2494" y2="63.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="229.2494" y1="63.5295" x2="224.2494" y2="63.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="223.0494" y="62.6295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="end">FINGER HOLE 20.00 SQ</text>
+<line x1="38.5547" y1="42.5295" x2="38.5547" y2="56.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="123.7047" y1="42.5295" x2="123.7047" y2="56.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="38.5547" y1="54.5295" x2="123.7047" y2="54.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="38.5547,54.5295 41.5547,55.4295 41.5547,53.6295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="123.7047,54.5295 120.7047,53.6295 120.7047,55.4295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="81.1297" y="52.8202" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle">170.30</text>
+<line x1="123.7047" y1="42.5295" x2="123.7047" y2="62.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="134.7047" y1="42.5295" x2="134.7047" y2="62.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="123.7047" y1="62.5295" x2="134.7047" y2="62.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="123.7047,62.5295 120.7047,61.6295 120.7047,63.4295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="134.7047,62.5295 137.7047,63.4295 137.7047,61.6295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="117.1047" y1="62.5295" x2="123.7047" y2="62.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="134.7047" y1="62.5295" x2="141.3047" y2="62.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="142.7047" y="60.8202" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="start">22.00</text>
+<line x1="138.6547" y1="47.5295" x2="144.4547" y2="47.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="138.6547" y1="41.3295" x2="144.4547" y2="41.3295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="144.4547" y1="47.5295" x2="144.4547" y2="41.3295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="144.4547,47.5295 143.5547,50.5295 145.3547,50.5295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="144.4547,41.3295 145.3547,38.3295 143.5547,38.3295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="144.4547" y1="54.1295" x2="144.4547" y2="47.5295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="144.4547" y1="41.3295" x2="144.4547" y2="34.7295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="141.9" y="33.3295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="start" transform="rotate(-90 141.9 33.3295)">12.40</text>
+<line x1="138.6547" y1="41.3295" x2="152.4547" y2="41.3295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="138.6547" y1="35.3295" x2="152.4547" y2="35.3295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="152.4547" y1="41.3295" x2="152.4547" y2="35.3295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="152.4547,41.3295 151.5547,44.3295 153.3547,44.3295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="152.4547,35.3295 153.3547,32.3295 151.5547,32.3295" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<line x1="152.4547" y1="47.9295" x2="152.4547" y2="41.3295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="152.4547" y1="35.3295" x2="152.4547" y2="28.7295" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<text x="149.9" y="27.3295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="start" transform="rotate(-90 149.9 27.3295)">12.00</text>
+<line x1="39.7547" y1="82.5388" x2="39.7547" y2="74.7388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="136.2547" y1="82.5388" x2="136.2547" y2="74.7388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="39.7547" y1="76.7388" x2="136.2547" y2="76.7388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="39.7547,76.7388 42.7547,77.6388 42.7547,75.8388" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="136.2547,76.7388 133.2547,75.8388 133.2547,77.6388" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="88.0047" y="75.0295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle">193.00</text>
+<line x1="138.6547" y1="125.9388" x2="146.4547" y2="125.9388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="138.6547" y1="84.9388" x2="146.4547" y2="84.9388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<line x1="144.4547" y1="125.9388" x2="144.4547" y2="84.9388" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
+<polygon points="144.4547,125.9388 145.3547,122.9388 143.5547,122.9388" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<polygon points="144.4547,84.9388 143.5547,87.9388 145.3547,87.9388" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
+<text x="141.9" y="105.4388" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 141.9 105.4388)">82.00</text>
+<text x="88.0047" y="24.4942" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="middle" font-weight="bold">FRONT (DETENT SIDE)</text>
+<text x="238.5744" y="24.4942" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="middle" font-weight="bold">FROM LEFT (FACE)</text>
+<text x="88.0047" y="69.0295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="middle" font-weight="bold">PLAN</text>
+<text x="147.4547" y="70.0295" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">NOTES</text>
+<line x1="147.4547" y1="71.4295" x2="279" y2="71.4295" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="147.4547" y="76.1295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
+<text x="151.9967" y="76.1295" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Datum (target): the drawer&#x27;s front-left-bottom corner (face, front side, floor).</text>
+<text x="147.4547" y="81.6563" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">2.</text>
+<text x="151.9967" y="81.6563" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Drawer: print floor down, no supports. The detent tongue is cut free in the front</text>
+<text x="151.9967" y="86.183" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">side; its bump clicks over the base&#x27;s ridge at the closed position and stops on the</text>
+<text x="151.9967" y="90.7098" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">groove&#x27;s end with the drawer out 165.9 mm (groove x 5.4..175.1). To take the</text>
+<text x="151.9967" y="95.2365" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">drawer out: pull it to the stop, lift out the bank and packing, press the tongue in</text>
+<text x="151.9967" y="99.7633" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">(towards the bay) with a fingertip and slide the drawer out.</text>
+<text x="147.4547" y="105.29" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">3.</text>
+<text x="151.9967" y="105.29" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Walls and floor 2.40. Cavity: cable bay 35.00 + battery bay 158.00, 34.00 deep</text>
+<text x="151.9967" y="109.8168" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">(spec). Floor grooves at Y 12.40, 74.40, 4.00 wide x 1.20 deep. Tongue 22.00 x</text>
+<text x="151.9967" y="114.3435" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">12.00, 1.40 thick, in 1.00 slots; bump at X 171.30, 2.00 + 1.30 ramp, 1.30 proud.</text>
+<text x="151.9967" y="118.8703" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">The face is the opening&#x27;s peaked profile, 0.50 smaller.</text>
+<text x="147.4547" y="124.397" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">4.</text>
+<text x="151.9967" y="124.397" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">UNCONFIRMED inputs (placeholders; make verify lists each): all 4 power banks.</text>
+<text x="151.9967" y="128.9238" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">They place the finger hole.</text>
+<text x="23" y="141.2888" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">SOURCES</text>
+<line x1="23" y1="142.6888" x2="143.4547" y2="142.6888" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="23" y="147.3888" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
+<text x="27.542" y="147.3888" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/printed/body.py: drawer, _detent</text>
+<text x="23" y="152.9156" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">2.</text>
+<text x="27.542" y="152.9156" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/layout.py (layout(2.4))</text>
+<rect x="165" y="150" width="120" height="48" fill="none" stroke="#000000" stroke-width="0.7"/>
+<line x1="165" y1="165" x2="285" y2="165" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="167.5" y="158.8" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="6.8587" fill="#000000" text-anchor="start" font-weight="bold">DRAWER</text>
+<text x="167.5" y="163.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#333333" text-anchor="start">Printed route: slides out of the base&#x27;s left side; prints floor down</text>
+<text x="166.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">DRAWN</text>
+<text x="166.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">generated</text>
+<line x1="195" y1="176" x2="195" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="196.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">VERSION</text>
+<text x="196.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">f730fa3</text>
+<line x1="225" y1="176" x2="225" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="226.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">UNITS</text>
+<text x="226.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">mm</text>
+<line x1="255" y1="176" x2="255" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="256.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">SCALE</text>
+<text x="256.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">1:2</text>
+<line x1="165" y1="176" x2="285" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="166.6" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">SIZE</text>
+<text x="166.6" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">A4</text>
+<line x1="181.8" y1="187" x2="181.8" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="183.4" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">SHEET</text>
+<text x="183.4" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">1 OF 1</text>
+<line x1="205.8" y1="187" x2="205.8" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="207.4" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">DRAWING NO</text>
+<text x="207.4" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">TDB-DRW-P</text>
+<line x1="265.8" y1="187" x2="265.8" y2="176" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="267.4" y="179.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">REV</text>
+<text x="267.4" y="185.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">A</text>
+<line x1="165" y1="187" x2="285" y2="187" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="166.6" y="190.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">MATERIAL</text>
+<text x="166.6" y="196.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">PETG or PLA</text>
+<line x1="198.6" y1="198" x2="198.6" y2="187" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="200.2" y="190.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">GENERAL TOLERANCE</text>
+<text x="200.2" y="196.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">+/-0.3 unless noted</text>
+<line x1="265.8" y1="198" x2="265.8" y2="187" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
+<text x="267.4" y="190.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">PROJECTION</text>
+<line x1="268.58" y1="195.14" x2="282.22" y2="195.14" stroke="#666666" stroke-width="0.25" stroke-linecap="round" stroke-dasharray="3.2,1.2,0.6,1.2"/>
+<polygon points="269.82,194.396 274.78,193.652 274.78,196.628 269.82,195.884" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<circle cx="278.748" cy="195.14" r="1.488" fill="none" stroke="#000000" stroke-width="0.5"/>
+<circle cx="278.748" cy="195.14" r="0.744" fill="none" stroke="#000000" stroke-width="0.5"/>
+</svg>
