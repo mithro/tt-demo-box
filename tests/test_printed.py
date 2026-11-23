@@ -36,7 +36,7 @@ def _inside(shape, p) -> bool:
 # --- the parts list ------------------------------------------------------------
 
 def test_parts_list(parts):
-    want = {"base", "deck", "lid", "drawer", "hinge-base", "hinge-lid", "mt1-pin"}
+    want = {"base", "deck", "lid", "drawer", "hinge-base", "hinge-lid", "mt1-pin", "bezel-clip"}
     want |= {f"bezel-{k}" for k in MONITORS} | {f"retainer-{k}" for k in MONITORS}
     want |= {f"packing-{k}" for k in BATTERIES}
     assert set(parts) == want
@@ -67,7 +67,7 @@ def test_print_orientation_puts_a_face_on_the_bed(parts):
     o = L.layout(2.4).outer
     assert B.posed(parts["base"]).BoundingBox().zlen == pytest.approx(o.size[2])   # floor down
     assert B.posed(parts["lid"]).BoundingBox().zlen == pytest.approx(
-        L.layout(2.4).lid_outer.size[2] + L.FIT + B.LIP_T)     # back down; the lip is proud
+        L.layout(2.4).lid_outer.size[2])                        # back down, nothing proud
     lid = B.posed(parts["lid"])
     # back plate down: the pocket opens upwards, so its centre is empty high up
     bb = lid.BoundingBox()
@@ -159,7 +159,7 @@ def test_heatset_holes_are_4_mm(parts):
             assert _inside(p.solid, (mid + side * (r + 0.05)).toTuple()), (name, h.what)
             assert _inside(p.solid, (mouth + d * (L.HEATSET_DEPTH + 0.3)).toTuple()), \
                 (name, h.what)
-    assert count >= 1 + 4 + 2 + 3 + 4      # MT2, base leaf, lid leaf, bezel, deck corners
+    assert count >= 1 + 4 + 2 + 3 + 1 + 4  # MT2, base leaf, lid leaf, bezel, clip, deck corners
 
 
 def test_hinge_leaf_screws_have_heatset_bosses(parts, lay):
@@ -295,16 +295,7 @@ def test_assembly_each_bank(key):
 def test_assembly_lid_turns_about_the_axis(lay):
     closed = dict((n, s) for n, s, _ in B.assembly("printed", 0.0, 0.0))
     opened = dict((n, s) for n, s, _ in B.assembly("printed", L.LID_OPEN_DEG, 0.0))
-    # the lid's face rests on the base's rim; only the bezel lip dips inside it
-    assert closed["lid"].BoundingBox().zmin == pytest.approx(lay.outer.z1 - L.FIT - B.LIP_T)
-    hy, hz = lay.hinge_axis
-    below = cq.Solid.makeBox(400, 400, lay.outer.z1 + 100, cq.Vector(-100, -100, -100))
-    dip = closed["lid"].intersect(below)
-    assert dip.Volume() > 0
-    for x0, y0, z0, x1, y1, z1 in B.lip_boxes(lay):
-        dip = dip.cut(cq.Solid.makeBox(x1 - x0, y1 - y0, z1 - z0,
-                                       cq.Vector(x0, y0 + hy, z0 + hz)))
-    assert dip.Volume() <= 1e-6
+    assert closed["lid"].BoundingBox().zmin == pytest.approx(lay.outer.z1)
     assert opened["lid"].BoundingBox().zmax > lay.outer.z1 + 150.0
     assert closed["base"].BoundingBox().xlen == opened["base"].BoundingBox().xlen
 
@@ -327,56 +318,92 @@ def test_over_bed_lid_splits_with_joints(lay):
     assert all(best <= B.section_area(B.lid(lay), "x", s) + 1e-6 for s in info.candidates)
 
 
-# --- R17: bezel lip; R18: no solid lumps; detent pad ---------------------------------
+# --- R17: bezel clip; R18: no solid lumps; bridges; detent pad; hardware -------------
 
-def test_bezel_front_left_corner_is_held_by_a_lip(lay):
-    """R17: lid material in front of (screen side, -Z) the corner without a
-    screw, FIT clear of the bezel, and the bezel can slide in under it."""
-    lid = B.lid(lay)
+def test_bezel_front_left_corner_is_clipped(lay, parts):
+    """R17: the opening corner without a bezel screw (the pocket's front-left)
+    is held by a flat printed clip screwed into a lid insert, clamping the
+    bezel's corner face to face; the clip prints flat and covers no window."""
     x0, y0, x1, _ = I.lid_opening(lay)
-    corners = [(x, y0) for x in (x0, x1)
-               if not any(abs(sx - x) <= 2 * I.BEZEL_SCREW_INSET
-                          and abs(sy - y0) <= 2 * I.BEZEL_SCREW_INSET
-                          for sx, sy in I.bezel_screws(lay))]
-    assert corners == [(x0, y0)]                  # the pocket's front-left corner
-    assert len(B.lip_boxes(lay)) == 1
-    bx, by = x0 + L.FIT + 1.0, y0 + L.FIT + 1.0   # just inside the bezel's corner
-    assert _inside(lid, (bx, by, -(L.FIT + B.LIP_T / 2)))      # the lip, in front
-    assert not _inside(lid, (bx, by, -L.FIT / 2))              # FIT clear of the bezel
+    screws = B.clip_screws(lay)
+    assert len(screws) == 1 and screws[0][0] < (x0 + x1) / 2      # front-left only
+    (sx, sy), = screws
+    clip = B.bezel_clip(lay, sx, sy)
+    bb = clip.BoundingBox()
+    assert bb.zmax == pytest.approx(0.0) and bb.zlen == pytest.approx(B.CLIP_T)
+    # it lies over the bezel's corner (in front of it, screen side) ...
+    assert _inside(clip, (x0 + L.FIT + 1.0, y0 + L.FIT + 1.0, -B.CLIP_T / 2))
+    assert bb.ymax == pytest.approx(y0 + L.FIT + B.CLIP_OVER)
     for m in MONITORS.values():
         bezel = I.monitor_bezel(m, lay).val()
-        assert lid.intersect(bezel).Volume() <= 1e-3
-        # fitting: slid BEZEL_SLIDE forward into the undercut, it is clear too,
-        # and slid back home its edge stays LIP_OVER under the lip
-        slid = bezel.translate(cq.Vector(0, -B.BEZEL_SLIDE, 0))
-        assert lid.intersect(slid).Volume() <= 1e-3
-        lip_y1 = B.lip_boxes(lay)[0][4]
-        assert lip_y1 - bezel.BoundingBox().ymin == pytest.approx(B.LIP_OVER)
-
-
-def test_lip_covers_no_window(lay):
-    for m in MONITORS.values():
+        assert clip.intersect(bezel).Volume() <= 1e-6
+        assert bezel.BoundingBox().zmin == pytest.approx(bb.zmax)   # clamps it
         wx0, wy0, wx1, wy1 = I._panel_rect(m, lay, C.monitor_window(m))
-        for x0, y0, _, x1, y1, _ in B.lip_boxes(lay):
-            assert x1 <= wx0 or x0 >= wx1 or y1 <= wy0 or y0 >= wy1, m.key
+        assert bb.xmax <= wx0 or bb.xmin >= wx1 or bb.ymax <= wy0 or bb.ymin >= wy1
+    # ... its screw goes into the lid's insert, through the clip's hole
+    hs = [h for h in parts["lid"].heatsets if h.what == "clip screw (bezel corner)"]
+    assert [(round(h.at[0], 6), round(h.at[1], 6)) for h in hs] == [(round(sx, 6), round(sy, 6))]
+    assert not _inside(clip, (sx, sy, -B.CLIP_T / 2))
+    # printed flat: the whole plate is on the bed
+    p = parts["bezel-clip"]
+    assert B.bed_contact_area(B.posed(p)) == pytest.approx(clip.Volume() / B.CLIP_T)
 
 
-def test_lip_clears_the_base_as_the_lid_swings(lay):
-    """The lip stands proud of the lid's face: every 10 degrees from shut to
-    the stop it stays clear of the base tub (and inside its walls when shut)."""
-    tub, lid = B.base_tub(lay), B.lid(lay)
-    for a in range(0, int(L.LID_OPEN_DEG) + 1, 10):
-        assert tub.intersect(lid.moved(lay.lid_location(float(a)))).Volume() <= 1e-3, a
+def test_lid_has_nothing_below_its_face(lay):
+    """Printed screen side up, nothing of the lid overhangs its face."""
+    assert B.lid(lay).BoundingBox().zmin == pytest.approx(0.0)
 
 
-def test_lid_front_band_is_hollow(lay):
-    """R18, direct: the band in front of the opening holds no more plastic
-    than its shell of ``wall``."""
-    lid, c, o = B.lid(lay), B.front_cavity(lay), lay.lid_outer
-    band = cq.Solid.makeBox(o.size[0], c.y1 + lay.wall - o.y0, o.size[2],
-                            cq.Vector(o.x0, o.y0, o.z0))
-    shell = band.Volume() - c.size[0] * c.size[1] * c.size[2]
-    assert lid.intersect(band).Volume() <= shell + 1.0
+def test_lid_front_band_is_hollow_and_ribbed(lay):
+    """R18, direct: the band's cells are empty but for the clip's boss, the
+    ribs between them are ``wall`` thick, and no cell (the screen-side skin's
+    bridge when printed) is wider than RIB_SPAN_MAX."""
+    lid, cells = B.lid(lay), B.front_cavities(lay)
+    assert len(cells) >= 2
+    assert max(c.size[1] for c in cells) <= B.RIB_SPAN_MAX
+    for a, b in zip(cells, cells[1:]):
+        assert b.y0 - a.y1 == pytest.approx(lay.wall)
+    bosses = [B.clip_boss(lay, x, y) for x, y in B.clip_screws(lay)]
+    allowed = 0.0
+    for c in cells:
+        for b in bosses:
+            dx = min(b.x1, c.x1) - max(b.x0, c.x0)
+            dy = min(b.y1, c.y1) - max(b.y0, c.y0)
+            dz = min(b.z1, c.z1) - max(b.z0, c.z0)
+            allowed += max(dx, 0) * max(dy, 0) * max(dz, 0)
+    held = sum(lid.intersect(cq.Solid.makeBox(*c.size, cq.Vector(c.x0, c.y0, c.z0))).Volume()
+               for c in cells)
+    assert held <= allowed + 1e-3
+    assert sum(c.size[0] * c.size[1] * c.size[2] for c in cells) > 150_000   # really hollow
+
+
+def test_drawer_opening_has_no_long_bridge(lay):
+    """The opening's top is 45 degree peaks: no downward-facing flat face in
+    the left wall over the drawer is wider than OPENING_PITCH (a flat 88 mm
+    top would sag onto the drawer)."""
+    tub, w = B.base_tub(lay), lay.wall
+    for f in tub.Faces():
+        if f.geomType() != "PLANE" or f.normalAt().z > -0.99:
+            continue
+        bb = f.BoundingBox()
+        if bb.xmax <= w + 1e-6 and bb.zmin > w + 1e-6 and bb.zmax < lay.deck_z:
+            assert bb.ylen <= B.OPENING_PITCH, (bb.ylen, bb.zmin)
+    # the drawer face fills it, FIT clear, shut and out at the stop
+    drawer = B.drawer(lay)
+    assert tub.intersect(drawer).Volume() <= 1e-3
+    assert tub.intersect(drawer.translate(cq.Vector(-lay.drawer_travel, 0, 0))).Volume() <= 1e-3
+    face_top = max(v.Z for v in drawer.Vertices() if v.X < w + 1e-6)
+    assert face_top > lay.bay.z1 + 1.0                  # the face's peaks
+
+
+def test_screw_heads_clear_when_shut_and_open():
+    """Bought hardware proud of the screen face (the bezel and clip screws'
+    pan heads) is in the assembly as keep-outs and clears everything."""
+    for angle in (0.0, L.LID_OPEN_DEG):
+        items = B.assembly("printed", angle, 0.0)
+        heads = [n for n, _, _ in items if n.startswith("hw:")]
+        assert len(heads) == len(I.bezel_screws(L.layout(2.4))) + 1
+        assert _clashes(items) == []
 
 
 def test_bodies_have_no_solid_lumps(lay):
