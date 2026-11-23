@@ -1,5 +1,9 @@
 # Everything runs through uv; no pyproject.toml.
 PY := uv run --no-project --with pytest --with cadquery --with ezdxf --with pypdf --with pillow --with shapely
+BLENDER := blender -b --factory-startup
+# scripts/export_scene.py RENDERS (tests/test_scene.py checks they agree)
+RENDERS := printed-closed printed-open-front printed-open-back printed-drawer-out \
+	laser-closed laser-open-front laser-open-back laser-drawer-out laser-flatpack
 
 .PHONY: test test-all verify outputs check tools fetch renders sheets
 
@@ -28,9 +32,17 @@ check: test verify
 fetch:
 	$(PY) python scripts/fetch.py
 
-## renders: Blender renders
+## renders: Blender renders -> output/renders/*.png (scene in tmp/scene, logs tmp/render-*.log)
 renders:
-	@echo "renders: not implemented yet (Task 14)"; exit 1
+	$(PY) python scripts/export_scene.py
+	mkdir -p output/renders
+	@for r in $(RENDERS); do \
+	  echo "render $$r (log: tmp/render-$$r.log)"; \
+	  $(BLENDER) -P render/render_scene.py -- --manifest tmp/scene/$$r.json \
+	    --out output/renders/$$r.png > tmp/render-$$r.log 2>&1 \
+	    || { tail -n 40 tmp/render-$$r.log; exit 1; }; \
+	  grep "rendered in" tmp/render-$$r.log; \
+	done
 
 ## sheets: drawing sheets
 sheets:
