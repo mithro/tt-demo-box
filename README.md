@@ -106,8 +106,12 @@ Everything runs through `uv` and `make`; there is no `pyproject.toml`.
   every STEP, STL, DXF, SVG, PDF and preview PNG into `tmp/check-outputs/` and compares them
   with `output/` byte for byte; `output/renders` is excluded) and `check-readme`
 
-Sheets are stamped with the hash of the last commit that changed anything outside `output/`,
-so after any source commit run `make outputs sheets` and commit `output/` again.
+Sheets are stamped with a content hash of what they are drawn from: the first 10 hex digits
+of a SHA-256 over `git rev-parse HEAD:<path>` for `demobox/`, `scripts/`, the
+`vendor/fpgas.online-mechanical` pin and the `Makefile` (`+` when any of them has uncommitted
+changes). Commits to the README, docs, tests or `output/` -- and squash or rebase merges that
+keep the content -- leave it unchanged; after a commit that changes those sources, run
+`make outputs sheets` and commit `output/` again.
 
 CI (`.github/workflows/check.yml`) runs `make fetch check` in a Debian 13 container with
 Inkscape 1.4, the same packages that drew the committed PDFs. It does not install Blender.

@@ -195,3 +195,66 @@ def test_ga_buy_note_does_not_claim_one_shop(n):
     words = _sheet_words(n)
     assert "AliExpress item numbers" not in words
     assert "listing numbers or shops" in words
+
+
+# --- the version stamp (finding 3, R23) -----------------------------------------------
+
+def _git(root, *args):
+    import subprocess
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True,
+                   env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+                        "PATH": "/usr/bin:/bin", "HOME": str(root)})
+
+
+def test_stamp_follows_the_sources_not_the_docs(tmp_path):
+    """Doc, README and output commits leave the stamp alone; a change to
+    demobox/, scripts/, the Makefile or the submodule pin moves it."""
+    from demobox.drafting import sheetkit as K
+    r = tmp_path / "repo"
+    (r / "demobox").mkdir(parents=True)
+    (r / "scripts").mkdir()
+    (r / "output").mkdir()
+    (r / "vendor" / "fpgas.online-mechanical").mkdir(parents=True)   # an unfetched submodule
+    (r / "demobox" / "a.py").write_text("A = 1\n")
+    (r / "scripts" / "s.py").write_text("pass\n")
+    (r / "Makefile").write_text("all:\n")
+    (r / "README.md").write_text("readme\n")
+    _git(r, "init", "-q")
+    _git(r, "update-index", "--add", "--cacheinfo",
+         "160000,1111111111111111111111111111111111111111,vendor/fpgas.online-mechanical")
+    _git(r, "add", "demobox", "scripts", "Makefile", "README.md")
+    _git(r, "commit", "-q", "-m", "one")
+
+    def v():
+        K.version.cache_clear()
+        return K.version(r)
+
+    first = v()
+    assert re.fullmatch(r"[0-9a-f]{%d}" % K.STAMP_LEN, first), first
+    (r / "README.md").write_text("readme, edited\n")
+    (r / "output" / "x.svg").write_text("<svg/>\n")
+    _git(r, "add", "README.md", "output")
+    _git(r, "commit", "-q", "-m", "docs and outputs only")
+    assert v() == first
+    (r / "demobox" / "a.py").write_text("A = 2\n")
+    assert v() == first + "+"                     # uncommitted source change
+    _git(r, "commit", "-q", "-am", "source")
+    second = v()
+    assert second not in (first, first + "+")
+    (r / "Makefile").write_text("all: x\n")
+    _git(r, "commit", "-q", "-am", "make")
+    third = v()
+    assert third != second
+    _git(r, "update-index", "--cacheinfo",
+         "160000,2222222222222222222222222222222222222222,vendor/fpgas.online-mechanical")
+    _git(r, "commit", "-q", "-m", "bump the submodule")
+    assert v() != third
+    K.version.cache_clear()
+
+
+def test_stamp_is_order_independent_and_short():
+    from demobox.drafting import sheetkit as K
+    a = K.stamp({"demobox": "1" * 40, "Makefile": "2" * 40})
+    assert a == K.stamp({"Makefile": "2" * 40, "demobox": "1" * 40})
+    assert len(a) == K.STAMP_LEN and a != K.stamp({"demobox": "1" * 40, "Makefile": "3" * 40})

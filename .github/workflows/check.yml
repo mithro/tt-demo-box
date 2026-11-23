@@ -47,10 +47,10 @@ jobs:
             ca-certificates git make curl libgl1 \
             inkscape fonts-dejavu-core fonts-dejavu-extra
 
-      # Full history, and the branch's own head rather than GitHub's merge:
-      # every sheet is stamped with the hash of the last commit that changed a
-      # source file (demobox/drafting/sheetkit.py version()), and a shallow
-      # clone or a merge commit would stamp a hash no checkout reproduces.
+      # The branch's own head rather than GitHub's merge: every sheet is
+      # stamped with a content hash of demobox/, scripts/, the submodule pin
+      # and the Makefile at HEAD (demobox/drafting/sheetkit.py version()), and
+      # a merge with a moved base would stamp content the branch never had.
       # The submodule holds the board data and the shared drawing code.
       - name: Check out the commit that was pushed, with submodules
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
