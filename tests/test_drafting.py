@@ -179,3 +179,19 @@ def test_hinge_profiles_read_their_true_depth():
         values = [abs(d.b[0] - d.a[0]) for d in PS.overall_dims(part) if d.side == "bottom"]
         assert any(abs(v - want) < 0.005 for v in values), (n, values)
         assert f">{want:.2f}</text>" in names.svg_path(n).read_text(), n
+
+
+def _sheet_words(n: str) -> str:
+    """Every text line on a generated sheet, joined by spaces."""
+    import html
+    svg = names.svg_path(n).read_text()
+    return " ".join(html.unescape(t) for t in re.findall(r"<text[^>]*>([^<]*)</text>", svg))
+
+
+@pytest.mark.parametrize("n", ["TDB-GA-P", "TDB-GA-L"])
+def test_ga_buy_note_does_not_claim_one_shop(n):
+    """M6: a monitor row reads Taobao, so the note may not say every listing
+    is an AliExpress item number."""
+    words = _sheet_words(n)
+    assert "AliExpress item numbers" not in words
+    assert "listing numbers or shops" in words

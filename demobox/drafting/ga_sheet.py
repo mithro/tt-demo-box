@@ -44,10 +44,6 @@ PART_W = 56.0
 LID_PARTS = ("lid", "hinge-lid", "bezel", "retainer", "panel", "monitor-driver")
 
 
-def _ins_name(key: str) -> str:
-    return next(n for n, s in names.SHEETS.items() if s.kind == "insert" and s.subject == key)
-
-
 def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
     """Where to buy it, as the part's sources say: a listing number or a site."""
     for s in sources:
@@ -222,8 +218,8 @@ def render_ga(defn: names.SheetDef):
             f"Bay {' x '.join(F(v) for v in lay.bay.size)} inside plus a "
             f"{F(lay.cable_bay.x1 - lay.cable_bay.x0)} cable bay; the drawer slides out of "
             f"the left side by {F(lay.drawer_travel)}.",
-            "Bought parts are counted from the route's data; monitor listings are AliExpress "
-            "item numbers. 1*: fit one monitor and one "
+            "Bought parts are counted from the route's data; monitor sources are listing "
+            "numbers or shops. 1*: fit one monitor and one "
             "power bank of those listed, with its insert and its packing. Hinge axis: the "
             f"base's back-top edge, Y {F(hy)}, Z {F(hz)}.",
             K.unconfirmed_note(None),
