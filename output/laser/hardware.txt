@@ -1,0 +1,11 @@
+Laser route hardware (3 mm plywood)
+
+   2  6 x 3 mm disc magnet
+   2  M3 nyloc nut (hinge)
+  40  M3 square nut
+   1  M3 x 10 pan-head screw (bezel clip)
+  29  M3 x 12 pan-head screw (T-slot)
+   6  M3 x 12 pan-head screw (hinge leaf)
+   1  M3 x 16 pan-head screw (board, MT2)
+   2  M3 x 40 bolt (hinge)
+   3  M3 x 8 pan-head screw (bezel)
