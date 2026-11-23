@@ -32,6 +32,7 @@ from demobox.drafting.hlr import project, to_view
 from demobox.layout import (HEATSET_DEPTH, INSERT_MATERIAL, LASER_BED, LID_OPEN_DEG, ROUTES,
                             layout)
 from demobox.parts.batteries import BATTERIES
+from demobox.parts.board import BOARD_KEYS, board_spec
 from demobox.parts.cables import CABLES
 from demobox.parts.monitors import MONITORS
 from demobox.printed import body as B
@@ -77,7 +78,7 @@ def printed_hardware(lay) -> dict[str, int]:
         len(I.bezel_screws(lay))
     hw[f"M3 x {m3.stock_length(B.CLIP_T + into)} pan-head (bezel clip)"] += \
         len(B.clip_screws(lay))
-    pcb = 1.6
+    pcb = max(board_spec(k).outline.thickness for k in BOARD_KEYS)
     hw[f"M3 x {m3.stock_length(pcb + into)} pan-head (board, MT2)"] += len(lay.standoffs)
     hw[f"M3 x {H.hinge_bolt_length(lay)} bolt + nyloc (hinge pin)"] += len(H.hinge_groups(lay))
     # the assembly's screw-head keep-outs are the bezel's and the clip's
