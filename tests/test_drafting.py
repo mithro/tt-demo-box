@@ -96,6 +96,28 @@ def test_every_insert_monitor_has_a_sheet():
     assert keys == set(MONITORS)
 
 
+def test_insert_sheets_come_from_the_monitor_codes(monkeypatch):
+    """Finding 4: a new MONITORS entry gets its TDB-INS-<code> sheet with no
+    edit to names.py; codes are short, upper case and unique."""
+    import importlib
+    from dataclasses import replace
+    from demobox.parts.monitors import MONITORS
+    codes = [m.code for m in MONITORS.values()]
+    assert len(set(codes)) == len(codes)
+    assert all(re.fullmatch(r"[A-Z0-9]{1,4}", c) for c in codes)
+    base = MONITORS["taobao-tim"]
+    monkeypatch.setitem(MONITORS, "new-mon", replace(base, key="new-mon", code="N7"))
+    try:
+        fresh = importlib.reload(names)
+        s = fresh.SHEETS["TDB-INS-N7"]
+        assert (s.kind, s.subject, s.size) == ("insert", "new-mon", "A4")
+        assert s.title == "MONITOR INSERT, N7"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(names)
+    assert "TDB-INS-N7" not in names.SHEETS
+
+
 # --- check_sheets ----------------------------------------------------------------
 
 _SVG = ('<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" '

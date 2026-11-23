@@ -118,11 +118,16 @@ Inkscape 1.4, the same packages that drew the committed PDFs. It does not instal
 
 ### Adding a monitor
 
-Add a `Monitor` entry to `demobox/parts/monitors.py` (panel size, active area and offset,
-connector exit, power, `cable_edge`, `window`, sources, `confirmed=False` until measured), then
-run `make verify outputs sheets`. The window rule, insert stack and cable path are checked for
-it; its bezel, retainer and insert sheet appear in `output/`. Only monitors without rear-facing
-sockets fit.
+Only monitors without rear-facing sockets fit.
+
+1. Add a `Monitor` entry to `MONITORS` in `demobox/parts/monitors.py`: its `key`, a short
+   unique `code` (upper-case letters and digits; it names the insert sheet `TDB-INS-<code>`),
+   panel size, active area and offset, connector exit, power, `cable_edge`, `window`, sources,
+   and `confirmed=False` until measured.
+2. `make verify`: the window rule, insert stack and cable path are checked for it.
+3. `make outputs sheets readme`: its bezel, retainer and insert sheet appear in `output/`, and
+   the README's UNCONFIRMED list picks up its placeholders.
+4. `make check`, then commit the entry and `output/`.
 
 ## UNCONFIRMED figures, and what to measure
 

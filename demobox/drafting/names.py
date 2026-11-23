@@ -6,8 +6,9 @@ the set.
 
 A name is ``TDB-`` (tt-demo-box), a short code for the subject, and the build
 route where the drawing belongs to one (``-P`` printed, ``-L`` laser).  The
-insert sheets carry the monitor instead: an insert is the same part for both
-routes but the bezel's outline, and is drawn for the printed route.  No name
+insert sheets carry the monitor's ``Monitor.code`` instead (``TDB-INS-T7``),
+one per entry in ``MONITORS``: an insert is the same part for both routes but
+the bezel's outline, and is drawn for the printed route.  No name
 is a prefix of another (``check_sheets.py`` tests it), so quoting one never
 points at two.
 
@@ -22,6 +23,7 @@ from pathlib import Path
 from typing import Literal
 
 from demobox._paths import ROOT
+from demobox.parts.monitors import MONITORS
 
 OUT = ROOT / "output" / "sheets"
 
@@ -60,9 +62,9 @@ SHEETS: dict[str, SheetDef] = dict((
     _s("TDB-CLIP-P", "A4", "part", "bezel-clip", "BEZEL CLIP"),
     _s("TDB-PKG-P", "A4", "packing", "", "BATTERY PACKING"),
     _s("TDB-PIN-P", "A4", "part", "mt1-pin", "MT1 LOCATING PIN"),
-    _s("TDB-INS-T7", "A4", "insert", "taobao-tim", "MONITOR INSERT, T7"),
-    _s("TDB-INS-C7", "A4", "insert", "car-7-aliexpress", "MONITOR INSERT, C7"),
-    _s("TDB-INS-K7", "A4", "insert", "kit-at070tn92", "MONITOR INSERT, K7"),
+    # one insert sheet per monitor, named by its code
+    *(_s(f"TDB-INS-{m.code}", "A4", "insert", k, f"MONITOR INSERT, {m.code}")
+      for k, m in MONITORS.items()),
 ))
 
 
