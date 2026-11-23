@@ -355,3 +355,10 @@ def test_locating_pin_is_one_valid_solid_of_peg_dia(lay):
     assert math.isclose(s.Volume(), math.pi * (L.PEG_DIA / 2) ** 2 * (bb.zmax - bb.zmin),
                         rel_tol=0.05)
 
+
+def test_verify_reports_the_insert_placeholders(capsys):
+    import verify
+    assert verify.main() == 0
+    out = capsys.readouterr().out
+    for name, _, _ in I.UNCONFIRMED:
+        assert name in out
