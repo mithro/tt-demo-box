@@ -1,6 +1,6 @@
 # tt-demo-box
 
-A portable, zero-setup Tiny Tapeout VGA demo station: a small clamshell box with a ~5" VGA
+A portable, zero-setup Tiny Tapeout VGA demo station: a small clamshell box with a 7" VGA
 monitor in the lid, a Tiny Tapeout ETR dev board (with the TinyVGA Pmod) exposed on the deck,
 and a power bank in a slide-out drawer underneath that comes out for airport security.
 
