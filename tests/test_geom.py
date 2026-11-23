@@ -1,0 +1,53 @@
+import pytest
+
+from demobox.geom import BedOverflow, Box, Cyl, box_gap, overlaps
+
+
+def b(x0, x1, y0=0, y1=10, z0=0, z1=10, what="b"):
+    return Box(x0, y0, z0, x1, y1, z1, what)
+
+
+def test_gap_one_mm_in_x():
+    assert box_gap(b(0, 10), b(11, 20)) == 1.0
+
+
+def test_overlap_two_mm_is_negative():
+    assert box_gap(b(0, 10), b(8, 20)) == -2.0
+
+
+def test_touching_is_zero():
+    assert box_gap(b(0, 10), b(10, 20)) == 0.0
+
+
+def test_gap_is_symmetric_and_diagonal_is_euclidean():
+    a, c = b(0, 10), b(13, 20, y0=14, y1=20)
+    assert box_gap(a, c) == box_gap(c, a) == pytest.approx(5.0)
+
+
+def test_overlaps_tolerance():
+    assert overlaps(b(0, 10), b(8, 20))
+    assert not overlaps(b(0, 10), b(8, 20), tol=2.0)
+    assert not overlaps(b(0, 10), b(10, 20))
+
+
+def test_union_covers_both():
+    u = b(0, 10, what="a").union(b(20, 30, y0=-5, y1=3, z1=40, what="c"))
+    assert (u.x0, u.y0, u.z0, u.x1, u.y1, u.z1) == (0, -5, 0, 30, 10, 40)
+    assert u.what == "a+c"
+
+
+def test_size_and_moved():
+    bx = Box(1, 2, 3, 4, 6, 9, "x")
+    assert bx.size == (3, 4, 6)
+    m = bx.moved(10, 0, -3)
+    assert (m.x0, m.x1, m.z0, m.z1) == (11, 14, 0, 6) and m.what == "x"
+
+
+def test_inverted_box_rejected():
+    with pytest.raises(ValueError):
+        Box(5, 0, 0, 1, 1, 1, "bad")
+
+
+def test_cyl_and_bedoverflow():
+    assert Cyl(0, 0, 0, 5, 2, "c").r == 2
+    assert issubclass(BedOverflow, Exception)

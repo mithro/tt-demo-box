@@ -21,7 +21,7 @@ check: test verify
 
 ## fetch: download upstream sources into tmp/src
 fetch:
-	@echo "fetch: not implemented yet (Task 2)"; exit 1
+	$(PY) python scripts/fetch.py
 
 ## renders: Blender renders
 renders:
