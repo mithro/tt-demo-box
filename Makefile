@@ -11,9 +11,9 @@ test:
 verify:
 	$(PY) python verify.py
 
-## outputs: regenerate everything under output/
+## outputs: regenerate everything under output/ (printed route; Task 8 adds laser)
 outputs:
-	@echo "outputs: not implemented yet (Task 12)"; exit 1
+	$(PY) python scripts/export_printed.py
 
 ## check: test + verify + sheet checks
 check: test verify

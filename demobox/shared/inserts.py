@@ -13,7 +13,15 @@ cable gutter (they are open on the screen side like the pocket), FIT inside
 the opening all round so it drops in.  It has the window
 ``checks.monitor_window(m)`` (R4) and, where the window does not expose the
 front button, the cut-out ``checks.button_cutout(m)``; nothing else of the
-pocket or the gutters shows, so cables do not show round the picture.
+pocket or the gutters shows, so cables do not show round the picture.  Its
+hinge-end edge is closer to the hinge axis than the knuckles' radius, so it is
+cut back by ``hinge.knuckle_relief`` along the knuckle groups, like the lid.
+
+It is screwed to the lid (R15) at ``bezel_screws(lay)``: an M3 clearance
+hole at each corner of the opening that lies in a cable gutter, where the lid
+has room for a boss; a corner of the pocket itself is skipped, since the
+panel and its retainer fill the pocket to within FIT.  The lid bodies put the
+boss (heat-set insert, or captured nut) under each hole.
 
 Retainer
 --------
@@ -46,7 +54,7 @@ from demobox.geom import Box, Cyl
 from demobox.layout import (DRIVER_STANDOFF, FIT, INSERT_MATERIAL, Layout, exit_edge,
                             insert_stack)
 from demobox.parts.monitors import Monitor
-from demobox.shared import m3
+from demobox.shared import hinge, m3
 
 #: Wall left at each end of the cable-exit edge to locate the panel there.
 EXIT_TAB = 15.0
@@ -57,6 +65,12 @@ COUNTERBORE_D = 2 * m3.HEAD_R + FIT
 COUNTERBORE_H = m3.HEAD_H
 #: Carrier bars on the panel's back, tying the driver posts to the walls.
 CARRIER_T = 2.0
+#: Bezel screws: centre in from the opening's two walls at a corner, and the
+#: clearance hole.  The lid's boss under a screw reaches this far from the
+#: walls plus its own radius, so a corner within BEZEL_SCREW_INSET + the boss
+#: of the pocket has no room.
+BEZEL_SCREW_INSET = 4.5
+BEZEL_SCREW_D = m3.CLEARANCE_D
 
 if POST_WALL < MIN_BOSS_WALL:
     raise ValueError(f"POST_WALL {POST_WALL} < MIN_BOSS_WALL {MIN_BOSS_WALL}")
@@ -96,7 +110,33 @@ def monitor_bezel(m: Monitor, lay: Layout) -> cq.Workplane:
     for rect in holes:
         hx0, hy0, hx1, hy1 = _panel_rect(m, lay, rect)
         plate = plate.cut(_solid(hx0, hy0, -1.0, hx1, hy1, t + 1.0))
+    for x, y in bezel_screws(lay):
+        plate = plate.cut(cq.Workplane("XY", origin=(x, y, -1.0)).circle(BEZEL_SCREW_D / 2)
+                          .extrude(t + 2.0))
+    for r in hinge.knuckle_relief(lay, (0.0, 0.0)):   # its hinge edge is by the axis
+        plate = plate.cut(cq.Workplane("XY").add(r))
     return plate
+
+
+def bezel_screws(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """(x, y) of the bezel's screws, closed lid frame: BEZEL_SCREW_INSET in
+    from each corner of the opening whose screw boss (a square of half-side
+    BEZEL_SCREW_INSET round the screw, out to the walls) stays out of the
+    pocket.  At least three, or the bezel is not held."""
+    x0, y0, x1, y1 = lid_opening(lay)
+    p, d = lay.lid_pocket, BEZEL_SCREW_INSET
+    out = []
+    for cx, sx in ((x0, 1), (x1, -1)):
+        for cy, sy in ((y0, 1), (y1, -1)):
+            x, y = cx + sx * d, cy + sy * d
+            bx0, bx1 = sorted((cx, x + sx * d))
+            by0, by1 = sorted((cy, y + sy * d))
+            if min(bx1, p.x1) - max(bx0, p.x0) > 0 and min(by1, p.y1) - max(by0, p.y0) > 0:
+                continue                       # a pocket corner: no room
+            out.append((x, y))
+    if len(out) < 3:
+        raise ValueError(f"only {len(out)} bezel screw corners clear of the pocket")
+    return tuple(sorted(out))
 
 
 def driver_posts(m: Monitor, lay: Layout) -> tuple[Cyl, ...]:
