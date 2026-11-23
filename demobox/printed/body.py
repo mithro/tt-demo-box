@@ -906,8 +906,8 @@ def split_base(lay: Layout, bed=PRINT_BED) -> tuple[dict[str, Printed], Split | 
     ``deck-right``; front/back for a split across Y)."""
     tub, tub_hs = _cached("tub", lay, lambda: _tub(lay))
     dk, dk_hs = _cached("deck", lay, lambda: _deck(lay))
-    note_t = ("Base tub: print floor down, no supports (the drawer opening's top "
-              "bridges the drawer's width). Heat-set M3 inserts: " )
+    note_t = ("Base tub: print floor down, no supports (the drawer opening's top is "
+              "45 degree peaks). Heat-set M3 inserts: ")
     note_d = "Deck: print flat, standoffs up. Heat-set M3 insert in the MT2 standoff."
     x, y = _footprint(tub)
     if x <= bed[0] + 1e-6 and y <= bed[1] + 1e-6:
