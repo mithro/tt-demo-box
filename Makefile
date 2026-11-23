@@ -36,11 +36,11 @@ check-outputs:
 check-sheets:
 	$(PY) python scripts/check_sheets.py
 
-## readme: rewrite README.md's UNCONFIRMED list from verify.py
+## readme: rewrite README.md's generated sections (UNCONFIRMED list, hardware tables)
 readme:
 	$(PY) python scripts/update_readme.py
 
-## check-readme: fail if README.md's UNCONFIRMED list is stale
+## check-readme: fail if any of README.md's generated sections is stale
 check-readme:
 	$(PY) python scripts/update_readme.py --check
 

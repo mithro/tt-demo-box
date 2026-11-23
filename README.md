@@ -41,8 +41,9 @@ does not compare `output/renders/*.png`. Everything else under `output/` is chec
 
 ## Bill of materials
 
-Counts are generated (`demobox.printed.body.hardware`, `demobox.laser.fittings.hardware`, listed
-in `output/laser/hardware.txt`) and checked on the GA sheets' parts lists.
+The hardware tables below are generated from `demobox.printed.body.hardware` and
+`demobox.laser.fittings.hardware` (`make readme`; `make check-readme` fails when they are stale);
+the same counts are in `output/laser/hardware.txt` and on the GA sheets' parts lists.
 
 Bought parts, both routes (one each):
 
@@ -63,6 +64,7 @@ Bought parts, both routes (one each):
 
 Hardware, printed route (M3 throughout):
 
+<!-- hardware-printed:begin -->
 | Qty | Part |
 |---:|---|
 | 15 | M3 heat-set insert, D4.0 x 5.7 |
@@ -72,9 +74,11 @@ Hardware, printed route (M3 throughout):
 | 1 | M3 x 6 pan-head (board, MT2) |
 | 4 | M3 x 6 pan-head (deck corners) |
 | 6 | M3 x 8 pan-head (hinge leaves) |
+<!-- hardware-printed:end -->
 
 Hardware, laser route (3 mm plywood, plus the printed hinge, bezel, clip, pin and packing):
 
+<!-- hardware-laser:begin -->
 | Qty | Part |
 |---:|---|
 | 4 | 12 x 4 mm self-adhesive rubber foot |
@@ -88,6 +92,7 @@ Hardware, laser route (3 mm plywood, plus the printed hinge, bezel, clip, pin an
 | 2 | M3 x 40 bolt (hinge) |
 | 3 | M3 x 8 pan-head screw (bezel) |
 | 1 | hook-and-loop tape, 51 x 16 mm pair (boost converter) |
+<!-- hardware-laser:end -->
 
 ## Building
 
