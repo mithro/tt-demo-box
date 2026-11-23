@@ -22,6 +22,7 @@ Run: make outputs
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -63,27 +64,29 @@ def write_assembly(path: Path) -> None:
     reproducible.normalise_step(path, name=path.stem)
 
 
-def main() -> int:
-    lay = layout(ROUTES["printed"])
+def main(out: Path = out) -> int:
+    lay = layout(RoutES["printed"])
     parts = body.printed_parts(lay)          # raises BedOverflow before writing
-    OUT.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     keep = {f"{n}.{ext}" for n in parts for ext in ("step", "stl")} | {"assembly.step"}
-    for old in sorted(OUT.iterdir()):
+    for old in sorted(out.iterdir()):
         if old.is_file() and old.name not in keep:
             old.unlink()
             print(f"removed {old.relative_to(ROOT)}")
     for name, p in parts.items():
         shape = body.posed(p)
         bb = shape.BoundingBox()
-        write_step(shape, OUT / f"{name}.step")
-        write_stl(shape, OUT / f"{name}.stl")
+        write_step(shape, out / f"{name}.step")
+        write_stl(shape, out / f"{name}.stl")
         print(f"{name:28s} {bb.xlen:7.2f} x {bb.ylen:7.2f} x {bb.zlen:6.2f} mm  {p.note}")
-    write_assembly(OUT / "assembly.step")
+    write_assembly(out / "assembly.step")
     print(f"assembly: lid at {LID_OPEN_DEG:g} deg, drawer shut")
-    for f in sorted(OUT.iterdir()):
+    for f in sorted(out.iterdir()):
         print(f"  {f.stat().st_size:>10,d}  {f.relative_to(ROOT)}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--out", type=Path, default=OUT, help="output directory")
+    sys.exit(main(ap.parse_args().out))
