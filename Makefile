@@ -5,7 +5,7 @@ BLENDER := blender -b --factory-startup
 RENDERS := printed-closed printed-open-front printed-open-back printed-drawer-out \
 	laser-closed laser-open-front laser-open-back laser-drawer-out laser-flatpack
 
-.PHONY: test test-all verify outputs check check-sheets tools fetch renders sheets
+.PHONY: test test-all verify outputs check check-sheets check-outputs check-readme readme tools fetch renders sheets
 
 ## test: run the pytest suite, less the tests marked slow (R21)
 test:
@@ -24,12 +24,25 @@ outputs:
 	$(PY) python scripts/export_printed.py
 	$(PY) python scripts/export_laser.py
 
-## check: test + verify + sheet checks (Task 11 adds: outputs are up to date)
-check: test verify check-sheets
+## check: everything CI runs: all tests, verify, sheet checks, outputs up to date
+check: test-all verify check-sheets check-outputs check-readme
+
+## check-outputs: rebuild output/ into tmp/check-outputs and compare byte for byte
+## (output/renders is not compared: Cycles noise)
+check-outputs:
+	$(PY) python scripts/check_outputs.py
 
 ## check-sheets: text collisions, small text, out of frame, drawing names
 check-sheets:
 	$(PY) python scripts/check_sheets.py
+
+## readme: rewrite README.md's UNCONFIRMED list from verify.py
+readme:
+	$(PY) python scripts/update_readme.py
+
+## check-readme: fail if README.md's UNCONFIRMED list is stale
+check-readme:
+	$(PY) python scripts/update_readme.py --check
 
 ## fetch: download upstream sources into tmp/src
 fetch:

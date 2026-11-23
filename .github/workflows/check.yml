@@ -1,0 +1,97 @@
+# Run `make fetch check` on every push to main and on every pull request.
+#
+# Same design as vendor/fpgas.online-mechanical's workflow: a Debian 13
+# (trixie) container, so that Inkscape 1.4, cairo and DejaVu are the packages
+# the committed PDFs were drawn with.  `make check` redraws every sheet and
+# compares it with output/ byte for byte (scripts/check_outputs.py).
+#
+# Only what `make check` needs is installed.  Blender is not: it is for
+# `make renders`, which CI does not run (output/renders/*.png are Cycles
+# renders and are not reproducible byte for byte, so nothing compares them).
+# curl is for `make fetch`, ca-certificates for its https downloads, libgl1 for
+# cadquery's OpenCascade (`import cadquery` needs libGL.so.1).
+
+name: make check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: make check (Debian 13, Inkscape 1.4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: debian:trixie
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Before the checkout, so that it finds git.
+      - name: Install Inkscape, the DejaVu fonts, libGL, git, make and curl
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends \
+            ca-certificates git make curl libgl1 \
+            inkscape fonts-dejavu-core fonts-dejavu-extra
+
+      # Full history, and the branch's own head rather than GitHub's merge:
+      # every sheet is stamped with the hash of the last commit that changed a
+      # source file (demobox/drafting/sheetkit.py version()), and a shallow
+      # clone or a merge commit would stamp a hash no checkout reproduces.
+      # The submodule holds the board data and the shared drawing code.
+      - name: Check out the commit that was pushed, with submodules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          submodules: true
+          persist-credentials: false
+
+      # The container runs as root and the workspace belongs to the runner's
+      # user, so git refuses it as "dubious ownership" (and the stamp would
+      # silently become "unversioned").  Scoped to this throwaway container.
+      - name: Let git read the workspace, and prove that it can
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git log -1 --format='HEAD is %H %s'
+          source="$(git log -1 --format=%h -- . ':(exclude)output')"
+          test -n "$source"
+          echo "the sheets will be stamped $source"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.10"
+          enable-cache: false
+
+      # When a PDF stops matching, the first question is what drew it.
+      - name: Say what is drawing
+        run: |
+          inkscape --version
+          dpkg-query --show inkscape libcairo2 fonts-dejavu-core fonts-dejavu-extra
+          uv --version
+
+      - name: make fetch check
+        run: make fetch check
+
+      - name: Keep what was rebuilt, if anything failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rebuilt-output
+          path: tmp/check-outputs/
+          if-no-files-found: warn
+          retention-days: 14
