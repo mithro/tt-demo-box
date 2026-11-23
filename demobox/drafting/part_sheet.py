@@ -467,7 +467,8 @@ def _hinge_part(defn, which: str) -> Part:
             # the screw holes from the leaf's own end: its foot on the base half,
             # its top on the lid's (the lid half's foot is the knuckles')
             K.Dim(f, fr(bb.xmax, bb.zmin if which == "base" else bb.zmax),
-                  fr(bb.xmax, screws[0][1]), "right", 0),
+                  fr(bb.xmax, screws[0][1]), "right", 0,
+                  text_side=None if which == "base" else "low"),
         ]
         if k0[0] - bb.xmin > 0.01:
             out.append(K.Dim(f, fr(bb.xmin, z), fr(k0[0], z), side, lane + 2,
