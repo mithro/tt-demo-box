@@ -46,7 +46,6 @@ CENTRE = dict(w=style.W_CENTRE, colour=style.C_LINE, dash=style.D_CENTRE)
 GAP = 16.0
 #: A dimension lane: the first sits LANE0 off the view, the next DIM_STEP on.
 LANE0 = 7.0
-CAPTION_H = 6.0
 
 DRAWN = "generated"
 REV = "A"

@@ -36,7 +36,6 @@ from demobox.shared import m3
 
 F = K.fmt
 TURN = (((1.0, 0.0, 0.0), 180.0),)
-SURVEY = "docs/superpowers/specs/monitor-survey.md"
 
 
 def render(defn: names.SheetDef):
