@@ -116,6 +116,17 @@ def test_long_battery_fails(monkeypatch, lay):
     assert failed and all("huge" in f for f in failed), failed
 
 
+def test_short_cable_bay_fails_the_port_end(lay):
+    """The port-end claim is a real check (M7): a cable bay too short for the
+    plug, or one not ending at the bank's port face, fails."""
+    short = replace(lay, cable_bay=replace(lay.cable_bay, x0=lay.cable_bay.x1 - 10.0))
+    failed = _failed(_run(C.batteries_fit, short))
+    assert any("port end against the cable-bay wall" in f for f in failed), failed
+    gap = replace(lay, cable_bay=lay.cable_bay.moved(-5.0, 0.0, 0.0))
+    failed = _failed(_run(C.batteries_fit, gap))
+    assert any("port end against the cable-bay wall" in f for f in failed), failed
+
+
 def test_bank_buttons_need_the_drawer_open(lay):
     r = _run(C.buttons_reachable, lay)
     notes = {what: detail for what, detail in r.unconfirmed}

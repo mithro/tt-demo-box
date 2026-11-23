@@ -29,8 +29,10 @@ the screen faces -Z (down onto the deck), the bezel plate fills Z 0 ..
 ``INSERT_MATERIAL`` and the panel's front face is at Z = ``INSERT_MATERIAL``.
 The panel is mounted buttons-down: its bottom edge is at the hinge end (lid
 Y = 0 side), so panel x runs along lid +X (the visitor's right, with the lid
-open) and panel y runs along lid -Y.  It is centred in X and sits FIT +
-INSERT_MATERIAL off the pocket's hinge-end wall, where its cable leaves.
+open) and panel y runs along lid -Y.  It sits FIT + INSERT_MATERIAL off the
+pocket's hinge-end wall; across X it is centred, except that a side-exit
+panel is pushed FIT + INSERT_MATERIAL off the pocket wall away from its exit,
+leaving the room by its cable edge (``panel_in_lid``).
 """
 
 from __future__ import annotations
@@ -291,9 +293,17 @@ def batteries_fit(report: Report, lay: Layout) -> None:
                      f"{_f(packing)} mm (+ FIT {FIT}), side spacers {_f((bw - W_) / 2)} mm each, "
                      f"headroom {_f(bh - H_)} mm")
         if b.port_face == "end":
-            report.check(True, f"{b.key}: port end against the cable-bay wall",
-                         f"ports face -X into the {_f(lay.cable_bay.size[0])} mm cable bay; "
-                         "the end-stop sits at the far end")
+            # the bank lies on the bay floor from bay.x0 (its packing's end-stop at
+            # the far end), so its port face is the bay/cable-bay boundary
+            cb = lay.cable_bay
+            plug = BOARD_CABLE.plug[0]
+            ok = (abs(cb.x1 - lay.bay.x0) <= EPS and cb.size[1] >= W_ - EPS
+                  and cb.size[2] >= H_ - EPS and cb.size[0] >= plug + FIT - EPS)
+            report.check(ok, f"{b.key}: port end against the cable-bay wall",
+                         f"port face at x {_f(lay.bay.x0)}, cable bay x {_f(cb.x0)}.."
+                         f"{_f(cb.x1)}, {_f(cb.size[1])} x {_f(cb.size[2])} over the "
+                         f"{W_} x {H_} face; {_f(cb.size[0])} mm long >= {plug} mm plug + "
+                         f"FIT {FIT}")
         elif b.port_face == "top":
             plug_h = BOARD_CABLE.plug[2]
             room = (lay.deck_z - lay.wall) - (lay.bay.z0 + H_)
