@@ -38,16 +38,16 @@ def _cable(key, title, dia, bend, plug, quote):
 
 CABLES: dict[str, Cable] = {c.key: c for c in (
     _cable("vga-slim", "Slim VGA cable, <= 0.5 m", 5.0, 30.0, (45.0, 17.0, 20.0),
-           "Cable sourcing: slim, short (<= 0.5 m) VGA cable."),
+           "Cable sourcing: \"a slim, short (<= 0.5 m) VGA cable\"."),
     _cable("vga-90-adapter", "VGA 90 degree adapter", 5.0, 30.0, (35.0, 17.0, 20.0),
-           "Cable sourcing: 90 degree adapter where a socket faces backwards; "
-           "shortens the plug run to ~20 mm."),
+           "Cable sourcing: \"with a 90 degree adapter where a monitor's socket faces "
+           "backwards\"; the ~20 mm run behind it is the tinyvga.py ANGLED_RUN (paraphrase)."),
     _cable("usb-c-right-angle", "USB-C right-angle cable", 3.5, 20.0, (20.0, 9.0, 8.5),
-           "Cable sourcing: short right-angle USB cables, right-angle at the board end."),
+           "Cable sourcing: \"USB: short right-angle cables.\""),
     _cable("usb-a-c", "USB-A to USB-C cable", 3.5, 20.0, (22.0, 13.0, 7.0),
-           "Bank to dev board: USB-A or USB-C to USB-C."),
+           "Cables and adapters: \"Bank to dev board: USB-A or USB-C to USB-C, right-angle at the board end preferred.\""),
     _cable("usb-12v-boost", "USB to 12 V DC (5.5 x 2.1) boost cable (Tim's adapter)", 4.0,
            25.0, (60.0, 20.0, 15.0),
-           "Tim's Shenzhen adapter: cable with a boost converter in line; the module "
-           "body size is a placeholder (measure it); the boost module needs a place to sit."),
+           "Cables and adapters: \"a USB to 12 V DC (5.5 x 2.1) boost cable. The boost "
+           "module must have a place to sit.\" Module body size is a placeholder (measure it)."),
 )}

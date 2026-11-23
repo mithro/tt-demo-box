@@ -72,9 +72,9 @@ _TAOBAO_TIM = Monitor(
         Source("Tim's photos (back, face-down)", _PHOTOS,
                "Back ~182 x ~117-118 mm (photo 11); front ~176-181 x ~113 (photo 5); "
                "screen window ~159 x ~86 (photo 5). Good to +/-2 mm."),
-        Source("Taobao listing size", _SURVEY,
-               "Listing: 170 x 113 mm (smaller than the photo reading; the pocket uses "
-               "182 x 118, the insert takes up the listing figure). Item H family."),
+        Source("Taobao listing size", "docs/superpowers/specs/2026-11-23-tt-demo-box-design.md",
+               "Monitors table, row T: \"listing: 170 x 113 mm, 800x480 or 1024x600\" "
+               "(smaller than the photo reading used for `panel`)."),
         Source("Cable and buttons", _PHOTOS,
                "Hard-wired cable leaves the long edge on the button side near the "
                "IR-window corner (photos 1, 2, 11); VGA + DC barrel + composite. "
