@@ -54,4 +54,14 @@ CABLES: dict[str, Cable] = {c.key: c for c in (
            "Battery survey: UGREEN PB505, Xiaomi PB2020 and Anker Zolo list \"built-in C\"; "
            "cable and plug body are not stated, so the USB-C right-angle figures are used. "
            "Unconfirmed."),
+    # Ruling R13: the monitor's own cable, not a bought one.  Its plug is the
+    # slim VGA cable's typical body.
+    Cable("monitor-pigtail", "Monitor's own hard-wired VGA cable (pigtail)", 5.0, 20.0,
+          (45.0, 17.0, 20.0), (
+              Source("Placeholder: Tim's monitor's own hard-wired cable",
+                     "docs/measurements/2026-11-23-photo-measurements.md",
+                     "The closed box allows a U-turn radius up to ~25.5 mm; measure the cable "
+                     "and its stiffness. Diameter 5.0 and plug body are the slim VGA cable's "
+                     "typical figures."),
+          ), confirmed=False),
 )}
