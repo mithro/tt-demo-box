@@ -12,6 +12,8 @@ top, reading along Y, so the packing for each bank is told apart.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import cadquery as cq
 
 from demobox.layout import FIT, Layout
@@ -21,6 +23,11 @@ ENGRAVE_DEPTH = 0.6
 #: Largest engraving letter height, and the margin kept round the text.
 ENGRAVE_SIZE = 6.0
 ENGRAVE_MARGIN = 2.0
+#: The engraving's font, by file: Debian's fonts-dejavu-core, which CI installs for the sheets.
+#: Named fonts are a fontconfig lookup ("Arial" is Liberation Sans on one machine and DejaVu on
+#: another, silently), and a different font is different geometry, so the STEP/STL outputs would
+#: not rebuild byte for byte.
+ENGRAVE_FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 
 
 def _solid(x0, y0, z0, x1, y1, z1) -> cq.Workplane:
@@ -50,7 +57,11 @@ def battery_packing(b: Battery, lay: Layout) -> cq.Workplane:
     size = min(ENGRAVE_SIZE, bay.x1 - stop_x0 - 2 * ENGRAVE_MARGIN)
     plane = cq.Plane(origin=((stop_x0 + bay.x1) / 2, cy, top), xDir=(0, 1, 0),
                      normal=(0, 0, 1))
-    cut = cq.Workplane(plane).text(text, size, -ENGRAVE_DEPTH, combine=False)
+    if not ENGRAVE_FONT.is_file():
+        raise FileNotFoundError(f"engraving font {ENGRAVE_FONT} is missing: "
+                                "install fonts-dejavu-core")
+    cut = cq.Workplane(plane).text(text, size, -ENGRAVE_DEPTH, combine=False,
+                                   font="DejaVu Sans", fontPath=str(ENGRAVE_FONT))
     tb = cut.val().BoundingBox()
     if (tb.xmin < stop_x0 + ENGRAVE_MARGIN or tb.xmax > bay.x1 - ENGRAVE_MARGIN
             or tb.ymin < bay.y0 + ENGRAVE_MARGIN or tb.ymax > bay.y1 - ENGRAVE_MARGIN):

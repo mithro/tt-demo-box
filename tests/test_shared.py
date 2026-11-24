@@ -390,6 +390,26 @@ def test_packing_engraved_with_the_model_name(lay, key):
     assert P.engraving(b) == b.key
 
 
+def test_packing_engraving_uses_the_pinned_font_file(lay, monkeypatch):
+    """The engraving is cut from ENGRAVE_FONT itself, not a font looked up by name.
+
+    A name lookup resolved to a different font in CI than locally, so the packing STEP/STL did
+    not rebuild byte for byte.  Swapping the file must change the solid; if the file were ignored
+    (a fallback font), both would be the same.
+    """
+    b = BATTERIES[sorted(BATTERIES)[0]]
+    sans = P.battery_packing(b, lay).val().Volume()
+    monkeypatch.setattr(P, "ENGRAVE_FONT", P.ENGRAVE_FONT.with_name("DejaVuSerif.ttf"))
+    serif = P.battery_packing(b, lay).val().Volume()
+    assert abs(sans - serif) > 0.01
+
+
+def test_packing_engraving_font_missing_fails_loudly(lay, monkeypatch, tmp_path):
+    monkeypatch.setattr(P, "ENGRAVE_FONT", tmp_path / "no-such-font.ttf")
+    with pytest.raises(FileNotFoundError, match="fonts-dejavu-core"):
+        P.battery_packing(BATTERIES[sorted(BATTERIES)[0]], lay)
+
+
 # --- MT1 locating pin ----------------------------------------------------------------
 
 def test_locating_pin_is_one_valid_solid_of_peg_dia(lay):
