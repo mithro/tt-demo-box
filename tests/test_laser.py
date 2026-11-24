@@ -376,7 +376,7 @@ def test_laser_printed_parts_fit_the_print_bed(lay):
 def test_hardware_list(lay):
     hw = P.hardware(lay, WALL)
     assert hw["M3 square nut"] >= 16
-    assert hw["6 x 3 mm disc magnet"] == 2
+    assert hw["6 x 3 mm disc magnet"] == 2 + 2 * len(lay.lid_catch)   # drawer latch + lid catch
     assert any(k.startswith("M3 x 12") for k in hw)
 
 
