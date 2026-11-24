@@ -255,6 +255,50 @@ def test_hinge_sweep_needs_two_knuckle_ranges(lay):
     assert any("KNUCKLE_LEN" in f for f in failed), failed
 
 
+def test_hinge_sweep_proves_the_stop(lay):
+    """R2: hinge_sweep checks the hinge's stop (``hinge.stop_faces``): each lid
+    knuckle's tab clear of its block short of LID_OPEN_DEG, on it at
+    LID_OPEN_DEG, blocked past it."""
+    from demobox.shared import hinge as H
+    r = _run(C.hinge_sweep, lay)
+    stop = [(ok, what, detail) for ok, what, detail in r.results if "stop" in what]
+    assert len(stop) == 3, stop
+    assert all(ok for ok, _, _ in stop), stop
+    assert all(f"{len(H.stop_faces(lay))} stops" in detail for _, _, detail in stop), stop
+
+
+def _stops_moved(dy, dz):
+    from demobox.shared import hinge as H
+    real = H.stop_faces
+
+    def moved(lay):
+        return tuple(replace(s, block=tuple((y + dy, z + dz) for y, z in s.block))
+                     for s in real(lay))
+    return moved
+
+
+@pytest.mark.parametrize("dy,dz,why", [
+    (0.0, -0.5, "lands"),        # the block 0.5 mm low: the lid opens past the stop
+    (0.0, -5.0, "blocks"),       # far too low: nothing stops the lid a degree past
+    (0.0, 0.3, "clear"),         # 0.3 mm high: the lid hits it before the stop
+])
+def test_hinge_sweep_fails_with_the_stop_moved(lay, monkeypatch, dy, dz, why):
+    from demobox.shared import hinge as H
+    monkeypatch.setattr(H, "stop_faces", _stops_moved(dy, dz))
+    failed = _failed(_run(C.hinge_sweep, lay))
+    assert failed and all("stop" in f for f in failed), failed
+    assert any(why in f for f in failed), failed
+
+
+def test_hinge_sweep_fails_with_no_lid_knuckle(lay):
+    """A knuckle_x holding a single knuckle has no base knuckle to pair with:
+    a stop failure, not a crash."""
+    x0 = max(lay.knuckle_x, key=lambda r: r[1] - r[0])[0]
+    one = replace(lay, knuckle_x=((x0, x0 + L.KNUCKLE_LEN),))
+    failed = _failed(_run(C.hinge_sweep, one))
+    assert any("stop" in f for f in failed), failed
+
+
 # --- the pigtail path ---------------------------------------------------------------
 
 def test_pigtail_path_runs_exit_notch_plug(lay):

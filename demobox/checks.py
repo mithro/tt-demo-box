@@ -30,10 +30,11 @@ from __future__ import annotations
 import math
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
-from shapely.geometry import Point, box as sbox
+from shapely.geometry import Point, Polygon, box as sbox
 
 from demobox import layout as L
 from demobox.geom import Box, overlaps
+from demobox.shared import hinge as H
 from demobox.layout import FINGERTIP_D, SLACK, Layout, exit_edge, tinyvga_offset
 from demobox.parts import board as board_mod
 from demobox.parts.batteries import BATTERIES
@@ -49,6 +50,9 @@ EPS = 1e-6
 #: zero area (a line), which is contact, not a collision.  1e-6 mm^2 is far
 #: below any real interference and far above floating-point noise.
 AREA_TOL = 1e-6
+#: The hinge stop's faces "touch" closer than this; a degree short of the stop
+#: they must be further apart.
+STOP_TOUCH = 0.05
 #: The lid catch's magnets may be this far apart with the lid shut (R22).
 CATCH_MAX_GAP = 1.0
 #: The bank-to-board USB cable: the longest this box asks for (a short
@@ -680,8 +684,9 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
 
     Closed, the lid rests on the base: contact (below AREA_TOL), not a
     collision.  The profile turns about the hinge axis (checked against an
-    independent rotation) and the sweep ends at LID_OPEN_DEG.  The physical
-    stop is the hinge's (Task 4's tests and the solid sweep)."""
+    independent rotation) and the sweep ends at LID_OPEN_DEG, where the
+    hinge's own stop (``hinge.stop_faces``) holds it: clear before, landing
+    at LID_OPEN_DEG, blocking past it (``_hinge_stop``)."""
     lid, o = lay.lid_outer, lay.outer
     hy, hz = lay.hinge_axis
     rr = lay.hinge_relief_r
@@ -737,6 +742,51 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
                      + (f" ({n} at {a:g} deg)" if area > 0 else "")
                      + f"; hinge relief r {_f(rr)} (contact below {AREA_TOL:g} mm^2 is not a "
                      "collision)")
+    _hinge_stop(report, lay, angles)
+
+
+def _hinge_stop(report: Report, lay: Layout, angles: list[float]) -> None:
+    """R2: the hinge's own stop (``hinge.stop_faces``).  At each lid knuckle
+    the lid -- its profile and the knuckle's tab, turned here by
+    ``lid_point_open`` -- misses the base's stop block at every sweep angle
+    short of LID_OPEN_DEG and is more than STOP_TOUCH off it a degree short;
+    at LID_OPEN_DEG it is within STOP_TOUCH of it without overlapping; a
+    degree past, it overlaps it."""
+    names = ("hinge stop clear: the lid misses each stop block short of LID_OPEN_DEG",
+             "hinge stop lands: each lid knuckle's tab on its stop block at LID_OPEN_DEG",
+             "hinge stop blocks: the lid can't open a degree past LID_OPEN_DEG")
+    try:
+        stops = H.stop_faces(lay)
+    except ValueError as e:
+        for what in names:
+            report.check(False, what, f"no stop: {e}")
+        return
+    lid = lay.lid_outer
+    corners = ((lid.y0, lid.z0), (lid.y1, lid.z0), (lid.y1, lid.z1), (lid.y0, lid.z1))
+    a = L.LID_OPEN_DEG
+
+    def lid_at(s: H.Stop, deg: float):
+        return Polygon([lid_point_open(lay, y, z, deg) for y, z in corners]).union(
+            Polygon([lid_point_open(lay, y, z, deg) for y, z in s.tab]))
+
+    clear, short, land, over, past = [], [], [], [], []
+    for s in stops:
+        block = Polygon(s.block)
+        clear.append(max(lid_at(s, d).intersection(block).area for d in angles if d < a))
+        short.append(lid_at(s, a - 1.0).distance(block))
+        at = lid_at(s, a)
+        land.append(at.distance(block))
+        over.append(at.intersection(block).area)
+        past.append(lid_at(s, a + 1.0).intersection(block).area)
+    n = f"{len(stops)} stops (X " + ", ".join(f"{_f(s.x0)}..{_f(s.x1)}" for s in stops) + ")"
+    report.check(max(clear) <= AREA_TOL and min(short) > STOP_TOUCH, names[0],
+                 f"{n}: largest YZ overlap {max(clear):.3g} mm^2 over 0..{a - 1:g} deg; "
+                 f"{min(short):.3f} mm apart at {a - 1:g} deg (> {STOP_TOUCH:g})")
+    report.check(max(land) <= STOP_TOUCH and max(over) <= AREA_TOL, names[1],
+                 f"{n}: {max(land):.3f} mm apart (<= {STOP_TOUCH:g}), overlap "
+                 f"{max(over):.3g} mm^2 at {a:g} deg")
+    report.check(min(past) > AREA_TOL, names[2],
+                 f"{n}: overlap {min(past):.3g} mm^2 at {a + 1:g} deg")
 
 
 def cables_route(report: Report, lay: Layout) -> None:
