@@ -50,92 +50,27 @@ standing.  Both bodies fit the 220 x 220 bed whole; ``check_bed`` raises
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import cadquery as cq
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
-from demobox.geom import BedOverflow, Box
-from demobox.layout import (CATCH_BLOCK_H, DESIGN_BANK, DESIGN_MONITOR, MAGNET_D,
-                            MAGNET_RECESS, MAGNET_T, PEG_DIA, PEG_HOLE_D, PIN_ROD_D,
-                            PRINT_BED, ROUTES, SLACK, TAPE_T, Layout, layout)
-from demobox.parts.batteries import BATTERIES
-from demobox.parts.board import board_spec
-from demobox.parts.cables import CABLES
-from demobox.parts.monitors import MONITORS
+from demobox.geom import Box
+from demobox.layout import (CATCH_BLOCK_H, MAGNET_D, MAGNET_T, PEG_DIA, PEG_HOLE_D, PIN_ROD_D,
+                            PRINT_BED, ROUTES, Layout, layout)
 from demobox.shared import hinge as H
 from demobox.shared.pin import PIN_CHAMFER, locating_pin, socket_depth
+from demobox.shared.solids import (  # noqa: F401  (re-exported: the route's public names)
+    ASSEMBLY_BANK, ASSEMBLY_BOARD, ASSEMBLY_MONITOR, BANK_OUT_LIFT, COLOURS, FLAT, FLIP,
+    MAGNET_POCKET_D, MAGNET_POCKET_DEPTH, Printed, bed_contact_area, board_pcb, boost_block,
+    box as _box, bx as _bx, check_bed, cut as _cut, fuse as _fuse, hinge_rod, monitor_block,
+    one as _one, packed_bank, posed, prism_x as _prism_x, zcyl as _zcyl)
 
 # --- design choices ------------------------------------------------------------
-#: A catch magnet's pocket: a slip fit across, deep enough to leave the
-#: magnet MAGNET_RECESS under the seam face.
-MAGNET_POCKET_D = MAGNET_D + 0.2
-MAGNET_POCKET_DEPTH = MAGNET_T + MAGNET_RECESS
-#: ``assembly(..., bank_out=True)``: the bank lifted this far above the rim.
-BANK_OUT_LIFT = 60.0
-
-#: The assembly's default monitor, bank and board revision.
-ASSEMBLY_MONITOR = DESIGN_MONITOR
-ASSEMBLY_BANK = DESIGN_BANK
-ASSEMBLY_BOARD = "v3.3"
-
-COLOURS: dict[str, tuple[float, float, float]] = {
-    "base": (0.22, 0.24, 0.28), "lid": (0.22, 0.24, 0.28), "mt1-pin": (0.95, 0.85, 0.20),
-    "board": (0.05, 0.40, 0.15), "tinyvga": (0.05, 0.30, 0.45), "vga-plug": (0.10, 0.10, 0.12),
-    "monitor": (0.02, 0.02, 0.05), "boost": (0.15, 0.15, 0.15), "bank": (0.85, 0.85, 0.85),
-    "magnet": (0.55, 0.55, 0.60), "hw": (0.75, 0.75, 0.78),
-}
-
 #: The assembly's one declared overlap (``clash.clashes``): the rod in the
 #: lid's last knuckle, whose last PRESS_LEN is a press fit (R24).  Every other
 #: pair -- the rod in its slip bores, the magnets in their pockets, the board
 #: on the plinth and pins, the loose pin in its hole -- only touches, and
 #: must not interpenetrate.
 DECLARED_OVERLAPS: frozenset[frozenset[str]] = frozenset({frozenset(("hw:hinge-rod", "lid"))})
-
-
-@dataclass(frozen=True)
-class Printed:
-    """A printed part in its design frame, the turn (axis, degrees about the
-    origin) that lays it on the bed, and a print note."""
-
-    solid: cq.Shape
-    print_orientation: tuple[tuple[float, float, float], float]
-    note: str
-
-
-# --- small solids --------------------------------------------------------------------
-
-def _box(x0, y0, z0, x1, y1, z1) -> cq.Solid:
-    return cq.Solid.makeBox(x1 - x0, y1 - y0, z1 - z0, cq.Vector(x0, y0, z0))
-
-
-def _bx(b: Box) -> cq.Solid:
-    return _box(b.x0, b.y0, b.z0, b.x1, b.y1, b.z1)
-
-
-def _zcyl(cx, cy, z0, z1, r) -> cq.Solid:
-    return cq.Solid.makeCylinder(r, z1 - z0, cq.Vector(cx, cy, z0), cq.Vector(0, 0, 1))
-
-
-def _prism_x(pts, x0, x1) -> cq.Solid:
-    """A (y, z) polygon extruded along X from x0 to x1."""
-    return cq.Workplane("YZ", origin=(x0, 0, 0)).polyline(pts).close().extrude(x1 - x0).val()
-
-
-def _fuse(a: cq.Shape, *others: cq.Shape) -> cq.Shape:
-    return a.fuse(*others).clean() if others else a
-
-
-def _cut(a: cq.Shape, *others: cq.Shape) -> cq.Shape:
-    return a.cut(*others).clean() if others else a
-
-
-def _one(shape: cq.Shape, what: str) -> cq.Solid:
-    solids = shape.Solids()
-    if len(solids) != 1:
-        raise ValueError(f"{what}: {len(solids)} solids, expected one")
-    return solids[0]
 
 
 _CACHE: dict[tuple[str, str], cq.Solid] = {}
@@ -227,54 +162,11 @@ def lid(lay: Layout) -> cq.Solid:
 
 # --- print orientation and the bed ------------------------------------------------------
 
-#: Turns (axis, degrees) about the origin.
-FLAT = ((1.0, 0.0, 0.0), 0.0)
-FLIP = ((1.0, 0.0, 0.0), 180.0)
 #: How each part lies on the bed: the base on its floor, the lid on its top
 #: plate, the pin standing on its end.
 PRINT_POSE: dict[str, tuple[tuple[float, float, float], float]] = {
     "base": FLAT, "lid": FLIP, "mt1-pin": FLAT,
 }
-
-
-def _turned(shape: cq.Shape, turn) -> cq.Shape:
-    axis, angle = turn
-    if angle == 0.0:
-        return shape
-    return shape.rotate(cq.Vector(0, 0, 0), cq.Vector(*axis), angle)
-
-
-def bed_contact_area(shape: cq.Shape) -> float:
-    """Area of the planar faces lying on the shape's lowest Z plane."""
-    z = shape.BoundingBox().zmin
-    area = 0.0
-    for f in shape.Faces():
-        if f.geomType() != "PLANE":
-            continue
-        bb = f.BoundingBox()
-        if abs(bb.zmin - z) < 1e-6 and abs(bb.zmax - z) < 1e-6:
-            area += f.Area()
-    return area
-
-
-def posed(p: Printed) -> cq.Shape:
-    """The part turned onto the bed, its bounding box's corner at the origin."""
-    s = _turned(p.solid, p.print_orientation)
-    bb = s.BoundingBox()
-    return s.translate(cq.Vector(-bb.xmin, -bb.ymin, -bb.zmin))
-
-
-def _footprint(shape: cq.Shape) -> tuple[float, float]:
-    bb = shape.BoundingBox()
-    return bb.xlen, bb.ylen
-
-
-def check_bed(name: str, shape: cq.Shape, bed=PRINT_BED) -> None:
-    """Raise BedOverflow when ``shape`` (posed) is bigger than the bed."""
-    x, y = _footprint(shape)
-    if x > bed[0] + 1e-6 or y > bed[1] + 1e-6:
-        raise BedOverflow(f"{name} {x:.2f} x {y:.2f} mm does not fit the {bed[0]:g} x "
-                          f"{bed[1]:g} mm print bed")
 
 
 def _printed(kind: str, solid: cq.Shape, note: str) -> Printed:
@@ -328,52 +220,6 @@ def hardware(lay: Layout) -> dict[str, int]:
 
 # --- assembly ------------------------------------------------------------------------
 
-def board_pcb(lay: Layout, key: str) -> cq.Shape:
-    """Board ``key``'s PCB with its holes, base frame (``layout``'s board
-    placement: base = (ox - by, oy + bx, oz + bz))."""
-    ol = board_spec(key).outline
-    ox, oy, oz = lay.board_origin
-    pcb = _box(ox - ol.height, oy, oz, ox, oy + ol.width, oz + ol.thickness)
-    return _cut(pcb, *(_zcyl(ox - h.y, oy + h.x, oz - 1.0, oz + ol.thickness + 1.0, h.dia / 2)
-                       for h in board_spec(key).holes))
-
-
-def _monitor_block(lay: Layout, monitor: str) -> cq.Solid:
-    """The monitor's panel taped to the lid, lid frame: centred in X on the
-    monitor space, SLACK in from its front edge, its back TAPE_T under the
-    inside face."""
-    mw, mh, md = MONITORS[monitor].panel
-    ms = lay.monitor_space
-    cx, y0 = (ms.x0 + ms.x1) / 2, ms.y0 + SLACK
-    top = lay.lid_outer.z1 - lay.wall - TAPE_T
-    return _box(cx - mw / 2, y0, top - md, cx + mw / 2, y0 + mh, top)
-
-
-def _boost_block(lay: Layout) -> cq.Solid:
-    """The boost module taped in the lid strip (R25), lid frame: its room
-    less SLACK round it, its back TAPE_T under the inside face."""
-    b = lay.boost_pocket
-    top = lay.lid_outer.z1 - lay.wall - TAPE_T
-    return _box(b.x0 + SLACK, b.y0 + SLACK, top - CABLES["usb-12v-boost"].plug[2],
-                b.x1 - SLACK, b.y1 - SLACK, top)
-
-
-def _rod(lay: Layout) -> cq.Solid:
-    hy, hz = lay.hinge_axis
-    length = H.pin_length(lay)
-    return cq.Solid.makeCylinder(PIN_ROD_D / 2, length, cq.Vector(lay.outer.x1 - length, hy, hz),
-                                 cq.Vector(1, 0, 0))
-
-
-def _packed(lay: Layout, bank: str) -> Box:
-    """Bank ``bank`` on the bay floor, centred in the bay (as
-    ``checks.packed_bank`` packs the design bank), base frame."""
-    l_, w, h = BATTERIES[bank].size
-    bay = lay.bank_bay
-    x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
-    return Box(x0, y0, bay.z0, x0 + l_, y0 + w, bay.z0 + h, f"bank {bank}")
-
-
 def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMBLY_MONITOR,
              board: str = ASSEMBLY_BOARD, bank: str = ASSEMBLY_BANK,
              ) -> list[tuple[str, cq.Shape, tuple[float, float, float]]]:
@@ -393,7 +239,7 @@ def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMB
     lay = layout(ROUTES[route], bank=bank, monitor=monitor)
     loc = lay.lid_location(angle_deg)
 
-    bank_box = _bx(_packed(lay, bank))
+    bank_box = _bx(packed_bank(lay, bank))
     if bank_out:
         bank_box = bank_box.translate(cq.Vector(0, 0, lay.rim_z + BANK_OUT_LIFT - lay.bank_bay.z0))
     mt1 = lay.pins[f"{board}/MT1"]
@@ -401,12 +247,12 @@ def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMB
     base_items = [("base", base(lay)), ("mt1-pin", pin), ("board", board_pcb(lay, board)),
                   ("tinyvga", _bx(lay.board_keepouts[f"{board}/tinyvga"])),
                   ("vga-plug", _bx(lay.board_keepouts[f"{board}/vga_plug"])),
-                  ("bank", bank_box), ("hw:hinge-rod", _rod(lay))]
+                  ("bank", bank_box), ("hw:hinge-rod", hinge_rod(lay))]
     base_items += [(f"hw:catch-magnet-base-{i}", _zcyl(c.cx, c.cy, c.z0, c.z1, MAGNET_D / 2))
                    for i, c in enumerate(lay.lid_catch, 1)]
-    lid_items = [("lid", lid(lay)), ("monitor", _monitor_block(lay, monitor))]
+    lid_items = [("lid", lid(lay)), ("monitor", monitor_block(lay, monitor))]
     if lay.boost_in_lid:
-        lid_items.append(("boost", _boost_block(lay)))
+        lid_items.append(("boost", boost_block(lay)))
     lid_items += [(f"hw:catch-magnet-lid-{i}", _zcyl(m.cx, m.cy, m.z0, m.z1, MAGNET_D / 2))
                   for i, m in enumerate(map(lay.catch_lid_magnet, lay.lid_catch), 1)]
 
