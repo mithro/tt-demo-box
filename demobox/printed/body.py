@@ -13,10 +13,8 @@ Base (``base``)
 A tub: floor and four walls ``wall`` thick, up to ``rim_z``.  It has:
 
 * the board's plinth (``Layout.plinth`` less ``plinth_relief``), its top the
-  PCB underside.  It is hollow underneath (it would be ~100 cm^3 solid):
-  sides and top ``wall`` thick, with ribs ``wall`` thick between cells no
-  wider than RIB_SPAN_MAX (``plinth_cells``) so the top bridges them, a
-  ``wall``-thick boss round each pin, and ``wall`` left under the relief;
+  PCB underside.  It is solid (R27): the slicer's infill saves the
+  filament, and an enclosed void would trap supports;
 * the MT2 pin, printed with it (``pins["MT2"]``, PEG_DIA, PIN_CHAMFER on top);
 * a PEG_HOLE_D hole at each revision's MT1 (``pins["<rev>/MT1"]``),
   ``pin.socket_depth`` deep (to the floor), for the loose ``mt1-pin``;
@@ -52,17 +50,16 @@ standing.  Both bodies fit the 220 x 220 bed whole; ``check_bed`` raises
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import cadquery as cq
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
-from demobox.checks import packed_bank
 from demobox.geom import BedOverflow, Box
-from demobox.layout import (CATCH_BLOCK, CATCH_BLOCK_H, DESIGN_MONITOR, MAGNET_D,
+from demobox.layout import (CATCH_BLOCK_H, DESIGN_BANK, DESIGN_MONITOR, MAGNET_D,
                             MAGNET_RECESS, MAGNET_T, PEG_DIA, PEG_HOLE_D, PIN_ROD_D,
                             PRINT_BED, ROUTES, SLACK, TAPE_T, Layout, layout)
+from demobox.parts.batteries import BATTERIES
 from demobox.parts.board import board_spec
 from demobox.parts.cables import CABLES
 from demobox.parts.monitors import MONITORS
@@ -74,13 +71,12 @@ from demobox.shared.pin import PIN_CHAMFER, locating_pin, socket_depth
 #: magnet MAGNET_RECESS under the seam face.
 MAGNET_POCKET_D = MAGNET_D + 0.2
 MAGNET_POCKET_DEPTH = MAGNET_T + MAGNET_RECESS
-#: The widest cell under the plinth's top (a bridge the printer spans).
-RIB_SPAN_MAX = 20.0
 #: ``assembly(..., bank_out=True)``: the bank lifted this far above the rim.
 BANK_OUT_LIFT = 60.0
 
-#: The assembly's default monitor and board revision.
+#: The assembly's default monitor, bank and board revision.
 ASSEMBLY_MONITOR = DESIGN_MONITOR
+ASSEMBLY_BANK = DESIGN_BANK
 ASSEMBLY_BOARD = "v3.3"
 
 COLOURS: dict[str, tuple[float, float, float]] = {
@@ -90,16 +86,12 @@ COLOURS: dict[str, tuple[float, float, float]] = {
     "magnet": (0.55, 0.55, 0.60), "hw": (0.75, 0.75, 0.78),
 }
 
-_MAGNETS = tuple(f"hw:catch-magnet-{side}-{i}" for side in ("base", "lid") for i in (1, 2))
-#: The assembly's declared contacts (``clash.clashes``): the rod in its bores
-#: (a press fit in the lid's last knuckle), the magnets in their pockets, the
-#: board on the plinth and the MT2 pin, the loose pin in the board and in its
-#: plinth hole.  Everything else must not touch.
-DECLARED_OVERLAPS: frozenset[frozenset[str]] = frozenset(
-    {frozenset(("hw:hinge-rod", "base")), frozenset(("hw:hinge-rod", "lid")),
-     frozenset(("board", "base")), frozenset(("board", "mt1-pin")),
-     frozenset(("mt1-pin", "base"))}
-    | {frozenset((m, "base" if "-base-" in m else "lid")) for m in _MAGNETS})
+#: The assembly's one declared overlap (``clash.clashes``): the rod in the
+#: lid's last knuckle, whose last PRESS_LEN is a press fit (R24).  Every other
+#: pair -- the rod in its slip bores, the magnets in their pockets, the board
+#: on the plinth and pins, the loose pin in its hole -- only touches, and
+#: must not interpenetrate.
+DECLARED_OVERLAPS: frozenset[frozenset[str]] = frozenset({frozenset(("hw:hinge-rod", "lid"))})
 
 
 @dataclass(frozen=True)
@@ -146,50 +138,19 @@ def _one(shape: cq.Shape, what: str) -> cq.Solid:
     return solids[0]
 
 
-_CACHE: dict[tuple[str, float], cq.Solid] = {}
+_CACHE: dict[tuple[str, str], cq.Solid] = {}
 
 
 def _cached(name: str, lay: Layout, build) -> cq.Solid:
-    key = (name, lay.wall)
+    """``build()``, once per part and layout (R27: keyed on the whole
+    layout, so another kit never gets the design kit's part)."""
+    key = (name, repr(lay))
     if key not in _CACHE:
         _CACHE[key] = build()
     return _CACHE[key]
 
 
 # --- the plinth ------------------------------------------------------------------------
-
-def _cells_along(lo: float, hi: float, wall: float) -> list[tuple[float, float]]:
-    """``lo..hi`` split into the fewest equal cells no wider than RIB_SPAN_MAX
-    with ``wall``-thick ribs between them."""
-    n = math.ceil((hi - lo + wall) / (RIB_SPAN_MAX + wall) - 1e-9)
-    c = (hi - lo - (n - 1) * wall) / n
-    return [(lo + i * (c + wall), lo + i * (c + wall) + c) for i in range(n)]
-
-
-def plinth_cells(lay: Layout) -> tuple[Box, ...]:
-    """The plinth's hollow, as a grid of cells: inside its sides and under
-    its top (each ``wall`` thick), ribs ``wall`` thick between them.  The
-    pin bosses and the wall under the relief are left solid as well
-    (``_plinth_cavity``)."""
-    pl, w = lay.plinth, lay.wall
-    if pl.size[2] <= 2 * w:
-        return ()
-    return tuple(Box(x0, y0, pl.z0, x1, y1, pl.z1 - w, "plinth cell")
-                 for x0, x1 in _cells_along(pl.x0 + w, pl.x1 - w, w)
-                 for y0, y1 in _cells_along(pl.y0 + w, pl.y1 - w, w))
-
-
-def _plinth_cavity(lay: Layout) -> cq.Shape | None:
-    cells = plinth_cells(lay)
-    if not cells:
-        return None
-    pl, w, r = lay.plinth, lay.wall, lay.plinth_relief
-    cavity = _fuse(*(_bx(c) for c in cells))
-    boss_r = PEG_HOLE_D / 2 + w
-    keep = [_zcyl(p.cx, p.cy, pl.z0 - 1.0, pl.z1 + 1.0, boss_r) for p in lay.pins.values()]
-    keep.append(_box(r.x0 - w, r.y0 - w, r.z0 - w, r.x1 + w, r.y1 + w, pl.z1 + 1.0))
-    return _cut(cavity, *keep)
-
 
 def _mt2_pin(lay: Layout) -> cq.Solid:
     p = lay.pins["MT2"]
@@ -239,9 +200,6 @@ def _base(lay: Layout) -> cq.Solid:
     cuts = [_bx(lay.plinth_relief), *_mt1_holes(lay),
             _box(n.x0, n.y0, max(n.z0, rim), n.x1, n.y1, n.z1)]
     cuts += [_pocket(c.cx, c.cy, rim, -1.0) for c in lay.lid_catch]
-    cavity = _plinth_cavity(lay)
-    if cavity is not None:
-        cuts.append(cavity)
     return _one(_cut(body, *cuts), "base")
 
 
@@ -331,7 +289,8 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
     rod = H.pin_length(lay)
     parts = {
         "base": _printed("base", base(lay), (
-            "Base: print floor down. Supports under the hinge knuckle only (the catch "
+            "Base: print floor down, normal infill (the plinth is solid; infill keeps it "
+            "light). Supports under the hinge knuckle only (the catch "
             "blocks' gussets, the stop blocks and the seal bead's lip print without). Press two "
             f"{MAGNET_D:g} x {MAGNET_T:g} mm magnets into the front-corner pockets, flush, "
             "glued if loose; pole them to pull the lid's.")),
@@ -406,32 +365,43 @@ def _rod(lay: Layout) -> cq.Solid:
                                  cq.Vector(1, 0, 0))
 
 
+def _packed(lay: Layout, bank: str) -> Box:
+    """Bank ``bank`` on the bay floor, centred in the bay (as
+    ``checks.packed_bank`` packs the design bank), base frame."""
+    l_, w, h = BATTERIES[bank].size
+    bay = lay.bank_bay
+    x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
+    return Box(x0, y0, bay.z0, x0 + l_, y0 + w, bay.z0 + h, f"bank {bank}")
+
+
 def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMBLY_MONITOR,
-             board: str = ASSEMBLY_BOARD) -> list[tuple[str, cq.Shape, tuple[float, float, float]]]:
+             board: str = ASSEMBLY_BOARD, bank: str = ASSEMBLY_BANK,
+             ) -> list[tuple[str, cq.Shape, tuple[float, float, float]]]:
     """The box in the base frame, ``(name, shape, colour)`` per solid: the
     lid ``angle_deg`` open, the bank in its bay or (``bank_out``) lifted
-    BANK_OUT_LIFT above the rim, with ``monitor`` and ``board`` fitted.
+    BANK_OUT_LIFT above the rim, with ``monitor``, ``board`` and ``bank``
+    fitted, in the box laid out for that ``monitor`` and ``bank`` (R27).
     Bought parts are plain blocks: the board's PCB, its TinyVGA (with the
     adapter) and the VGA plug, the monitor panel, the boost module (when in
     the lid), the bank; the magnets and the rod are ``hw:``.  The one entry
     point for both routes: ``"laser"`` is ``demobox.laser.fittings``'."""
     if route == "laser":
         from demobox.laser.fittings import assembly as laser_assembly
-        return laser_assembly(angle_deg, bank_out, monitor=monitor, board=board)
+        return laser_assembly(angle_deg, bank_out, monitor=monitor, board=board, bank=bank)
     if route != "printed":
         raise ValueError(f"unknown route {route!r}; routes are {sorted(ROUTES)}")
-    lay = layout(ROUTES[route])
+    lay = layout(ROUTES[route], bank=bank, monitor=monitor)
     loc = lay.lid_location(angle_deg)
 
-    bank = _bx(packed_bank(lay))
+    bank_box = _bx(_packed(lay, bank))
     if bank_out:
-        bank = bank.translate(cq.Vector(0, 0, lay.rim_z + BANK_OUT_LIFT - lay.bank_bay.z0))
+        bank_box = bank_box.translate(cq.Vector(0, 0, lay.rim_z + BANK_OUT_LIFT - lay.bank_bay.z0))
     mt1 = lay.pins[f"{board}/MT1"]
     pin = locating_pin(lay).val().translate(cq.Vector(mt1.cx, mt1.cy, mt1.z0 - socket_depth(lay)))
     base_items = [("base", base(lay)), ("mt1-pin", pin), ("board", board_pcb(lay, board)),
                   ("tinyvga", _bx(lay.board_keepouts[f"{board}/tinyvga"])),
                   ("vga-plug", _bx(lay.board_keepouts[f"{board}/vga_plug"])),
-                  ("bank", bank), ("hw:hinge-rod", _rod(lay))]
+                  ("bank", bank_box), ("hw:hinge-rod", _rod(lay))]
     base_items += [(f"hw:catch-magnet-base-{i}", _zcyl(c.cx, c.cy, c.z0, c.z1, MAGNET_D / 2))
                    for i, c in enumerate(lay.lid_catch, 1)]
     lid_items = [("lid", lid(lay)), ("monitor", _monitor_block(lay, monitor))]

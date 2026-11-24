@@ -200,26 +200,35 @@ def test_plinth_relief_keeps_a_wall_under_it(lay, base):
     assert _inside(base, (cx, cy, r.z0 - lay.wall + 0.1))
 
 
-def test_plinth_is_hollow_but_never_thin(lay, base):
-    """Hollow underneath (it saves material), its top and sides ``wall``
-    thick, ribs no further apart than RIB_SPAN_MAX so the top bridges."""
-    pl, w = lay.plinth, lay.wall
-    solid = _box(pl.x0, pl.y0, pl.z0, pl.x1, pl.y1, pl.z1)
-    assert _common(base, solid) < 0.6 * solid.Volume()
-    cells = B.plinth_cells(lay)
-    assert cells
-    for c in cells:
-        assert c.size[0] <= B.RIB_SPAN_MAX + 1e-6 and c.size[1] <= B.RIB_SPAN_MAX + 1e-6
-        assert c.x0 >= pl.x0 + w - 1e-6 and c.x1 <= pl.x1 - w + 1e-6
-        assert c.y0 >= pl.y0 + w - 1e-6 and c.y1 <= pl.y1 - w + 1e-6
-        assert c.z1 <= pl.z1 - w + 1e-6
-    for a in cells:
-        for b in cells:
-            if a is not b:
-                gap = max(b.x0 - a.x1, a.x0 - b.x1, b.y0 - a.y1, a.y0 - b.y1)
-                assert gap >= w - 1e-6
-    zm, ym = (pl.z0 + pl.z1) / 2, (pl.y0 + pl.y1) / 2
-    assert _inside(base, (pl.x0 + w - 0.1, ym, zm)) and _inside(base, (pl.x1 - w + 0.1, ym, zm))
+def test_plinth_is_solid(lay, base):
+    """R27: the plinth is solid (a slicer's infill saves the filament; an
+    enclosed void would trap supports): the base is one shell."""
+    assert len(base.Shells()) == 1
+    pl = lay.plinth
+    for fx, fy in ((0.3, 0.3), (0.5, 0.5), (0.7, 0.4)):
+        x, y = pl.x0 + fx * pl.size[0], pl.y0 + fy * pl.size[1]
+        assert _inside(base, (x, y, (pl.z0 + pl.z1) / 2)), (x, y)
+
+
+def test_base_follows_the_layout():
+    """R27: a different kit builds its own base, never the cached design one."""
+    design = B.base(L.layout(2.4)).BoundingBox()
+    other_lay = L.layout(2.4, bank="iniu-p512")
+    other = B.base(other_lay).BoundingBox()
+    # the INIU is lower (29 vs 32 mm), so its base's rim is lower
+    assert other_lay.rim_z < L.layout(2.4).rim_z
+    assert (other.xlen, other.ylen, other.zlen) != pytest.approx(
+        (design.xlen, design.ylen, design.zlen))
+    assert (other.xlen, other.ylen) == pytest.approx(other_lay.outer.size[:2])
+    assert other.zlen < design.zlen
+    shut = {n: s for n, s, _ in B.assembly("printed", 0.0, False, bank="iniu-p512")}
+    assert shut["base"].BoundingBox().xlen == pytest.approx(other_lay.outer.size[0])
+    assert shut["bank"].BoundingBox().xlen == pytest.approx(104.0)
+
+
+def test_only_the_press_fit_is_declared():
+    """Every other pair must not touch, so none is exempt."""
+    assert B.DECLARED_OVERLAPS == frozenset({frozenset(("hw:hinge-rod", "lid"))})
 
 
 def test_mt1_holes_go_to_the_floor(lay, base):
@@ -406,7 +415,7 @@ def _cases():
 @pytest.mark.parametrize("rev,angle,bank_out", _cases(),
                          ids=[f"{r}-{a:g}{'-bank-out' if o else ''}" for r, a, o in _cases()])
 def test_assembly_no_clash(rev, angle, bank_out):
-    """Review Focus 3/4: only the declared contacts touch (the rod in its
-    bores, the magnets in their pockets, the board on its pins and plinth)."""
+    """Review Focus 3/4: nothing interpenetrates but the one declared pair,
+    the rod in the lid knuckle's R24 press fit."""
     items = B.assembly("printed", angle, bank_out, board=rev)
     assert clashes(items, B.DECLARED_OVERLAPS) == []
