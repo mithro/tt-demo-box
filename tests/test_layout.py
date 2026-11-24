@@ -131,10 +131,20 @@ def test_size_budget(lay):
         assert lay.boost_pocket.size[:2] == pytest.approx(fits[0])
 
     width = inner_x + 2 * w
+    # R18b: CATCH_BLOCK only when the lid's catch blocks reach over the monitor
+    ms_x0 = (width - (panel[0] + 2 * s)) / 2
+    over = any(lay.catch_base_block(c).x0 < ms_x0 + panel[0] + 2 * s
+               and ms_x0 < lay.catch_base_block(c).x1 for c in lay.lid_catch)
+    # R18: the pigtail turns behind the stiff run's end, in front of the rod
+    pig = CABLES["monitor-pigtail"]
+    run_end = w + s - x0 + max(_adapter().moved(*L.tinyvga_offset(k)).x1 for k in BOARD_KEYS) \
+        + TINYVGA.plug_body_len + TINYVGA.straight_run
     depth = max(w + s + board_row_y + s + bank_row_y + s + w,
-                panel[1] + 2 * s + 2 * w + L.CATCH_BLOCK)
+                panel[1] + 2 * s + 2 * w + (L.CATCH_BLOCK if over else 0.0),
+                run_end + pig.min_bend_r + pig.dia / 2 + L.PIN_ROD_D / 2 + L.FIT + L.KNUCKLE_R)
     rim = w + max(bank.size[2], stack_h) + s
-    assert lay.outer == Box(0.0, 0.0, 0.0, width, depth, rim, lay.outer.what)
+    o = lay.outer
+    assert (o.x0, o.y0, o.z0, o.x1, o.y1, o.z1) == pytest.approx((0.0, 0.0, 0.0, width, depth, rim))
     assert lay.outer.size == pytest.approx((width, depth, rim))
     assert lay.rim_z == pytest.approx(rim)
     assert lay.lid_outer.size[2] == pytest.approx(w + L.TAPE_T + panel[2] + L.CLOSED_CLEARANCE)
@@ -160,17 +170,21 @@ def test_size_budget_printed_literals():
     Boost (60 x 20 x 15 + 2*1 = 62 x 22 x 17): room between the bay (to 155.4) and
              the plug (from 162.4) is 7.0, past the plug (194.3 + 1 .. 195.3) 0:
              neither way fits -> in the lid strip.
-    Depth  = 2.4 + 1 + 90.855 + 1 + (73 + 2) + 1 + 2.4 = 173.655
-             (>= 118 + 2 + 4.8 + catch block 10 = 134.8)
+    Depth  = max of three terms (R18, R18b):
+             rows    2.4 + 1 + 90.855 + 1 + (73 + 2) + 1 + 2.4 = 173.655;
+             monitor 118 + 2 + 4.8 + catch block 10 = 134.8 (the catch blocks,
+                     X 2.4..12.4, reach over the monitor at 6.85..190.85);
+             pigtail the stiff run's end 151.255 + min bend 15 + rod clearance
+                     (2.5 + 1.5 + 0.5 = 4.5) + KNUCKLE_R 4 = 174.755   (wins).
     Rim    = 2.4 + max(bank 32, board stack 20.0) + 1 = 35.4        (bank wins)
     Lid    = 2.4 + tape 1.0 + monitor 20.0 + clearance 2.0 = 25.4
-    Closed 197.7 x 173.655 x 60.8 = 2.087 L.
+    Closed 197.7 x 174.755 x 60.8 = 2.101 L.
     """
     lay = L.layout(L.ROUTES["printed"])
     assert lay.vga_adapter is True and lay.boost_in_lid is True
     assert lay.boost_pocket.size == pytest.approx((62.0, 22.0, 17.0), abs=0.01)
-    assert lay.outer.size == pytest.approx((197.7, 173.655, 35.4), abs=0.01)
-    assert lay.lid_outer.size == pytest.approx((197.7, 173.655, 25.4), abs=0.01)
+    assert lay.outer.size == pytest.approx((197.7, 174.755, 35.4), abs=0.01)
+    assert lay.lid_outer.size == pytest.approx((197.7, 174.755, 25.4), abs=0.01)
     assert lay.port_room.size[0] == pytest.approx(23.0, abs=0.01)
     v = lay.board_keepouts["v3.2/vga_plug"]
     assert (v.x0, v.x1, v.y0, v.y1) == pytest.approx((162.4, 194.3, 94.255, 151.255), abs=0.01)
@@ -465,10 +479,10 @@ def test_hinge_relief_r_less_than_the_lid_depth(lay):
 
 def test_knuckle_x_design_kit():
     """R15, by hand (printed, R16a box).  Within hinge_relief_r = 6.72 of the
-    axis (Y 169.655, Z 35.4) in YZ lie only the port room (X 2.4..25.4: it
+    axis (Y 170.755, Z 35.4) in YZ lie only the port room (X 2.4..25.4: it
     runs to the back wall and the rim) and the packed bank (X 26.4..154.4,
-    back-top edge at Y 169.255, Z 34.4: 1.08 from the axis).  The VGA plug's
-    stiff run ends at Y 151.255, 18.4 in front of the axis; the boost is in
+    back-top edge at Y 169.255, Z 34.4: 1.80 from the axis).  The VGA plug's
+    stiff run ends at Y 151.255, 19.5 in front of the axis; the boost is in
     the lid.  The pigtail's notch is on the plug's run axis, X 178.35 +- 3.
     So, of X 0..197.7:  0..2.4, 25.4..26.4, 154.4..175.35, 181.35..197.7."""
     lay = L.layout(L.ROUTES["printed"])

@@ -61,8 +61,13 @@ Base rows
   R16a); if none is left it goes in ``lid_strip`` (``boost_in_lid``).
 * **Width** = max(board row, port room + bay, the VGA plug's keep-out +
   SLACK, monitor W + 2*SLACK) + 2*wall.
-  **Depth** = wall + SLACK + board row Y + SLACK + bank row Y + SLACK + wall,
-  and at least monitor H + 2*SLACK + 2*wall + CATCH_BLOCK.
+  **Depth** = the largest of three terms: *rows* = wall + SLACK + board row
+  Y + SLACK + bank row Y + SLACK + wall; *monitor* = monitor H + 2*SLACK +
+  2*wall (+ CATCH_BLOCK only when the lid's catch blocks reach over the
+  monitor in X, R18b); *pigtail* = the VGA plug's stiff-run end + the
+  pigtail's ``min_bend_r`` + ``PIGTAIL_ROD_CLEAR`` + ``KNUCKLE_R`` (R18: the
+  pigtail drops ``PIGTAIL_ROD_CLEAR`` in front of the hinge rod and turns
+  forward into the run's end with a full bend radius of room).
 * **Height.**  ``rim_z = wall + max(bank H, board stack H) + SLACK``; the
   board stack is the keep-out union's z extent.  The board stands on
   ``plinth`` (floor to PCB underside), lifted so the union's top is at
@@ -201,7 +206,10 @@ UNCONFIRMED: tuple[tuple[str, float, Source], ...] = (
 _USB = CABLES["usb-c-right-angle"]   # bank to board, right-angle at J1
 _PIGTAIL = CABLES["monitor-pigtail"]  # the monitor's own VGA cable (ruling R13)
 _BOOST = CABLES["usb-12v-boost"]
-_ADAPTER = CABLES["vga-90-adapter"]  # R16a: left/right-angle type (assumed; UNCONFIRMED)
+_ADAPTER = CABLES["vga-90-adapter"]
+#: R18: the pigtail's centre stays this far from the hinge axis, in front of
+#: the full-width hinge rod (cable radius + rod radius + FIT).
+PIGTAIL_ROD_CLEAR = _PIGTAIL.dia / 2 + PIN_ROD_D / 2 + FIT  # R16a: left/right-angle type (assumed; UNCONFIRMED)
 
 
 # --- board-frame keep-outs ---------------------------------------------------
@@ -497,10 +505,7 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     # --- outer ------------------------------------------------------------------
     inner_x = max(board_row_x, port_len + bay_x, plug_x1 + SLACK, mw + 2 * SLACK)
     width = inner_x + 2 * wall
-    depth = max(wall + SLACK + board_row_y + SLACK + bay_y + SLACK + wall,
-                mh + 2 * SLACK + 2 * wall + CATCH_BLOCK)
     rim_z = wall + max(b.size[2], stack_h) + SLACK
-    outer = Box(0.0, 0.0, 0.0, width, depth, rim_z, "base")
 
     # R10 as amended by R16a: the boost on the floor in bank-row room the bay
     # and the plug leave (between them, or past the plug), along X or turned;
@@ -564,15 +569,26 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
                       rim_z - MAGNET_RECESS - MAGNET_T, rim_z - MAGNET_RECESS, MAGNET_D / 2,
                       f"lid catch magnet (base) {i + 1}") for i, x in enumerate(xs))
 
+    # --- depth: the largest of three named terms (R18, R18b) --------------------
+    ms_x0 = (width - (mw + 2 * SLACK)) / 2
+    # the lid's catch blocks reach over the monitor in X: it sits behind them
+    over = any(x < ms_x0 + mw + 2 * SLACK and ms_x0 < x + CATCH_BLOCK for x in xs)
+    depth_rows = wall + SLACK + board_row_y + SLACK + bay_y + SLACK + wall
+    depth_monitor = mh + 2 * SLACK + 2 * wall + (CATCH_BLOCK if over else 0.0)
+    # the pigtail drops PIGTAIL_ROD_CLEAR in front of the hinge rod and turns
+    # forward into the stiff run's end with min_bend_r of room behind it
+    run_end = max(keepouts[f"{k}/vga_plug"].y1 for k in BOARD_KEYS)
+    depth_pigtail = run_end + _PIGTAIL.min_bend_r + PIGTAIL_ROD_CLEAR + KNUCKLE_R
+    depth = max(depth_rows, depth_monitor, depth_pigtail)
+    outer = Box(0.0, 0.0, 0.0, width, depth, rim_z, "base")
+
     # --- hinge and lid (lid frame, closed) --------------------------------------
     hy, hz = depth - KNUCKLE_R, rim_z
     lid_h = wall + TAPE_T + md + CLOSED_CLEARANCE
     lid_outer = Box(0.0, -hy, 0.0, width, depth - hy, lid_h, "lid")
     in_z1 = lid_h - wall                          # the inside face (tape side)
-    ms_x0 = (width - (mw + 2 * SLACK)) / 2
     # against the front wall, unless the catch blocks in the lid's front rim
     # reach over the monitor in X: then just behind them
-    over = any(x < ms_x0 + mw + 2 * SLACK and ms_x0 < x + CATCH_BLOCK for x in xs)
     ms_y0 = lid_outer.y0 + wall + (CATCH_BLOCK if over else 0.0)
     monitor_space = Box(ms_x0, ms_y0, CLOSED_CLEARANCE, ms_x0 + mw + 2 * SLACK,
                         ms_y0 + mh + 2 * SLACK, in_z1 - TAPE_T, f"monitor space ({monitor})")
