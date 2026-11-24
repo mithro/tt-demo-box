@@ -5,10 +5,7 @@ generator, the check and the tests all ask here, so they cannot disagree about
 the set.
 
 A name is ``TDB-`` (tt-demo-box), a short code for the subject, and the build
-route where the drawing belongs to one (``-P`` printed, ``-L`` laser).  The
-insert sheets carry the monitor's ``Monitor.code`` instead (``TDB-INS-T7``),
-one per entry in ``MONITORS``: an insert is the same part for both routes but
-the bezel's outline, and is drawn for the printed route.  No name
+route where the drawing belongs to one (``-P`` printed, ``-L`` laser).  No name
 is a prefix of another (``check_sheets.py`` tests it), so quoting one never
 points at two.
 
@@ -23,7 +20,6 @@ from pathlib import Path
 from typing import Literal
 
 from demobox._paths import ROOT
-from demobox.parts.monitors import MONITORS
 
 OUT = ROOT / "output" / "sheets"
 
@@ -32,9 +28,10 @@ OUT = ROOT / "output" / "sheets"
 class SheetDef:
     name: str
     size: Literal["A3", "A4"]
-    kind: Literal["ga", "cutlist", "part", "packing", "insert"]
-    #: The route for "ga"/"cutlist", the printed part's name for "part", the
-    #: monitor key for "insert", "" for "packing" (every bank).
+    kind: Literal["ga", "cutlist", "part", "fittings"]
+    #: The route for "ga", "cutlist" and "fittings" (the route's printed
+    #: fittings, every one on the sheet); the printed route's part name
+    #: (``printed.body.printed_parts``) for "part".
     subject: str
     title: str
 
@@ -48,23 +45,15 @@ def _s(name, size, kind, subject, title) -> tuple[str, SheetDef]:
 
 
 #: Reading order: the two general arrangements, the laser cut list, the
-#: printed parts, then the monitor inserts.
+#: printed route's parts, then the laser route's printed fittings.
 SHEETS: dict[str, SheetDef] = dict((
     _s("TDB-GA-P", "A3", "ga", "printed", "DEMO BOX, PRINTED"),
     _s("TDB-GA-L", "A3", "ga", "laser", "DEMO BOX, LASER-CUT"),
     _s("TDB-CUT-L", "A3", "cutlist", "laser", "LASER CUT LIST"),
-    _s("TDB-BASE-P", "A4", "part", "base", "BASE TUB"),
-    _s("TDB-DECK-P", "A4", "part", "deck", "DECK"),
-    _s("TDB-LID-P", "A4", "part", "lid", "LID"),
-    _s("TDB-DRW-P", "A4", "part", "drawer", "DRAWER"),
-    _s("TDB-HGB-P", "A4", "part", "hinge-base", "HINGE, BASE HALF"),
-    _s("TDB-HGL-P", "A4", "part", "hinge-lid", "HINGE, LID HALF"),
-    _s("TDB-CLIP-P", "A4", "part", "bezel-clip", "BEZEL CLIP"),
-    _s("TDB-PKG-P", "A4", "packing", "", "BATTERY PACKING"),
+    _s("TDB-BASE-P", "A3", "part", "base", "BASE"),
+    _s("TDB-LID-P", "A3", "part", "lid", "LID"),
     _s("TDB-PIN-P", "A4", "part", "mt1-pin", "MT1 LOCATING PIN"),
-    # one insert sheet per monitor, named by its code
-    *(_s(f"TDB-INS-{m.code}", "A4", "insert", k, f"MONITOR INSERT, {m.code}")
-      for k, m in MONITORS.items()),
+    _s("TDB-FIT-L", "A3", "fittings", "laser", "PRINTED FITTINGS, LASER"),
 ))
 
 

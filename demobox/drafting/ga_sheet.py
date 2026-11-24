@@ -1,15 +1,18 @@
 """A3 sheets for a whole route: the general arrangements and the laser cut list.
 
 General arrangement (``TDB-GA-P``, ``TDB-GA-L``): the closed box in three
-views, first angle, projected from ``assembly(route, 0, 0)`` with its bought
-hardware (the ``hw:`` solids) left out; in the view from the left, the lid at
-its 100 degree stop in phantom line (``assembly(route, 100, 0)``'s lid), the
-angle dimensioned about the hinge axis.  Overall sizes closed and open, the
-hinge axis' position, balloons on the made parts a view shows, and the parts
-list: every made part with the sheet that draws it, and the bought parts,
-counted from the route's own data (``laser.fittings.hardware`` for the laser
-route; the printed route's inserts, screws and bolts from its parts' records,
-the screw-head ``hw:`` solids cross-checking the bezel and clip screws).
+views, first angle, projected from the made parts of ``assembly(route, 0,
+False)`` (the bought blocks inside and the ``hw:`` solids left out); in the
+view from the left, the lid at its LID_OPEN_DEG stop in phantom line (the
+parts ``assembly(route, LID_OPEN_DEG, False)`` moves), the angle dimensioned
+about the hinge axis.  Overall sizes closed and open, the hinge axis'
+position, balloons on the made parts a view shows, and the parts list: the
+route's printed parts (``printed.body.printed_parts`` or
+``laser.fittings.printed_parts``, each counted in the assembly) with the
+sheet that draws it, the laser panels, the route's ``hardware``, and the
+design kit's bought parts.  The notes give the closed size and volume
+(``layout``'s, as ``checks.size_budget`` proves them) and how the box goes
+together.
 
 Cut list (``TDB-CUT-L``): every laser panel outline flat, at one scale, with
 its name and cut size; the DXFs are the cutting files.
@@ -19,29 +22,27 @@ from __future__ import annotations
 
 import math
 import re
-from collections import Counter
 
 import cadquery as cq
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from tools.drafting import style
 
+from demobox import checks
 from demobox.drafting import names
 from demobox.drafting import sheetkit as K
 from demobox.drafting.hlr import project, to_view
-from demobox.layout import LASER_BED, LID_OPEN_DEG, ROUTES, layout
+from demobox.layout import (DESIGN_BANK, DESIGN_MONITOR, LASER_BED, LID_OPEN_DEG, MAGNET_D,
+                            MAGNET_T, PIN_ROD_D, ROUTES, SLACK, layout)
 from demobox.parts.batteries import BATTERIES
-from demobox.parts.cables import CABLES
 from demobox.parts.monitors import MONITORS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
-from demobox.shared import inserts as I
 
 F = K.fmt
-#: Room in the parts list's PART column, mm.
-PART_W = 56.0
-#: The lid's parts, for the open-lid phantom.
-LID_PARTS = ("lid", "hinge-lid", "bezel", "retainer", "panel", "monitor-driver")
+#: The assembly's bought parts, drawn as plain blocks: inside the closed box,
+#: so a GA view of the outside leaves them out.
+BOUGHT_BLOCKS = frozenset(("board", "tinyvga", "vga-plug", "monitor", "boost", "bank"))
 
 
 def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
@@ -53,20 +54,29 @@ def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
     return "survey"
 
 
-def printed_hardware(lay) -> dict[str, int]:
-    """The printed route's bought hardware (``body.hardware``), plus the
-    board's screw check: the assembly's screw-head ``hw:`` solids are the
-    bezel's and the clip's, and must agree with them (the catch magnets are
-    counted by ``body.hardware``)."""
-    heads = [n for n, _, _ in B.assembly("printed", 0.0, 0.0)
-             if n.startswith("hw:") and "magnet" not in n]
-    if len(heads) != len(I.bezel_screws(lay)) + len(B.clip_screws(lay)):
-        raise ValueError(f"hw: solids {heads} disagree with the bezel and clip screws")
-    return B.hardware(lay)
+def _made(route: str, angle_deg: float) -> list[tuple[str, cq.Shape]]:
+    """The route's made parts (printed parts, panels), assembled at ``angle_deg``."""
+    return [(n, s) for n, s, _ in B.assembly(route, angle_deg, False)
+            if not n.startswith("hw:") and n not in BOUGHT_BLOCKS]
 
 
-def _parts_rows(route: str, lay) -> tuple[list[list[str]], dict[str, int]]:
-    """The parts list rows and each ballooned part's item number."""
+def _count(names_: list[str], part: str) -> int:
+    """How many of ``part`` an assembly holds: its own name, or its name with
+    a ``-<where>`` suffix (``magnet-block-lid-1``)."""
+    return sum(1 for n in names_ if n == part or n.startswith(part + "-"))
+
+
+def _part_sheets() -> dict[str, str]:
+    """The printed route's part -> the sheet that draws it."""
+    return {s.subject: n for n, s in names.SHEETS.items() if s.kind == "part"}
+
+
+def parts_rows(route: str, lay) -> tuple[list[list[str]], dict[str, int]]:
+    """The parts list rows (ITEM, QTY, PART, DRAWING/SOURCE) and each
+    ballooned part's item number: the printed parts counted in the closed
+    assembly, the laser panels, the route's hardware, and the bought kit."""
+    from demobox.laser import fittings as LF
+    from demobox.laser import panels as P
     rows: list[list[str]] = []
     item: dict[str, int] = {}
 
@@ -75,46 +85,28 @@ def _parts_rows(route: str, lay) -> tuple[list[list[str]], dict[str, int]]:
         if key:
             item[key] = len(rows)
 
+    in_box = [n for n, _, _ in B.assembly(route, 0.0, False)]
     if route == "printed":
-        for key, part, ref in (("base", "Base tub", "TDB-BASE-P"), ("deck", "Deck", "TDB-DECK-P"),
-                               ("lid", "Lid", "TDB-LID-P"), ("drawer", "Drawer", "TDB-DRW-P"),
-                               ("hinge-base", "Hinge, base half", "TDB-HGB-P"),
-                               ("hinge-lid", "Hinge, lid half", "TDB-HGL-P"),
-                               ("bezel-clip", "Bezel clip", "TDB-CLIP-P"),
-                               ("mt1-pin", "MT1 locating pin", "TDB-PIN-P"),
-                               ("packing", "Battery packing, per bank", "TDB-PKG-P")):
-            add(key, 1, part, ref)
-        add("insert", 1, "Bezel + retainer, per monitor", "TDB-INS-*")
-        hw = printed_hardware(lay)
+        sheets = _part_sheets()
+        for key in B.printed_parts(lay):
+            add(key, _count(in_box, key), key, sheets[key])
+        hw = B.hardware(lay)
     else:
-        from demobox.laser import fittings as LF
-        from demobox.laser import panels as P
-        add("panels", len(P.panels(lay, lay.wall)), "Plywood panels, 3 mm", "TDB-CUT-L")
-        counts = Counter(p for p, *_ in LF.placed(lay, lay.wall))
-        add("fittings", sum(counts.values()), "Printed fittings (blocks)", "STEP")
-        for key, part in (("hinge-base", "Hinge, base half"), ("hinge-lid", "Hinge, lid half"),
-                          ("bezel-clip", "Bezel clip"), ("mt1-pin", "MT1 locating pin"),
-                          ("packing", "Battery packing, per bank")):
-            add(key, 1, part, "STEP")
-        add("insert", 1, "Bezel + retainer, per monitor", "STEP")
-        hw = P.hardware(lay, lay.wall)
+        add("panels", len(P.panels(lay, lay.wall)), f"plywood panels, {lay.wall:g} mm",
+            "TDB-CUT-L")
+        for key in LF.printed_parts(lay, lay.wall):
+            add(key, _count(in_box, key), key, "TDB-FIT-L")
+        hw = LF.hardware(lay, lay.wall)
     for what, n in hw.items():
-        # the column holds PART_W; a long name says "pan-head", and then loses
-        # its "(where it goes)"
-        if style.text_width(what, style.T_TABLE) > PART_W:
-            what = what.replace(" pan-head screw", " pan-head")
-        if style.text_width(what, style.T_TABLE) > PART_W:
-            what = re.sub(r" \(.*\)$", "", what)
         add("", n, what, "bought")
     add("", 1, "TT demo board v3.2 or v3.3", "Tiny Tapeout")
     add("", 1, "TinyVGA Pmod", "mole99/tiny-vga")
-    for k, m in MONITORS.items():
-        add("", "1*", f"Monitor {k}", _where(m.sources, r"AliExpress (\d+)|(Taobao)"))
-    for k, b in BATTERIES.items():
-        add("", "1*", f"Power bank {k}", _where(b.sources))
-    for c in CABLES.values():
-        add("", 1, re.sub(r" \(.*?\)", "", c.title).replace("Slim VGA cable, <= 0.5 m",
-                                                            "VGA cable, slim, <= 0.5 m"), "spec")
+    m, b = MONITORS[DESIGN_MONITOR], BATTERIES[DESIGN_BANK]
+    add("", 1, f"Monitor {DESIGN_MONITOR}", _where(m.sources, r"AliExpress (\d+)|(Taobao)"))
+    add("", 1, f"Power bank {DESIGN_BANK}", _where(b.sources))
+    for c in (checks.usb_cable(), checks.ADAPTER, checks.BOOST):
+        if c.key != "bank-built-in":         # the bank's own cable comes with it
+            add("", 1, re.sub(r" \(.*?\)", "", c.title), "spec")
     return rows, item
 
 
@@ -125,26 +117,43 @@ def render(defn: names.SheetDef):
 
 
 def _projections(route: str):
-    closed = [(n, s) for n, s, _ in B.assembly(route, 0.0, 0.0) if not n.startswith("hw:")]
+    closed = _made(route, 0.0)
     comp = cq.Compound.makeCompound([s for _, s in closed])
     projs = {v: project(comp, v) for v in ("front", "side", "plan")}
-    opened = [s for n, s, _ in B.assembly(route, LID_OPEN_DEG, 0.0)
-              if n in LID_PARTS or n.startswith("bezel-clip")]
+    # the lid's parts: whatever opening the lid moves
+    still = {n: s.BoundingBox().center for n, s in closed}
+    opened = [s for n, s in _made(route, LID_OPEN_DEG)
+              if (s.BoundingBox().center - still[n]).Length > 1e-6]
     lid_open = project(cq.Compound.makeCompound(opened), "side")
-    return projs, lid_open, dict(closed)
+    return projs, lid_open
+
+
+def size_note(lay) -> str:
+    """The closed size and volume, as ``checks.size_budget`` proves them."""
+    report = checks.Report()
+    checks.size_budget(report, lay)
+    if report.failures:
+        raise ValueError(f"size budget fails: {report.results}")
+    o, lid = lay.outer, lay.lid_outer
+    h = o.size[2] + lid.size[2]
+    litres = o.size[0] * o.size[1] * h / 1e6
+    return (f"Closed {F(o.size[0])} x {F(o.size[1])} x {F(h)} mm (base {F(o.size[2])} high, "
+            f"lid {F(lid.size[2])}), {litres:.2f} L: the contents plus {SLACK:g} mm slack a "
+            "side plus the walls (make verify, size budget).")
 
 
 def render_ga(defn: names.SheetDef):
+    from demobox.laser import fittings as LF
     route = defn.subject
     lay = layout(ROUTES[route])
-    projs, lid_open, solids = _projections(route)
+    projs, lid_open = _projections(route)
     o, lo = lay.outer, lay.lid_outer
     hy, hz = lay.hinge_axis
     W, D, Hb = o.x1, o.y1, o.z1
     Hc = Hb + lo.z1                                   # closed height
     bb_open = lid_open.bbox()
     top_open = max((pt for pl in lid_open.visible for pt in pl), key=lambda q: q[1])
-    rows, item = _parts_rows(route, lay)
+    rows, item = parts_rows(route, lay)
 
     def ann(views):
         f, s, p = views["front"], views["side"], views["plan"]
@@ -157,30 +166,19 @@ def render_ga(defn: names.SheetDef):
             # open: the height to the lid's top, and how far it reaches behind
             K.Dim(s, (-D, 0.0), top_open, "left", 0),
             K.Dim(s, (bb_open[0], 0.0), (-hy, 0.0), "bottom", 0, text_side="low"),
-            # on the base's side face, clear of its edges: the paper left of the view
-            # is the open-height dimension's and the gap's
             K.Leader(s, ax, (s.x(ax[0]) + 8.0, s.y(ax[1]) - 10.0), "HINGE AXIS", dot=True),
             K.Angle(s.pt(*ax), 26.0, 0.0, LID_OPEN_DEG, f"{LID_OPEN_DEG:g}\N{DEGREE SIGN}"),
         ]
-        # balloons on what the views show
-        # below the view for the base and the drawer, above the closed lid for the
+        # balloons below the view for the base, above the closed lid for the
         # lid, so the paper right of the view stays free for the parts list
         below = s.y(0.0) - 13.0
-        spots = [("drawer", to_view("side", (0.0, lay.bay.y0 + 12.0, lay.bay.z0 + 4.0)),
-                  0.0, below),
-                 ("base", to_view("side", (0.0, D * 0.55, 12.0)), 0.0, below),
+        spots = [("base", to_view("side", (0.0, D * 0.3, Hb * 0.4)), 0.0, below),
                  ("lid", to_view("side", (0.0, D * 0.25, Hb + lo.z1 / 2)), 6.0,
-                  s.y(Hc) + 13.0)]
-        if "panels" in item:
-            spots.append(("panels", to_view("side", (0.0, D * 0.55, 12.0)), 0.0, below))
+                  s.y(Hc) + 13.0),
+                 ("panels", to_view("side", (0.0, D * 0.3, Hb * 0.4)), 0.0, below)]
         for key, tip, dx, y in spots:
             if key in item:
                 out.append(K.Balloon(s, tip, (s.x(tip[0]) + dx, y), str(item[key])))
-        kn = H._knuckles(lay, "base")[-1]
-        if "hinge-base" in item:
-            tip = to_view("plan", ((kn[0] + kn[1]) / 2, hy + 1.0, 0.0))
-            out.append(K.Balloon(p, tip, (p.rect.x1 + 14.0, p.y(tip[1]) + 4.0),
-                                 str(item["hinge-base"])))
         return out
 
     def build(sheet, s):
@@ -211,32 +209,59 @@ def render_ga(defn: names.SheetDef):
                            K.L_CENTRE, K.L_DIM])
         table = K.Table("PARTS LIST", ["ITEM", "QTY", "PART", "DRAWING, SOURCE"], rows,
                         ["end", "end", "start", "start"])
-        route_word = "3D-printed" if route == "printed" else "laser-cut 3 mm plywood"
+        rod = H.pin_length(lay)
+        n_mag = 2 * len(lay.lid_catch)
+        if route == "printed":
+            build_note = (
+                "Two printed parts, base and lid. Board: MT2 pin + loose MT1 pin: "
+                "the MT2 pin is printed on the plinth, the loose printed MT1 pin (TDB-PIN-P) "
+                "goes in the fitted revision's hole (v3.2 or v3.3).")
+            catch = (f"Lid catch: {n_mag} {MAGNET_D:g} x {MAGNET_T:g} mm magnets pressed flush "
+                     "into pockets in the front corners, poled to pull.")
+        else:
+            build_note = (
+                f"{lay.wall:g} mm plywood panels, finger-jointed and glued (TDB-CUT-L); the "
+                "hinge knuckle blocks, the seal bead and the magnet blocks are printed and "
+                "glued in (TDB-FIT-L). Board: MT2 pin + loose MT1 pin, two "
+                f"{PIN_ROD_D:g} mm rods {LF.board_pin_length(lay):.1f} mm long standing on "
+                "the floor through plinth-top: MT2's glued, MT1's loose in the fitted "
+                "revision's hole (v3.2 or v3.3).")
+            catch = (f"Lid catch: {n_mag} {MAGNET_D:g} x {MAGNET_T:g} mm magnets pressed flush "
+                     "into the printed magnet blocks, two glued in the base's front corners "
+                     "and two in the lid's, poled to pull.")
+        route_word = "3D-printed" if route == "printed" else "laser-cut plywood"
         notes = [
-            f"The {route_word} demo box, closed, drawer shut; base frame datum (target) at "
-            "the front-left-bottom outside corner, X to the visitor's right, Y away, Z up.",
-            f"The lid turns {LID_OPEN_DEG:g} deg about the hinge axis to its stop (just past "
-            "upright); the view from the left shows it there in phantom.",
-            f"Bay {' x '.join(F(v) for v in lay.bay.size)} inside plus a "
-            f"{F(lay.cable_bay.x1 - lay.cable_bay.x0)} cable bay; the drawer slides out of "
-            f"the left side by {F(lay.drawer_travel)}.",
-            "Bought parts are counted from the route's data; monitor sources are listing "
-            "numbers or shops. 1*: fit one monitor and one "
-            "power bank of those listed, with its insert and its packing. Hinge axis: the "
-            f"base's back-top edge, Y {F(hy)}, Z {F(hz)}.",
+            f"The {route_word} demo box, closed; base frame datum (target) at the "
+            "front-left-bottom outside corner, X to the visitor's right, Y away, Z up.",
+            size_note(lay),
+            f"The lid turns {LID_OPEN_DEG:g} deg about the hinge axis (Y {F(hy)}, Z {F(hz)}) "
+            "to its stop, where the view from the left shows it in phantom. Hinge: printed "
+            f"knuckles on one {PIN_ROD_D:g} mm rod {rod:.1f} mm long, pressed in from the "
+            f"right side face: the last {H.PRESS_LEN:g} mm of its bore there is a press fit "
+            "and the first knuckle's bore is blind.",
+            "Monitor: double-sided foam tape (VHB type) on its back, to the lid's flat "
+            "inside face" + ("; the boost module is taped beside it in the lid strip."
+                             if lay.boost_in_lid else "."),
+            build_note,
+            "The bank lifts out with the lid open: it stands loose on the floor of its bay, "
+            "behind the board.",
+            catch,
+            "Parts list: the route's made parts and hardware from its data; the monitor and "
+            "the power bank are the design kit the box is sized for.",
             K.unconfirmed_note(None),
         ]
-        sources = ["demobox/layout.py (layout), demobox/checks.py (verify.py)",
-                   ("demobox/printed/body.py (assembly)" if route == "printed" else
-                    "demobox/laser/panels.py, fittings.py (assembly, hardware)"),
-                   "docs/superpowers/specs/2026-11-23-tt-demo-box-design.md",
-                   "docs/superpowers/specs/monitor-survey.md, battery-survey.md"]
+        sources = ["demobox/layout.py (layout), demobox/checks.py (size_budget)",
+                   ("demobox/printed/body.py (printed_parts, hardware, assembly)"
+                    if route == "printed" else
+                    "demobox/laser/panels.py, fittings.py (printed_parts, hardware, assembly)"),
+                   "demobox/shared/hinge.py (pin_length, PRESS_LEN)",
+                   "docs/superpowers/specs/2026-11-24-compact-box-design.md"]
         return lay_, [table], legend, notes, sources, draw
 
-    material = "PETG or PLA" if route == "printed" else "3 mm plywood"
+    material = "PETG or PLA" if route == "printed" else f"{lay.wall:g} mm plywood"
     tol = K.PRINTED_TOL if route == "printed" else "+/-0.2 unless noted"
     return K.render(defn, build, subtitle=f"General arrangement, {route} route",
-                    material=material, tolerance=tol, scales=(0.4, 0.2))
+                    material=material, tolerance=tol, scales=(0.5, 0.4, 0.2))
 
 
 # --- the cut list ------------------------------------------------------------------------
@@ -292,21 +317,26 @@ def render_cutlist(defn: names.SheetDef):
         table = K.Table("PANELS", ["NO", "PANEL (DXF)", "CUT SIZE", "HOLES"], rows,
                         ["end", "start", "end", "end"])
         seams = ", ".join(f"{sm.name} ({' + '.join(sm.pieces)})" for sm in body.seams)
+        bed = (f"laser bed {F(LASER_BED[0])} x {F(LASER_BED[1])}: "
+               + (f"panels split to fit it are glued along a finger seam: {seams}."
+                  if body.seams else "every panel fits it whole."))
         notes = [
             f"Every panel of the laser route, flat, at {K.scale_label(s)}, numbered as in the "
             f"table; CUT SIZE is the outline grown by half the {F(P.KERF)} kerf. The DXFs in "
             "output/laser are the cutting files: cut from them, not from this sheet.",
-            f"3 mm plywood; laser bed {F(LASER_BED[0])} x {F(LASER_BED[1])}. Panels split to "
-            f"fit the bed and glued along a finger seam: {seams}.",
-            "Finger joints and T-slots are drawn as cut; holes are M3 clearance less the "
-            "kerf; engraved marks (layer ENGRAVE) are not drawn.",
+            f"{lay.wall:g} mm plywood; {bed}",
+            "Finger joints are drawn as cut, and glued: no screws or nuts. The holes are "
+            f"the board pins' in plinth-top: MT2 D{F(P.MT2_HOLE_D)}, tight for its glued rod; "
+            f"MT1 D{F(P.MT1_HOLE_D)}, a slip fit for the loose rod, one per board revision. "
+            "Engraved marks (layer ENGRAVE: names, magnet-block outlines) are not drawn.",
             K.unconfirmed_note(None),
         ]
         sources = ["demobox/laser/panels.py (panels, build)", "output/laser/*.dxf"]
         return lay_, [table], None, notes, sources, draw
 
-    return K.render(defn, build, subtitle="Every laser-cut panel, flat", material="3 mm plywood",
-                    tolerance="+/-0.2 unless noted", scales=(0.2, 0.1), projection=False)
+    return K.render(defn, build, subtitle="Every laser-cut panel, flat",
+                    material=f"{lay.wall:g} mm plywood", tolerance="+/-0.2 unless noted",
+                    scales=(0.5, 0.4, 0.2), projection=False)
 
 
 #: The cut list leaves the annotation column's width for the panel table.

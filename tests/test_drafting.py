@@ -73,21 +73,40 @@ def test_project_hidden_and_chord():
 
 # --- names -------------------------------------------------------------------------
 
-def test_names_are_the_one_answer():
+#: The compact box's sheet set, in reading order.
+SHEET_SET = ("TDB-GA-P", "TDB-GA-L", "TDB-CUT-L", "TDB-BASE-P", "TDB-LID-P", "TDB-PIN-P",
+             "TDB-FIT-L")
+
+
+def test_sheet_set_exact():
+    """Exactly the compact box's seven sheets: the two general arrangements,
+    the cut list, the printed route's three parts and the laser route's
+    printed fittings."""
     got = list(names.SHEETS)
-    for need in ("TDB-GA-P", "TDB-GA-L", "TDB-CUT-L", "TDB-BASE-P", "TDB-DECK-P",
-                 "TDB-LID-P", "TDB-DRW-P", "TDB-HGB-P", "TDB-HGL-P", "TDB-CLIP-P",
-                 "TDB-PKG-P", "TDB-PIN-P", "TDB-INS-T7", "TDB-INS-C7", "TDB-INS-K7"):
-        assert need in got
-    assert len(set(got)) == len(got)
+    assert got == list(SHEET_SET)
     for a in got:
         assert re.fullmatch(r"TDB-[A-Z0-9]+(-[A-Z0-9]+)*", a)
         for b in got:
             assert a == b or not b.startswith(a), f"{a} is a prefix of {b}"
     for n, s in names.SHEETS.items():
-        assert s.size == ("A3" if n in ("TDB-GA-P", "TDB-GA-L", "TDB-CUT-L") else "A4")
+        assert s.size == ("A4" if n == "TDB-PIN-P" else "A3")
         assert names.svg_path(n) == ROOT / "output" / "sheets" / f"{s.stem}.svg"
         assert names.name_for(names.svg_path(n)) == n
+    assert not (ROOT / "demobox" / "drafting" / "insert_sheet.py").exists()
+
+
+def test_part_sheets_draw_each_routes_printed_parts():
+    """The printed route's part sheets draw its ``printed_parts``, one each;
+    TDB-FIT-L draws every one of the laser route's printed fittings."""
+    from demobox.drafting import part_sheet as PS
+    from demobox.laser import fittings as LF
+    from demobox.layout import ROUTES, layout
+    from demobox.printed import body as B
+    printed = {s.subject for s in names.SHEETS.values() if s.kind == "part"}
+    assert printed == set(B.printed_parts(layout(ROUTES["printed"])))
+    fit = names.SHEETS["TDB-FIT-L"]
+    drawn = [p.key for p in PS.fitting_parts(fit)]
+    assert drawn == list(LF.printed_parts(layout(ROUTES["laser"])))
 
 
 # --- check_sheets ----------------------------------------------------------------
@@ -138,24 +157,70 @@ def test_generated_sheets_pass_the_check():
     assert cs.main() == 0
 
 
-# --- overall dimensions are the solid's (review fix round 1) ---------------------
+# --- the parts list ------------------------------------------------------------------
+
+def _assembly_count(route: str, part: str) -> int:
+    """How many of a made part the closed assembly holds: the part's own
+    name, or its name with a ``-<where>`` suffix (``magnet-block-lid-1``)."""
+    from demobox.printed import body as B
+    return sum(1 for n, _, _ in B.assembly(route, 0.0, False)
+               if n == part or n.startswith(part + "-"))
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_ga_parts_list_matches_hardware(route):
+    """The GA parts list is the route's ``printed_parts`` (counted in its
+    assembly) and its ``hardware``, each once with its count: nothing is
+    typed in by hand."""
+    from demobox.drafting import ga_sheet as G
+    from demobox.laser import fittings as LF
+    from demobox.laser import panels as P
+    from demobox.layout import ROUTES, layout
+    from demobox.printed import body as B
+    lay = layout(ROUTES[route])
+    rows, _ = G.parts_rows(route, lay)
+    by_part = {}
+    for item, qty, part, ref in rows:
+        assert part not in by_part, f"{part} listed twice"
+        by_part[part] = (qty, ref)
+    hw = B.hardware(lay) if route == "printed" else LF.hardware(lay, lay.wall)
+    for what, n in hw.items():
+        assert by_part[what] == (str(n), "bought"), what
+    made = B.printed_parts(lay) if route == "printed" else LF.printed_parts(lay, lay.wall)
+    for key in made:
+        assert by_part[key][0] == str(_assembly_count(route, key)), key
+    if route == "laser":
+        assert by_part["knuckles-base"][0] == "1"
+        assert by_part["magnet-block"] == ("4", "TDB-FIT-L")
+        assert by_part["plywood panels, 3 mm"] == (str(len(P.panels(lay, lay.wall))),
+                                                   "TDB-CUT-L")
+    else:
+        assert {k: by_part[k] for k in made} == {
+            "base": ("1", "TDB-BASE-P"), "lid": ("1", "TDB-LID-P"),
+            "mt1-pin": ("1", "TDB-PIN-P")}
+    # every row's item number is its place
+    assert [r[0] for r in rows] == [str(i) for i in range(1, len(rows) + 1)]
+
+
+# --- overall dimensions are the solid's ---------------------------------------------
 
 def _part_records():
     from demobox.drafting import part_sheet as PS
     for n, s in names.SHEETS.items():
-        if s.kind == "packing":
-            yield n, PS.packing_part(s)
-        elif s.kind == "part":
+        if s.kind == "part":
             yield n, PS.BUILDERS[s.subject](s)
+        elif s.kind == "fittings":
+            for p in PS.fitting_parts(s):
+                yield f"{n} {p.key}", p
 
 
 def test_part_overall_dims_are_the_solid_bbox():
     """Every part sheet's overall dimensions read the solid's exact bounding
-    box (to 0.01), not the discretised outline's: the hinge profiles read
-    15.98 and 7.95 for 16.00 and 8.00 when they came off the polylines."""
+    box (to 0.01), not the discretised outline's."""
     from demobox.drafting import part_sheet as PS
+    from demobox.drafting.hlr import exact_bbox
+    seen = 0
     for n, part in _part_records():
-        from demobox.drafting.hlr import exact_bbox
         x0, y0, z0, x1, y1, z1 = exact_bbox(part.shape())
         sizes = (x1 - x0, y1 - y0, z1 - z0)
         dims = [d for d in PS.overall_dims(part) if d.text is None]
@@ -164,16 +229,11 @@ def test_part_overall_dims_are_the_solid_bbox():
             horizontal = d.side in ("top", "bottom")
             value = abs(d.b[0] - d.a[0]) if horizontal else abs(d.b[1] - d.a[1])
             assert min(abs(value - s) for s in sizes) < 0.01, (n, value, sizes)
+        seen += 1
+    assert seen == 3 + 4
 
 
-def test_hinge_profiles_read_their_true_depth():
-    from demobox.drafting import part_sheet as PS
-    for n, want in (("TDB-HGB-P", 16.0), ("TDB-HGL-P", 8.0)):
-        part = PS.BUILDERS[names.SHEETS[n].subject](names.SHEETS[n])
-        values = [abs(d.b[0] - d.a[0]) for d in PS.overall_dims(part) if d.side == "bottom"]
-        assert any(abs(v - want) < 0.005 for v in values), (n, values)
-        assert f">{want:.2f}</text>" in names.svg_path(n).read_text(), n
-
+# --- what the generated sheets say ----------------------------------------------------
 
 def _sheet_words(n: str) -> str:
     """Every text line on a generated sheet, joined by spaces."""
@@ -182,16 +242,91 @@ def _sheet_words(n: str) -> str:
     return " ".join(html.unescape(t) for t in re.findall(r"<text[^>]*>([^<]*)</text>", svg))
 
 
-@pytest.mark.parametrize("n", ["TDB-GA-P", "TDB-GA-L"])
-def test_ga_buy_note_does_not_claim_one_shop(n):
-    """M6: a monitor row reads Taobao, so the note may not say every listing
-    is an AliExpress item number."""
-    words = _sheet_words(n)
-    assert "AliExpress item numbers" not in words
-    assert "listing numbers or shops" in words
+#: A ruling ID (R15, R16a) or a review "finding": the ledger they point at is
+#: not part of the repo.  A radius is always written with its decimals (R4.00).
+RULING = re.compile(r"\bR\d+(?![.\d])|finding", re.IGNORECASE)
 
 
-# --- the version stamp (finding 3, R23) -----------------------------------------------
+def test_no_ruling_ids_on_sheets():
+    """No sheet, and no drafting source, cites a ruling ID or a review finding."""
+    for n in names.SHEETS:
+        hits = RULING.findall(_sheet_words(n))
+        assert not hits, (n, hits)
+    for src in (ROOT / "demobox" / "drafting").glob("*.py"):
+        for i, line in enumerate(src.read_text().splitlines(), 1):
+            assert not RULING.search(line), f"{src.name}:{i}: {line.strip()}"
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_ga_sheet_says_how_the_box_goes_together(route):
+    """The GA notes: the closed size and volume (the layout's), the tape, the
+    board's pins, the bank lifting out, the stop and the rod."""
+    from demobox.layout import LID_OPEN_DEG, ROUTES, layout
+    lay = layout(ROUTES[route])
+    o, lid = lay.outer, lay.lid_outer
+    words = _sheet_words("TDB-GA-" + route[0].upper())
+    h = o.size[2] + lid.size[2]
+    assert f"{o.size[0]:.2f} x {o.size[1]:.2f} x {h:.2f}" in words
+    assert f"{o.size[0] * o.size[1] * h / 1e6:.2f} L" in words
+    assert "double-sided foam tape" in words
+    assert "MT2 pin + loose MT1 pin" in words
+    assert "lifts out with the lid open" in words
+    assert f"{LID_OPEN_DEG:g} deg" in words
+    assert "pressed in from the right side face" in words
+    assert "drawer" not in words.lower() and "screw" not in words.lower()
+    if route == "laser":
+        assert "3 mm rods" in words
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_ga_sheet_lists_the_hardware(route):
+    from demobox.laser import fittings as LF
+    from demobox.layout import ROUTES, layout
+    from demobox.printed import body as B
+    lay = layout(ROUTES[route])
+    hw = B.hardware(lay) if route == "printed" else LF.hardware(lay, lay.wall)
+    words = _sheet_words("TDB-GA-" + route[0].upper())
+    for what in hw:
+        assert what in words, what
+
+
+def test_base_sheet_dimensions_its_features():
+    """The base sheet dimensions the plinth, the pins, the notch and the
+    magnet pockets."""
+    from demobox.layout import ROUTES, layout
+    lay = layout(ROUTES["printed"])
+    words = _sheet_words("TDB-BASE-P")
+    pl, n = lay.plinth, lay.hinge_notch
+    for v in (pl.x1 - pl.x0, pl.y1 - pl.y0, n.x1 - n.x0, lay.pins["MT2"].cx,
+              lay.pins["MT2"].cy, lay.lid_catch[0].cx, lay.lid_catch[1].cx):
+        assert f"{v:.2f}" in words, v
+    for word in ("PLINTH", "MT2", "MT1", "NOTCH", "MAGNET"):
+        assert word in words, word
+
+
+def test_lid_sheet_dimensions_its_features():
+    """The lid sheet shows the tray, the knuckles and the magnet pockets."""
+    from demobox.layout import ROUTES, layout
+    from demobox.shared import hinge as H
+    lay = layout(ROUTES["printed"])
+    words = _sheet_words("TDB-LID-P")
+    for k in H.knuckle_plan(lay):
+        if k.part == "lid":
+            assert f"{k.x1 - k.x0:.2f}" in words, k
+    for word in ("KNUCKLE", "MAGNET", "tape"):
+        assert word in words, word
+    assert "TRAY" in words
+
+
+def test_fit_sheet_names_every_fitting():
+    from demobox.laser import fittings as LF
+    from demobox.layout import ROUTES, layout
+    words = _sheet_words("TDB-FIT-L")
+    for key in LF.printed_parts(layout(ROUTES["laser"])):
+        assert key.upper() in words, key
+
+
+# --- the version stamp -----------------------------------------------------------
 
 def _git(root, *args):
     import subprocess
