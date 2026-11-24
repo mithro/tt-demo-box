@@ -411,12 +411,31 @@ def test_hinge_axis_inset(lay):
     assert hz + L.KNUCKLE_R <= hz + lay.lid_outer.z1 + EPS
 
 
+def test_hinge_relief_r_by_hand(lay):
+    """R11, derived by hand.  The lid's back face (lid y = KNUCKLE_R) turns
+    about the axis; opened a degrees, its point at lid z = h is at base
+    Y = hy + KNUCKLE_R cos a + h sin a, which is inside the base's back face
+    (hy + KNUCKLE_R) while h <= KNUCKLE_R (1 - cos a) / sin a
+    = KNUCKLE_R tan(a / 2).  That point is below the seam and furthest from
+    the axis: sqrt(K^2 + K^2 tan^2(a/2)) = K / cos(a/2), largest at the stop:
+    4 / cos(50 deg) = 6.2229.  Plus FIT 0.5 = 6.7229, both routes (the walls
+    don't enter it)."""
+    assert lay.hinge_relief_r == pytest.approx(6.7229, abs=1e-3)
+    assert lay.hinge_relief_r == pytest.approx(
+        L.KNUCKLE_R / math.cos(math.radians(L.LID_OPEN_DEG / 2)) + L.FIT, abs=1e-6)
+
+
+def test_hinge_relief_r_less_than_the_lid_depth(lay):
+    assert lay.hinge_relief_r < lay.lid_outer.size[2]
+    assert lay.hinge_relief_r < lay.rim_z
+
+
 def test_hinge_notch(lay):
     m = MONITORS[L.DESIGN_MONITOR]
     n = lay.hinge_notch
     exit_x = lay.monitor_space.x0 + L.SLACK + m.pigtail_exit_u
     assert (n.x0 + n.x1) / 2 == pytest.approx(exit_x)
-    assert n.size[0] == pytest.approx(CABLES["vga-slim"].dia + 2 * L.FIT)
+    assert n.size[0] == pytest.approx(CABLES["monitor-pigtail"].dia + 2 * L.FIT)
     hy, hz = lay.hinge_axis
     assert n.y0 < hy < n.y1 and n.z0 < hz < n.z1
     closed = Box(0.0, 0.0, 0.0, lay.outer.x1, lay.outer.y1, lay.rim_z + lay.lid_outer.z1)

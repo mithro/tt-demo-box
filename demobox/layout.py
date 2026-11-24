@@ -85,8 +85,13 @@ Hinge and catch
 ---------------
 The hinge axis is on the seam, ``KNUCKLE_R`` in from the back face, so the
 knuckles stay inside base + lid.  ``hinge_notch`` is the gap in the knuckle
-line at the X of the monitor's pigtail exit, the pigtail's diameter (the VGA
-cable's) + 2*FIT wide; the plug does not pass, the cable is threaded first.
+line at the X of the monitor's pigtail exit, the pigtail's diameter
+(``CABLES["monitor-pigtail"]``) + 2*FIT wide; the plug does not pass, the
+cable is threaded first.  ``hinge_relief_r`` is the radius about the axis
+within which the hinge's two kinds of segment are relieved (ruling R11): the
+furthest any lid point that enters the base's YZ profile, at any angle of
+``sweep_angles()``, gets from the axis, plus FIT.  At lid-knuckle segments the
+base is cut back to it; at base-knuckle segments the lid is.
 ``lid_catch`` is two magnets under the front rim, each in a ``CATCH_BLOCK``
 block against the inside of the front wall, at the X nearest its front
 corner where the block clears every board-row keep-out in XY.
@@ -178,7 +183,7 @@ UNCONFIRMED: tuple[tuple[str, float, Source], ...] = (
 )
 
 _USB = CABLES["usb-c-right-angle"]   # bank to board, right-angle at J1
-_PIGTAIL = CABLES["vga-slim"]        # the monitor's own VGA cable: a slim VGA cable's figures
+_PIGTAIL = CABLES["monitor-pigtail"]  # the monitor's own VGA cable (ruling R13)
 _BOOST = CABLES["usb-12v-boost"]
 
 
@@ -186,7 +191,9 @@ _BOOST = CABLES["usb-12v-boost"]
 
 def _usb_plug(key: str) -> Box:
     """The right-angle USB-C plug in J1, board frame: out past the shell's
-    overhang along board +y, its cable leaving downward at the far end."""
+    overhang along board +y.  Its cable leaves the far end sideways, towards
+    the bank row (board +x, base +Y): the shortest run to the bank, and the
+    way ``checks.usb_path`` routes it."""
     spec = board_spec(key)
     j1 = next(f for f in spec.features if f.kind == "usb_power")
     length, width, height = _USB.plug
@@ -273,6 +280,7 @@ class Layout:
     boost_in_lid: bool
     hinge_axis: tuple[float, float]  # (y, z)
     hinge_notch: Box
+    hinge_relief_r: float            # R11: knuckle-segment relief radius about the axis
     lid_outer: Box                   # lid frame, closed
     monitor_space: Box               # lid frame, closed
     lid_strip: Box                   # lid frame, closed
@@ -317,6 +325,33 @@ class Layout:
         hy, hz = self.hinge_axis
         return (cq.Location(cq.Vector(0.0, hy, hz))
                 * cq.Location(cq.Vector(0.0, 0.0, 0.0), cq.Vector(1.0, 0.0, 0.0), -angle_deg))
+
+
+def sweep_angles() -> list[float]:
+    """Every whole degree from 0 to LID_OPEN_DEG, and the stop itself."""
+    angles = [float(a) for a in range(0, int(math.floor(LID_OPEN_DEG)) + 1)]
+    if angles[-1] != LID_OPEN_DEG:
+        angles.append(float(LID_OPEN_DEG))
+    return angles
+
+
+def _hinge_relief_r(lid: Box, base: Box, hy: float, hz: float) -> float:
+    """R11: the furthest from the axis (hy, hz) any lid point gets while
+    inside the base's YZ profile, over ``sweep_angles()``, plus FIT.  The lid
+    profile turned to each angle is clipped to the base's; the clip is convex,
+    so its furthest point from the axis is a vertex."""
+    from shapely.geometry import Polygon, box as sbox
+    region = sbox(base.y0, base.z0, base.y1, base.z1)
+    corners = ((lid.y0, lid.z0), (lid.y1, lid.z0), (lid.y1, lid.z1), (lid.y0, lid.z1))
+    far = 0.0
+    for a in sweep_angles():
+        t = math.radians(-a)
+        prof = Polygon([(hy + y * math.cos(t) - z * math.sin(t), hz + y * math.sin(t) + z * math.cos(t))
+                        for y, z in corners])
+        inside = prof.intersection(region)
+        if inside.area > 0:
+            far = max(far, max(math.hypot(y - hy, z - hz) for y, z in inside.exterior.coords))
+    return far + FIT
 
 
 def _catch_x0(keepouts: dict[str, Box], wall: float, width: float, from_left: bool) -> float:
@@ -443,6 +478,7 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     half = _PIGTAIL.dia / 2 + FIT
     hinge_notch = Box(exit_x - half, hy - KNUCKLE_R, hz - KNUCKLE_R,
                       exit_x + half, hy + KNUCKLE_R, hz + KNUCKLE_R, "hinge notch (pigtail)")
+    hinge_relief_r = _hinge_relief_r(lid_outer, outer, hy, hz)
 
     # --- lid catch -----------------------------------------------------------
     xs = (_catch_x0(keepouts, wall, width, True), _catch_x0(keepouts, wall, width, False))
@@ -458,5 +494,6 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
         plinth_relief=plinth_relief, pins=pins,
         bank_bay=bank_bay, port_room=port_room, boost_pocket=boost_pocket,
         boost_in_lid=boost_in_lid, hinge_axis=(hy, hz), hinge_notch=hinge_notch,
+        hinge_relief_r=hinge_relief_r,
         lid_outer=lid_outer, monitor_space=monitor_space, lid_strip=lid_strip,
         lid_catch=catch)
