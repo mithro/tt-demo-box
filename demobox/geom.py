@@ -1,0 +1,125 @@
+"""Axis-aligned geometry primitives shared by every part module.
+
+Frames: a ``Box`` or ``Cyl`` carries no frame of its own; the module that
+builds one states the frame in its docstring (board frame for
+``demobox.parts.board``, the TinyVGA plug frame for ``demobox.parts.tinyvga``,
+the base frame for the enclosure).  Only boxes in the same frame may be
+compared with ``box_gap`` / ``overlaps``.  All lengths are millimetres.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+
+
+class BedOverflow(Exception):
+    """A part does not fit its machine bed (R5).
+
+    The message must name the part and its size, e.g.
+    ``BedOverflow("lid_frame 230.0 x 120.0 mm does not fit the 220 x 220 mm print bed")``.
+    Printed-part and laser exports both raise this.
+    """
+
+
+@dataclass(frozen=True)
+class Box:
+    x0: float
+    y0: float
+    z0: float
+    x1: float
+    y1: float
+    z1: float
+    what: str = ""
+
+    def __post_init__(self) -> None:
+        if self.x1 < self.x0 or self.y1 < self.y0 or self.z1 < self.z0:
+            raise ValueError(f"Box {self.what!r} has negative extent: {self}")
+
+    @property
+    def size(self) -> tuple[float, float, float]:
+        return (self.x1 - self.x0, self.y1 - self.y0, self.z1 - self.z0)
+
+    def moved(self, dx: float, dy: float, dz: float) -> "Box":
+        return replace(self, x0=self.x0 + dx, x1=self.x1 + dx,
+                       y0=self.y0 + dy, y1=self.y1 + dy,
+                       z0=self.z0 + dz, z1=self.z1 + dz)
+
+    def union(self, other: "Box") -> "Box":
+        return Box(min(self.x0, other.x0), min(self.y0, other.y0), min(self.z0, other.z0),
+                   max(self.x1, other.x1), max(self.y1, other.y1), max(self.z1, other.z1),
+                   f"{self.what}+{other.what}")
+
+
+@dataclass(frozen=True)
+class Cyl:
+    """A cylinder with its axis along Z."""
+
+    cx: float
+    cy: float
+    z0: float
+    z1: float
+    r: float
+    what: str = ""
+
+
+#: The in-plane axes of a prism along each axis, in order.
+PLANE_OF = {"z": ("x", "y"), "x": ("y", "z"), "y": ("x", "z")}
+
+
+@dataclass(frozen=True)
+class Stadium:
+    """A stadium (slot) prism along ``axis``: the hull of two radius-``r``
+    circles centred at (x0, y0) and (x1, y1), from z0 to z1 along the axis.
+
+    The field names are the Z-prism's (the default).  For another axis the
+    centres are in that axis's plane, ``PLANE_OF[axis]`` order -- (y, z) for
+    a prism along X -- and z0..z1 is the extent along the axis."""
+
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    r: float
+    z0: float
+    z1: float
+    what: str = ""
+    axis: str = "z"
+
+    def __post_init__(self) -> None:
+        if self.axis not in PLANE_OF:
+            raise ValueError(f"Stadium {self.what!r}: axis {self.axis!r} is not x, y or z")
+
+    @property
+    def length(self) -> float:
+        """Overall length of the slot, end to end."""
+        return ((self.x1 - self.x0) ** 2 + (self.y1 - self.y0) ** 2) ** 0.5 + 2 * self.r
+
+    @property
+    def width(self) -> float:
+        return 2 * self.r
+
+    def covers(self, x: float, y: float) -> bool:
+        """True when (x, y) lies inside the stadium's outline."""
+        dx, dy = self.x1 - self.x0, self.y1 - self.y0
+        n = dx * dx + dy * dy
+        t = 0.0 if n == 0 else max(0.0, min(1.0, ((x - self.x0) * dx + (y - self.y0) * dy) / n))
+        px, py = self.x0 + t * dx, self.y0 + t * dy
+        return (x - px) ** 2 + (y - py) ** 2 <= self.r ** 2 + 1e-9
+
+
+def box_gap(a: Box, b: Box) -> float:
+    """Clearance between two boxes: positive = gap, 0 = touching, negative =
+    overlap depth (the smallest translation that would separate them)."""
+    gaps = [max(b.x0 - a.x1, a.x0 - b.x1),
+            max(b.y0 - a.y1, a.y0 - b.y1),
+            max(b.z0 - a.z1, a.z0 - b.z1)]
+    positive = [g for g in gaps if g > 0]
+    if positive:
+        # Separated: Euclidean distance between the boxes.
+        return sum(g * g for g in positive) ** 0.5
+    return max(gaps)  # all <= 0: the shallowest axis is the overlap depth
+
+
+def overlaps(a: Box, b: Box, tol: float = 0.0) -> bool:
+    """True when the boxes interpenetrate by more than ``tol``."""
+    return box_gap(a, b) < -tol

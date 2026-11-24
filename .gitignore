@@ -1,2 +1,5 @@
 tmp/
 __pycache__/
+.worktrees/
+.superpowers/
+output/.cache/
