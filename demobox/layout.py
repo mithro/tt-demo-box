@@ -4,63 +4,87 @@ One layout, two bodies: the printed route calls ``layout(2.4)``, the laser
 route ``layout(3.0)``.  ``verify.py`` proves the fits from the same numbers.
 Every placement below is computed from ``demobox.parts``; the only numbers
 typed here are the spec's (``LID_OPEN_DEG`` .. ``CLOSED_CLEARANCE``), the
-machine bed, and a few named design choices.
+machine beds, ``SLACK`` and a few named design choices.  The box is sized for
+one kit (``DESIGN_MONITOR``, ``DESIGN_BANK``, both board revisions): every
+dimension is that kit plus ``SLACK`` plus the walls, and nothing else.
 
 Frames
 ------
 Base frame: origin at the front-left-bottom outside corner of the base; X to
 the visitor's right, Y away from the visitor (towards the hinge), Z up.  Every
-``Box``/``Cyl`` field of ``Layout`` is in the base frame except ``lid_outer``
-and ``lid_pocket``.
+``Box``/``Cyl`` field of ``Layout`` is in the base frame except ``lid_outer``,
+``monitor_space``, ``lid_strip`` and (when ``boost_in_lid``) ``boost_pocket``.
 
 Lid frame: the base frame translated to the hinge axis, i.e. origin at
-(x = 0, y = hinge y, z = hinge z), axes parallel to the base's.  Closed, the
-lid lies in front of and above the axis (Y <= 0, Z >= 0); its screen face is
-Z = 0, facing down onto the deck.  Opening turns it about the axis (parallel to
-X) so the front edge rises and goes back: ``lid_location(a)`` /
-``lid_profile_yz(a)`` give it at ``a`` degrees open (0 closed, 100 at the stop).
+(x = 0, y = hinge y, z = hinge z), axes parallel to the base's.  The axis is
+on the seam (z = ``rim_z``), so closed, the lid lies above z = 0 and mostly in
+front of the axis (Y < 0; its back ``KNUCKLE_R`` is behind it).  The lid's
+inside face is up at z = ``lid_outer.z1 - wall``; the monitor hangs from it,
+screen down.  Opening turns the lid about the axis (parallel to X) so the
+front edge rises and goes back: ``lid_location(a)`` / ``lid_profile_yz(a)``
+give it at ``a`` degrees open (0 closed, 100 at the stop).
 
 Board placement
 ---------------
 The submodule's ``BoardSpec`` frame is a top view from the component side,
 Y up (``tools.schema``; ``tools.kicad_extract.frame`` flips KiCad's Y-down).
-On the deck the board is component side up with its Pmod edge (board y = 0)
-towards the hinge, so board y maps to base -Y.  Keeping it un-mirrored then
-forces board x to base -X: a 180 degree turn about Z,
+In the box the board is component side up (not mirrored), turned +90 degrees
+about Z so that its long run -- J1's USB-C plug, the board, the TinyVGA and
+its VGA plug -- lies along X, J1 at -X and the Pmod edge (board y = 0) with
+the TinyVGA at +X:
 
-    base = (ox - bx, oy - by, oz + bz),   (ox, oy, oz) = ``board_origin``.
+    base = (ox - by, oy + bx, oz + bz),   (ox, oy, oz) = ``board_origin``.
 
-J1 (board x 70.9..81.5, the y-max edge) therefore lands at the **front-left**
-of the board (the plan's "front-right" line had the turn wrong).
-
-Drawer
-------
-The bank drawer slides out of the base's left side, along -X
-(``drawer_out``).  From the drawer face inward: face wall, ``cable_bay``
-(CABLE_BAY long), ``bay`` (BAY_INSIDE), back wall.  Each bank lies L along X,
-W along Y (centred by its packing insert), on the bay floor, with its port end
-at the cable-bay boundary, so its end button faces the finger hole in the
-drawer face.  ``drawer_travel`` takes the longest bank fully outside the base
-while the drawer's back stays in its runners; the USB cables stay plugged in
-and pay out from a slack loop in the deck cavity above the drawer.
+Base rows
+---------
+* **Board row (front).**  Both revisions' keep-outs (``"<rev>/envelope"``,
+  ``"<rev>/usb_plug"``, ``"<rev>/tinyvga"``) are placed together; their union
+  starts at ``wall + SLACK`` in X and in Y.  The row is that union plus
+  ``SLACK`` at each X end.  ``vga_adapter`` is whichever of False/True gives
+  the shorter row (ties: False, no adapter part); the TinyVGA keep-out is
+  ``TINYVGA.plug_keepout(straight=not vga_adapter)``.
+* **Bank row (behind),** starting ``SLACK`` behind the board row, ``bank W +
+  2*SLACK`` deep.  Along X from the left wall: ``port_room`` (by J1, so the
+  bank-to-board cable is short; long enough for the longest bank-side plug +
+  SLACK, and at least ``FINGERTIP_D`` for the bank's end button), then
+  ``bank_bay`` (the bank + SLACK each side), then ``boost_pocket`` (the boost
+  module + SLACK each side) if the bank row stays no longer than the board
+  row.  Otherwise the boost module goes in ``lid_strip`` (``boost_in_lid``).
+* **Width** = max(board row, bank row, monitor W + 2*SLACK) + 2*wall.
+  **Depth** = wall + SLACK + board row Y + SLACK + bank row Y + SLACK + wall,
+  and at least monitor H + 2*SLACK + 2*wall.
+* **Height.**  ``rim_z = wall + max(bank H, board stack H) + SLACK``; the
+  board stack is the keep-out union's z extent.  The board stands on
+  ``plinth`` (floor to PCB underside), lifted so the union's top is at
+  ``rim_z - SLACK``: level with the rim, in view over the front wall.  The
+  plinth covers the PCBs but stops short, along X, of every keep-out that
+  hangs below the PCB underside (the J1 plugs; the TinyVGA is past the Pmod
+  edge anyway).  ``outer`` is the base only: ``outer.z1 == rim_z``.
+* **Pins.**  ``pins["MT2"]`` is the fixed pin both revisions share;
+  ``pins["<rev>/MT1"]`` is where the one loose pin goes for that revision (the
+  plinth has a ``PEG_HOLE_D`` hole at each).  Each is ``PEG_DIA``, from the
+  plinth top to ``PIN_PROUD`` above that revision's PCB top.
 
 Lid
 ---
-The common pocket is the largest monitor insert (panel + INSERT_MATERIAL each
-side + FIT each side) and at least LID_POCKET_MIN.  Its depth is the deepest
-insert stack plus FIT.  Monitors mount buttons-down, so a panel's bottom edge
-faces the hinge end.
+A tray over the base footprint, ``wall + TAPE_T + monitor depth +
+CLOSED_CLEARANCE`` deep.  The monitor is taped to the inside face, centred
+in X, against the free (front) edge wall, cable edge towards the hinge:
+``monitor_space`` is the panel plus SLACK each side in X and Y, its depth
+exactly the panel's, its face ``CLOSED_CLEARANCE`` above the seam.
+``lid_strip`` is the rest of the inside, between the monitor and the
+hinge-end wall; it carries the cables and, if ``boost_in_lid``, the boost
+module (against the inside face, at the strip's -X monitor-side corner).
 
-Cable gutters (R13) give every monitor's cables an in-lid route to the hinge
-cable channel: ``lid_cable_gutters["hinge"]`` runs across the lid between the
-pocket and the hinge-end wall, and a side gutter (``"left"``/``"right"``) runs
-beside the pocket on each side some monitor's cable leaves by, joining the
-hinge gutter.  They are as deep as the pocket and open to it.  Each is at
-least the monitor-side cable bundle (``lid_cable_bundle``: VGA + DC lead, side
-by side) + FIT wide; where a cable leaves a panel edge square into a gutter
-and must turn along it, the gutter is widened so the turn keeps the bundle's
-bend radius, counting the room the insert leaves beside the panel (a side-exit
-monitor's insert pushes its panel to the far side: ``checks.panel_in_lid``).
+Hinge and catch
+---------------
+The hinge axis is on the seam, ``KNUCKLE_R`` in from the back face, so the
+knuckles stay inside base + lid.  ``hinge_notch`` is the gap in the knuckle
+line at the X of the monitor's pigtail exit, the pigtail's diameter (the VGA
+cable's) + 2*FIT wide; the plug does not pass, the cable is threaded first.
+``lid_catch`` is two magnets under the front rim, each in a ``CATCH_BLOCK``
+block against the inside of the front wall, at the X nearest its front
+corner where the block clears every board-row keep-out in XY.
 """
 
 from __future__ import annotations
@@ -71,7 +95,7 @@ from dataclasses import dataclass
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from tools.schema import Source
 
-from demobox.geom import Box, Cyl, Stadium
+from demobox.geom import Box, Cyl
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.board import BOARD_KEYS, board_envelope, board_spec
 from demobox.parts.cables import CABLES
@@ -80,58 +104,57 @@ from demobox.parts.tinyvga import TINYVGA
 
 # --- spec values, verbatim -------------------------------------------------
 LID_OPEN_DEG = 100.0
-BAY_INSIDE = (158.0, 82.0, 34.0)
-CABLE_BAY = 35.0
-LID_POCKET_MIN = (185.0, 120.0)
-FIT = 0.5                 # insert / slide clearance, per side
-CLOSED_CLEARANCE = 2.0    # lid underside above the tallest thing on the deck
+FIT = 0.5                 # slip / threading clearance, per side
+CLOSED_CLEARANCE = 2.0    # monitor face above the tallest thing in the base
 PRINT_BED = (220.0, 220.0)
 LASER_BED = (300.0, 200.0)
-#: M3 heat-set insert in printed parts: hole diameter and depth.
-HEATSET_HOLE_D = 4.0
-HEATSET_DEPTH = 5.7
 #: The two build routes and their wall thickness: printed shell, 3 mm plywood.
 ROUTES: dict[str, float] = {"printed": 2.4, "laser": 3.0}
+#: Room left round each thing in the box, per side (spec Goal 1).
+SLACK = 1.0
+
+# --- the kit (spec Decision 1) -------------------------------------------------
+DESIGN_MONITOR = "taobao-tim"
+DESIGN_BANK = "xiaomi-pb2020"
+#: Plugs that can sit at the bank's port end: the box's own USB-C or USB-A
+#: cable into a socket bank, or a bank's built-in cable.
+BANK_SIDE_PLUGS = ("usb-c-right-angle", "usb-a-c", "bank-built-in")
 
 # --- design choices ----------------------------------------------------------
-#: The VGA plug is sized for a 90 degree adapter: with a straight plug the base
-#: would be deeper than the print bed (``_base_depth(2.4, straight=True)``).
-VGA_PLUG_STRAIGHT = False
+#: Hinge knuckle radius (``demobox.shared.hinge`` uses this one).
+KNUCKLE_R = 4.0
+#: The bought hinge rod: "3 mm steel rod or 2.85 mm filament".
+PIN_ROD_D = 3.0
 #: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
-#: in the base's front wall rim and the lid's front band, MAGNET_RECESS below
+#: under the base's front rim and in the lid's front rim, MAGNET_RECESS below
 #: each seam face, so the shut lid's magnets face each other 2 x MAGNET_RECESS
 #: apart.  Each sits in a CATCH_BLOCK square, CATCH_BLOCK_H tall block against
-#: the front wall, CATCH_INSET_X in from each side wall (clear of the board).
+#: the front wall (a 2.4 or 3 mm wall can't hold a 6 mm magnet).
 MAGNET_D = 6.0
 MAGNET_T = 3.0
 MAGNET_RECESS = 0.2
 CATCH_BLOCK = 10.0
 CATCH_BLOCK_H = 6.0
-CATCH_INSET_X = 35.0
-#: Monitor insert material: front bezel plate and rear retainer thickness.
-INSERT_MATERIAL = 1.2
-#: Bare-kit driver board standoff height above the panel's back.
-DRIVER_STANDOFF = 5.0
-#: Deck standoff minimum: an M3 heat-set insert (HEATSET_DEPTH) from the top,
-#: rounded up to the whole millimetre (a floor under the insert).
-STANDOFF_MIN = float(math.ceil(HEATSET_DEPTH))
-#: MT1 locating peg: into the board's 3.2 mm hole, below the PCB's top face.
+#: Board locating pins, into the boards' 3.2 mm MT1/MT2 holes.
 PEG_DIA = 3.0
-PEG_HEIGHT = 1.2
-#: The boss's hole for the loose pin: PEG_DIA plus a slip clearance, so the
-#: pin pushes in by hand and comes out again for the other revision.
+#: The plinth's hole for the loose MT1 pin: PEG_DIA plus a slip clearance, so
+#: the pin pushes in by hand and comes out again for the other revision.
 PEG_HOLE_D = PEG_DIA + 0.2
-#: Finger hole in the drawer face: a slot this wide round the banks' end
-#: buttons (``Layout.drawer_face_hole``, a stadium through the face).
-FINGER_HOLE_D = 20.0
+#: How far the board pins stand above the PCB top: the closed lid comes down
+#: to CLOSED_CLEARANCE above the board, so a board can't lift off them.
+PIN_PROUD = CLOSED_CLEARANCE + 1.0
+#: A fingertip on a bank's end button (the port room is at least this long).
+FINGERTIP_D = 16.0
 
-# --- placeholders for part heights not in any source (UNCONFIRMED) -----------
+# --- placeholders (UNCONFIRMED) ------------------------------------------------
 #: J1 axis above the PCB top: a top-mount USB-C receptacle's 3.2 mm shell / 2.
 USB_C_AXIS_ABOVE_PCB = 1.6
 #: TinyVGA PCB underside relative to the host PCB underside when plugged in:
 #: a right-angle header into a right-angle socket leaves the two PCBs
 #: about coplanar.
 TINYVGA_Z_OFFSET = 0.0
+#: Double-sided foam tape (VHB type) between the monitor's back and the lid.
+TAPE_T = 1.0
 
 #: (name, value, source) for verify.py to report as UNCONFIRMED.
 UNCONFIRMED: tuple[tuple[str, float, Source], ...] = (
@@ -141,20 +164,15 @@ UNCONFIRMED: tuple[tuple[str, float, Source], ...] = (
     ("TINYVGA_Z_OFFSET", TINYVGA_Z_OFFSET, Source(
         "Placeholder: TinyVGA height when plugged into J13", "demobox/layout.py",
         "Assumed coplanar with the host PCB; measure a plugged-in TinyVGA.")),
+    ("TAPE_T", TAPE_T, Source(
+        "Placeholder: foam tape thickness", "docs/superpowers/specs/2026-11-24-compact-box-design.md",
+        "Decision 3: VHB-type double-sided foam tape; 1.0 mm is typical, "
+        "measure the tape bought.")),
 )
 
 _USB = CABLES["usb-c-right-angle"]   # bank to board, right-angle at J1
-_VGA = CABLES["vga-slim"]
+_PIGTAIL = CABLES["vga-slim"]        # the monitor's own VGA cable: a slim VGA cable's figures
 _BOOST = CABLES["usb-12v-boost"]
-
-
-def insert_stack(m: Monitor) -> float:
-    """Depth of a monitor's insert stack: bezel plate + panel (+ driver board
-    on standoffs, for bare kits) + rear retainer."""
-    depth = INSERT_MATERIAL + m.panel[2] + INSERT_MATERIAL
-    if m.driver is not None:
-        depth += DRIVER_STANDOFF + m.driver.z1
-    return depth
 
 
 # --- board-frame keep-outs ---------------------------------------------------
@@ -181,17 +199,17 @@ def tinyvga_offset(key: str) -> tuple[float, float, float]:
             pmod.body_y0, TINYVGA_Z_OFFSET)
 
 
-def _tinyvga(key: str, straight: bool) -> Box:
+def _tinyvga(key: str, adapter: bool) -> Box:
     """TinyVGA PCB + DE-15 + VGA plug keep-out in J13 (pmod3), board frame."""
-    u = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(straight))
+    u = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(straight=not adapter))
     return Box(u.x0, u.y0, u.z0, u.x1, u.y1, u.z1,
                f"{key} TinyVGA + VGA plug").moved(*tinyvga_offset(key))
 
 
-def _board_frame(key: str, straight: bool) -> dict[str, Box]:
+def _board_frame(key: str, adapter: bool) -> dict[str, Box]:
     return {"envelope": board_envelope(key),
             "usb_plug": _usb_plug(key),
-            "tinyvga": _tinyvga(key, straight)}
+            "tinyvga": _tinyvga(key, adapter)}
 
 
 def _union(boxes) -> Box:
@@ -202,29 +220,26 @@ def _union(boxes) -> Box:
     return u
 
 
-def _all_board_frame(straight: bool) -> Box:
-    return _union(b for k in BOARD_KEYS for b in _board_frame(k, straight).values())
+def _all_board_frame(adapter: bool) -> Box:
+    return _union(b for k in BOARD_KEYS for b in _board_frame(k, adapter).values())
 
 
 def _to_base(b: Box, origin: tuple[float, float, float], what: str) -> Box:
+    """Board-frame box to the base frame: base = (ox - by, oy + bx, oz + bz)."""
     ox, oy, oz = origin
-    return Box(ox - b.x1, oy - b.y1, oz + b.z0, ox - b.x0, oy - b.y0, oz + b.z1, what)
+    return Box(ox - b.y1, oy + b.x0, oz + b.z0, ox - b.y0, oy + b.x1, oz + b.z1, what)
 
 
-# --- base footprint ----------------------------------------------------------
-
-def _pocket_xy() -> tuple[float, float]:
-    px = max(m.panel[0] + 2 * INSERT_MATERIAL + 2 * FIT for m in MONITORS.values())
-    py = max(m.panel[1] + 2 * INSERT_MATERIAL + 2 * FIT for m in MONITORS.values())
-    if px < LID_POCKET_MIN[0] or py < LID_POCKET_MIN[1]:
-        raise ValueError(f"lid pocket {px} x {py} is below LID_POCKET_MIN {LID_POCKET_MIN}")
-    return px, py
+def _board_keepouts(origin: tuple[float, float, float], adapter: bool) -> dict[str, Box]:
+    """Both revisions' keep-outs in the base frame, keyed ``"<rev>/<part>"``."""
+    return {f"{k}/{part}": _to_base(b, origin, f"{k} {part}")
+            for k in BOARD_KEYS for part, b in _board_frame(k, adapter).items()}
 
 
 def exit_edge(m: Monitor) -> str:
     """The panel edge (front view, upright) the monitor's cables leave by.  A
     bare kit's connectors are on its driver board; its cables are taken out at
-    the hinge end ("bottom"), the shortest way to the hinge channel."""
+    the hinge end ("bottom"), the shortest way to the hinge."""
     if m.cable_edge is not None:
         return m.cable_edge
     if m.connector_exit in ("left", "right", "top", "bottom"):
@@ -232,113 +247,44 @@ def exit_edge(m: Monitor) -> str:
     return "bottom"
 
 
-def lid_cable_bundle() -> tuple[float, float]:
-    """(width, bend radius) of the monitor-side cables in the lid, side by
-    side: the VGA cable plus, for 12 V monitors, the boost cable's DC lead."""
-    cables = [_VGA] + ([_BOOST] if any(m.power_in == "12V-boost" for m in MONITORS.values())
-                       else [])
-    return sum(c.dia for c in cables), max(c.min_bend_r for c in cables)
-
-
-def _gutter_widths() -> dict[str, float]:
-    """Width of each lid cable gutter (see the module docstring)."""
-    px, _ = _pocket_xy()
-    d, r = lid_cable_bundle()
-    run = d + FIT
-    turn = r + d / 2 + FIT             # panel edge to the gutter's far side
-    edges = {exit_edge(m) for m in MONITORS.values()}
-    # a bottom exit's panel sits FIT + INSERT_MATERIAL off the pocket's hinge end
-    widths = {"hinge": max(run, turn - (FIT + INSERT_MATERIAL)) if "bottom" in edges else run}
-    for m in MONITORS.values():
-        e = exit_edge(m)
-        if e in ("left", "right"):
-            room = px - FIT - INSERT_MATERIAL - m.panel[0]   # panel pushed to the far side
-            widths[e] = max(widths.get(e, run), turn - room)
-    return widths
-
-
-def _lid_inner_xy() -> tuple[float, float]:
-    """Pocket plus cable gutters, the lid's inside footprint."""
-    px, py = _pocket_xy()
-    g = _gutter_widths()
-    return px + g.get("left", 0.0) + g.get("right", 0.0), py + g["hinge"]
-
-
-def _drawer_depth(wall: float) -> float:
-    """Base Y the drawer needs: base wall, FIT, drawer wall, bay, and back."""
-    return BAY_INSIDE[1] + 2 * (2 * wall + FIT)
-
-
-def _base_width(wall: float, straight: bool) -> float:
-    u = _all_board_frame(straight)
-    return max(u.size[0] + 2 * (wall + FIT),
-               # drawer face (it is the base's left wall there), cable bay, bay,
-               # drawer back wall, FIT, base right wall
-               CABLE_BAY + BAY_INSIDE[0] + 3 * wall + FIT,
-               _lid_inner_xy()[0] + 2 * wall)
-
-
-def _base_depth(wall: float, straight: bool) -> float:
-    u = _all_board_frame(straight)
-    return max(u.size[1] + 2 * (wall + FIT),
-               _drawer_depth(wall),
-               _lid_inner_xy()[1] + 2 * wall)
-
-
-def _finger_slot(buttons: list[tuple[float, float]], wall: float) -> Stadium:
-    """The drawer face's finger hole: a FINGER_HOLE_D slot along X through the
-    face (0 .. wall), its centres the two end buttons (y, z) furthest apart.
-    Raises if a third button falls outside it."""
-    a, b = max(((p, q) for p in buttons for q in buttons), key=lambda pq: math.dist(*pq))
-    slot = Stadium(*a, *b, FINGER_HOLE_D / 2, 0.0, wall, "drawer face finger hole", axis="x")
-    for y, z in buttons:
-        if not slot.covers(y, z):
-            raise ValueError(f"end button at (y {y:.2f}, z {z:.2f}) is outside the finger slot")
-    return slot
-
-
 # --- the layout --------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Layout:
     wall: float
-    outer: Box
-    deck_z: float
+    outer: Box                       # the base; outer.z1 == rim_z
+    rim_z: float                     # the seam
     board_origin: tuple[float, float, float]
     board_keepouts: dict[str, Box]   # "<rev>/envelope", "<rev>/usb_plug", "<rev>/tinyvga"
-    standoffs: tuple[Cyl, ...]       # screwed, M3 heat-set insert (shared MT2)
-    mt1_boss: Stadium                # merged boss under both MT1s, no insert
-    pegs: dict[str, Cyl]             # per revision: locating peg into MT1
-    supports: tuple[Cyl, ...]        # plain edge-support pads, no insert
-    usb_slot: Box
-    bay: Box
-    cable_bay: Box
-    drawer_face_hole: Stadium        # along X through the face: centres (y, z)
-    drawer_out: tuple[float, float, float]
-    drawer_travel: float
-    boost_pocket: Box
+    vga_adapter: bool                # a 90 degree VGA adapter on the TinyVGA
+    plinth: Box                      # floor to the PCB underside
+    pins: dict[str, Cyl]             # "MT2" (fixed), "<rev>/MT1" (the loose pin's places)
+    bank_bay: Box
+    port_room: Box
+    boost_pocket: Box                # base frame, or lid frame (closed) if boost_in_lid
+    boost_in_lid: bool
     hinge_axis: tuple[float, float]  # (y, z)
-    hinge_cable_channel: Box
+    hinge_notch: Box
     lid_outer: Box                   # lid frame, closed
-    lid_pocket: Box                  # lid frame, closed
-    lid_cable_gutters: dict[str, Box]  # lid frame, closed: "hinge", and "left"/"right"
-    lid_catch: tuple[Cyl, ...]       # the base-side catch magnets (base frame, in the front wall)
+    monitor_space: Box               # lid frame, closed
+    lid_strip: Box                   # lid frame, closed
+    lid_catch: tuple[Cyl, ...]       # the base-side catch magnets
 
     def catch_base_block(self, c: Cyl) -> Box:
         """The block holding catch magnet ``c`` under the base's rim (base frame)."""
-        h, w = self.outer.z1, self.wall
+        h, w = self.rim_z, self.wall
         return Box(c.cx - CATCH_BLOCK / 2, w, h - CATCH_BLOCK_H, c.cx + CATCH_BLOCK / 2,
                    w + CATCH_BLOCK, h, "lid catch block (base)")
 
     def catch_lid_block(self, c: Cyl) -> Box:
-        """The block over it in the lid's front band (lid frame, closed)."""
+        """The block over it in the lid's front rim (lid frame, closed)."""
         b = self.catch_base_block(c)
-        d = self.outer.y1
+        d = self.hinge_axis[0]
         return Box(b.x0, b.y0 - d, 0.0, b.x1, b.y1 - d, CATCH_BLOCK_H, "lid catch block (lid)")
 
     def catch_lid_magnet(self, c: Cyl) -> Cyl:
         """The lid-side magnet facing ``c`` across the seam (lid frame, closed)."""
-        return Cyl(c.cx, c.cy - self.outer.y1, MAGNET_RECESS, MAGNET_RECESS + MAGNET_T,
+        return Cyl(c.cx, c.cy - self.hinge_axis[0], MAGNET_RECESS, MAGNET_RECESS + MAGNET_T,
                    MAGNET_D / 2, "lid catch magnet (lid)")
 
     def _open_yz(self, y: float, z: float, angle_deg: float) -> tuple[float, float]:
@@ -365,132 +311,129 @@ class Layout:
                 * cq.Location(cq.Vector(0.0, 0.0, 0.0), cq.Vector(1.0, 0.0, 0.0), -angle_deg))
 
 
-def layout(wall: float) -> Layout:
-    straight = VGA_PLUG_STRAIGHT
-    width = _base_width(wall, straight)
-    depth = _base_depth(wall, straight)
+def _catch_x0(keepouts: dict[str, Box], wall: float, width: float, from_left: bool) -> float:
+    """The x0 of the catch block nearest its front corner whose footprint
+    (front wall inside, CATCH_BLOCK square) clears every keep-out in XY."""
+    lo, hi = wall, width - wall
+    y0, y1 = wall, wall + CATCH_BLOCK
+    x0 = lo if from_left else hi - CATCH_BLOCK
+    while True:
+        hits = [k for k in keepouts.values()
+                if k.x0 < x0 + CATCH_BLOCK and x0 < k.x1 and k.y0 < y1 and y0 < k.y1]
+        if not hits:
+            return x0
+        x0 = max(k.x1 for k in hits) if from_left else min(k.x0 for k in hits) - CATCH_BLOCK
+        if x0 < lo or x0 + CATCH_BLOCK > hi:
+            names = ", ".join(sorted(k.what for k in hits))
+            raise ValueError(f"no room for the {'left' if from_left else 'right'} lid catch "
+                             f"block along the front wall: blocked by {names}")
 
-    # --- drawer: front of the base, sliding out of the left side -------------
-    bay_y0 = wall + FIT + wall
-    bay_z0 = wall + wall                     # base floor + drawer floor
-    cable_bay = Box(wall, bay_y0, bay_z0, wall + CABLE_BAY, bay_y0 + BAY_INSIDE[1],
-                    bay_z0 + BAY_INSIDE[2], "drawer cable bay")
-    bay = Box(cable_bay.x1, bay_y0, bay_z0, cable_bay.x1 + BAY_INSIDE[0],
-              bay_y0 + BAY_INSIDE[1], bay_z0 + BAY_INSIDE[2], "battery bay")
-    longest = max(b.size[0] for b in BATTERIES.values())
-    drawer_travel = bay.x0 + longest + FIT
 
-    buttons = [(bay.y0 + (BAY_INSIDE[1] - b.size[1]) / 2 + b.button[1], bay.z0 + b.button[2])
-               for b in BATTERIES.values() if b.button is not None and b.button[0] == "end"]
-    drawer_face_hole = _finger_slot(buttons, wall)
+def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) -> Layout:
+    b = BATTERIES[bank]
+    m = MONITORS[monitor]
+    if exit_edge(m) != "bottom" or m.pigtail_exit_u is None:
+        raise ValueError(f"monitor {monitor!r} has no pigtail exit on its bottom edge: "
+                         "only a taped design-kit monitor can be laid out")
+    mw, mh, md = m.panel
 
-    # --- deck: over the drawer and the USB-C cable's drop --------------------
-    cavity = _USB.min_bend_r + _USB.dia      # right-angle drop turning flat
-    deck_z = bay.z1 + FIT + cavity + wall
+    # --- board row: the VGA plug choice that gives the shorter row ------------
+    unions = {a: _all_board_frame(a) for a in (False, True)}
+    adapter = unions[True].size[1] < unions[False].size[1]
+    u = unions[adapter]
+    board_row_x = u.size[1] + 2 * SLACK          # board y runs along base X
+    board_row_y = u.size[0]
+    stack_h = u.size[2]
 
-    # --- board on the deck ----------------------------------------------------
-    frames = {k: _board_frame(k, straight) for k in BOARD_KEYS}
-    u = _all_board_frame(straight)
-    standoff_h = max(STANDOFF_MIN, -u.z0 + FIT)
-    ox = width / 2 + (u.x0 + u.x1) / 2         # keep-outs centred across the deck
-    oy = wall + FIT + u.y1                     # front-most keep-out FIT off the front wall
-    origin = (ox, oy, deck_z + standoff_h)
-    keepouts = {f"{k}/{part}": _to_base(b, origin, f"{k} {part}")
-                for k, parts in frames.items() for part, b in parts.items()}
-    height = origin[2] + u.z1 + CLOSED_CLEARANCE
-    outer = Box(0.0, 0.0, 0.0, width, depth, height, "base")
+    # --- bank row ---------------------------------------------------------------
+    port_len = max(max(CABLES[k].plug[0] for k in BANK_SIDE_PLUGS) + SLACK, FINGERTIP_D)
+    bay_x, bay_y = b.size[0] + 2 * SLACK, b.size[1] + 2 * SLACK
+    boost = tuple(d + 2 * SLACK for d in _BOOST.plug)
+    boost_in_lid = port_len + bay_x + boost[0] > board_row_x
+    bank_row_x = port_len + bay_x + (0.0 if boost_in_lid else boost[0])
 
-    # Under-board supports, all with their tops at the board underside:
-    #  * ``standoffs``: screwed, with an M3 heat-set insert -- the holes both
-    #    revisions share (MT2);
-    #  * ``mt1_boss``: one merged stadium boss under the revisions' MT1 holes,
-    #    which differ by 5 mm (too close for two inserted bosses), no insert;
-    #  * ``pegs``: a locating peg per revision rising from the boss into that
-    #    revision's MT1 hole.  Each revision's peg sits under the other
-    #    revision's PCB, so a fixed pair would lift either board: the boss has a
-    #    PEG_HOLE_D hole at each MT1 and only the fitted revision's peg (a loose
-    #    printed pin) is pushed in;
-    #  * ``supports``: plain pads at the other two corners of the hole
-    #    rectangle (clear of J1), so two fixings do not let the board rock.
-    def at(x, y):
-        return ox - x, oy - y
+    # --- outer ------------------------------------------------------------------
+    width = max(board_row_x, bank_row_x, mw + 2 * SLACK) + 2 * wall
+    depth = max(wall + SLACK + board_row_y + SLACK + bay_y + SLACK + wall,
+                mh + 2 * SLACK + 2 * wall)
+    rim_z = wall + max(b.size[2], stack_h) + SLACK
+    outer = Box(0.0, 0.0, 0.0, width, depth, rim_z, "base")
 
-    std_r = max(h.keepout_dia for k in BOARD_KEYS for h in board_spec(k).holes) / 2
-    holes: dict[tuple[float, float], list[str]] = {}
+    # --- board on its plinth -------------------------------------------------
+    # union: base X from wall + SLACK, base Y from wall + SLACK, top at rim - SLACK
+    origin = (wall + SLACK + u.y1, wall + SLACK - u.x0, rim_z - SLACK - u.z1)
+    ox, oy, oz = origin
+    keepouts = _board_keepouts(origin, adapter)
+    specs = {k: board_spec(k) for k in BOARD_KEYS}
+    # PCBs (board x 0..W, y 0..H), stopping short of the J1 plugs, which hang
+    # below the PCB underside past the J1 edge
+    pcb_y1 = min(max(s.outline.height for s in specs.values()),
+                 min(_usb_plug(k).y0 for k in BOARD_KEYS))
+    pcb = Box(0.0, 0.0, 0.0, max(s.outline.width for s in specs.values()), pcb_y1, 0.0)
+    p = _to_base(pcb, origin, "")
+    plinth = Box(p.x0, p.y0, wall, p.x1, p.y1, max(oz, wall), "board plinth")
+
+    def pin(h, key: str, what: str) -> Cyl:
+        top = oz + specs[key].outline.thickness + PIN_PROUD
+        return Cyl(ox - h.y, oy + h.x, plinth.z1, top, PEG_DIA / 2, what)
+
+    holes = {k: {h.label: h for h in s.holes} for k, s in specs.items()}
+    mt2 = {(holes[k]["MT2"].x, holes[k]["MT2"].y) for k in BOARD_KEYS}
+    tops = {s.outline.thickness for s in specs.values()}
+    if len(mt2) != 1 or len(tops) != 1:
+        raise ValueError(f"the revisions do not share MT2 {mt2} and PCB thickness {tops}: "
+                         "one fixed pin can't serve both")
+    k0 = BOARD_KEYS[0]
+    pins = {"MT2": pin(holes[k0]["MT2"], k0, "MT2 pin (fixed)")}
     for k in BOARD_KEYS:
-        for h in board_spec(k).holes:
-            holes.setdefault((h.x, h.y), []).append(f"{k} {h.label}")
-    shared = {xy: names for xy, names in holes.items() if len(names) == len(BOARD_KEYS)}
-    standoffs = tuple(Cyl(*at(x, y), deck_z, origin[2], std_r, "standoff " + ", ".join(n))
-                      for (x, y), n in shared.items())
-    mt1 = {k: next(h for h in board_spec(k).holes if h.label == "MT1") for k in BOARD_KEYS}
-    ends = sorted(at(h.x, h.y) for h in mt1.values())
-    mt1_boss = Stadium(*ends[0], *ends[-1], std_r, deck_z, origin[2], "MT1 boss (no insert)")
-    pegs = {k: Cyl(*at(h.x, h.y), origin[2], origin[2] + PEG_HEIGHT, PEG_DIA / 2,
-                   f"{k} MT1 locating peg") for k, h in mt1.items()}
-    mt2 = next(h for h in board_spec(BOARD_KEYS[0]).holes if h.label == "MT2")
-    j1_y0 = min(f.y0 for k in BOARD_KEYS for f in board_spec(k).features
-                if f.kind == "usb_power")
-    supports = (
-        Cyl(*at(min(h.x for h in mt1.values()), mt2.y), deck_z, origin[2], std_r,
-            "edge support (Pmod corner)"),
-        Cyl(*at(mt2.x, j1_y0 - std_r - FIT), deck_z, origin[2], std_r,
-            "edge support (J1 corner)"),
-    )
+        pins[f"{k}/MT1"] = pin(holes[k]["MT1"], k, f"{k} MT1 pin (loose)")
 
-    # USB-C slot: under both revisions' plug cable ends
-    plugs = [keepouts[f"{k}/usb_plug"] for k in BOARD_KEYS]
-    usb_slot = Box(min(p.x0 for p in plugs) - FIT, min(p.y0 for p in plugs) - FIT,
-                   deck_z - wall,
-                   max(p.x1 for p in plugs) + FIT, max(p.y0 for p in plugs) + _USB.dia + FIT,
-                   deck_z, "deck USB-C slot")
+    # --- bank row: port room, bay, boost ---------------------------------------
+    row_y0 = oy + u.x1 + SLACK
+    port_room = Box(wall, row_y0, wall, wall + port_len, row_y0 + bay_y, rim_z, "port room")
+    bank_bay = Box(port_room.x1, row_y0, wall, port_room.x1 + bay_x, row_y0 + bay_y, rim_z,
+                   "bank bay")
 
-    # boost converter body: on the base floor behind the drawer, at the left
-    bl, bw, bh = _BOOST.plug
-    by0 = bay.y1 + wall + FIT
-    boost_pocket = Box(wall + FIT, by0, wall, wall + FIT + bl + 2 * FIT,
-                       by0 + bw + 2 * FIT, wall + bh + FIT, "boost converter pocket")
+    # --- hinge and lid (lid frame, closed) --------------------------------------
+    hy, hz = depth - KNUCKLE_R, rim_z
+    lid_h = wall + TAPE_T + md + CLOSED_CLEARANCE
+    lid_outer = Box(0.0, -hy, 0.0, width, depth - hy, lid_h, "lid")
+    in_z1 = lid_h - wall                          # the inside face (tape side)
+    ms_x0 = (width - (mw + 2 * SLACK)) / 2
+    ms_y0 = lid_outer.y0 + wall
+    monitor_space = Box(ms_x0, ms_y0, CLOSED_CLEARANCE, ms_x0 + mw + 2 * SLACK,
+                        ms_y0 + mh + 2 * SLACK, in_z1 - TAPE_T, f"monitor space ({monitor})")
+    lid_strip = Box(wall, monitor_space.y1, 0.0, width - wall, lid_outer.y1 - wall, in_z1,
+                    "lid strip")
 
-    # --- hinge and lid ---------------------------------------------------------
-    hinge = (depth, height)                   # back-top edge of the base
-    px, py = _pocket_xy()
-    pocket_depth = max(insert_stack(m) for m in MONITORS.values()) + FIT
-    lid_depth = pocket_depth + wall
-    lid_outer = Box(0.0, -depth, 0.0, width, 0.0, lid_depth, "lid")
-    gw = _gutter_widths()
-    inner_x = _lid_inner_xy()[0]
-    in_x0 = (width - inner_x) / 2
-    p_x0 = in_x0 + gw.get("left", 0.0)
-    p_y1 = -wall - gw["hinge"]
-    lid_pocket = Box(p_x0, p_y1 - py, 0.0, p_x0 + px, p_y1, pocket_depth, "lid pocket")
-    gutters = {"hinge": Box(in_x0, p_y1, 0.0, in_x0 + inner_x, -wall, pocket_depth,
-                            "lid hinge-end cable gutter")}
-    if "left" in gw:
-        gutters["left"] = Box(in_x0, lid_pocket.y0, 0.0, p_x0, p_y1, pocket_depth,
-                              "lid left cable gutter")
-    if "right" in gw:
-        gutters["right"] = Box(lid_pocket.x1, lid_pocket.y0, 0.0, lid_pocket.x1 + gw["right"],
-                               p_y1, pocket_depth, "lid right cable gutter")
+    if boost_in_lid:
+        boost_pocket = Box(lid_strip.x0, lid_strip.y0, in_z1 - boost[2],
+                           lid_strip.x0 + boost[0], lid_strip.y0 + boost[1], in_z1,
+                           "boost converter pocket (lid)")
+        if boost_pocket.y1 > lid_strip.y1 or boost_pocket.z0 < lid_strip.z0:
+            raise ValueError(f"boost module {_BOOST.plug} does not fit the lid strip "
+                             f"{lid_strip.size}")
+    else:
+        boost_pocket = Box(bank_bay.x1, row_y0, wall, bank_bay.x1 + boost[0],
+                           row_y0 + boost[1], wall + boost[2], "boost converter pocket")
 
-    vga = keepouts[f"{BOARD_KEYS[0]}/tinyvga"]
-    cx = (vga.x0 + vga.x1) / 2
-    chan_w = _VGA.plug[1] + _BOOST.dia + 2 * FIT  # VGA plug threads through, beside the 12 V lead
-    bend = max(_VGA.min_bend_r, _BOOST.min_bend_r)
-    hinge_cable_channel = Box(cx - chan_w / 2, hinge[0] - bend, deck_z,
-                              cx + chan_w / 2, hinge[0], hinge[1] + pocket_depth,
-                              "hinge cable channel")
+    exit_x = monitor_space.x0 + SLACK + m.pigtail_exit_u
+    half = _PIGTAIL.dia / 2 + FIT
+    hinge_notch = Box(exit_x - half, hy - KNUCKLE_R, hz - KNUCKLE_R,
+                      exit_x + half, hy + KNUCKLE_R, hz + KNUCKLE_R, "hinge notch (pigtail)")
 
-    catch = tuple(Cyl(x, wall + CATCH_BLOCK / 2, height - MAGNET_RECESS - MAGNET_T,
-                      height - MAGNET_RECESS, MAGNET_D / 2, f"lid catch magnet (base) {i + 1}")
-                  for i, x in enumerate((CATCH_INSET_X, width - CATCH_INSET_X)))
+    # --- lid catch -----------------------------------------------------------
+    xs = (_catch_x0(keepouts, wall, width, True), _catch_x0(keepouts, wall, width, False))
+    if xs[0] + CATCH_BLOCK > xs[1]:
+        raise ValueError(f"the lid catch blocks overlap along the front wall: x0 = {xs}")
+    catch = tuple(Cyl(x + CATCH_BLOCK / 2, wall + CATCH_BLOCK / 2,
+                      rim_z - MAGNET_RECESS - MAGNET_T, rim_z - MAGNET_RECESS, MAGNET_D / 2,
+                      f"lid catch magnet (base) {i + 1}") for i, x in enumerate(xs))
 
     return Layout(
-        wall=wall, outer=outer, deck_z=deck_z, board_origin=origin,
-        board_keepouts=keepouts, standoffs=standoffs, mt1_boss=mt1_boss, pegs=pegs,
-        supports=supports, usb_slot=usb_slot,
-        bay=bay, cable_bay=cable_bay, drawer_face_hole=drawer_face_hole,
-        drawer_out=(-1.0, 0.0, 0.0), drawer_travel=drawer_travel,
-        boost_pocket=boost_pocket, hinge_axis=hinge,
-        hinge_cable_channel=hinge_cable_channel,
-        lid_outer=lid_outer, lid_pocket=lid_pocket, lid_cable_gutters=gutters,
+        wall=wall, outer=outer, rim_z=rim_z, board_origin=origin,
+        board_keepouts=keepouts, vga_adapter=adapter, plinth=plinth, pins=pins,
+        bank_bay=bank_bay, port_room=port_room, boost_pocket=boost_pocket,
+        boost_in_lid=boost_in_lid, hinge_axis=(hy, hz), hinge_notch=hinge_notch,
+        lid_outer=lid_outer, monitor_space=monitor_space, lid_strip=lid_strip,
         lid_catch=catch)
