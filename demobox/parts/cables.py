@@ -50,4 +50,8 @@ CABLES: dict[str, Cable] = {c.key: c for c in (
            25.0, (60.0, 20.0, 15.0),
            "Cables and adapters: \"a USB to 12 V DC (5.5 x 2.1) boost cable. The boost "
            "module must have a place to sit.\" Module body size is a placeholder (measure it)."),
+    _cable("bank-built-in", "Power bank built-in USB-C cable", 4.0, 20.0, (20.0, 9.0, 8.5),
+           "Battery survey: UGREEN PB505, Xiaomi PB2020 and Anker Zolo list \"built-in C\"; "
+           "cable and plug body are not stated, so the USB-C right-angle figures are used. "
+           "Unconfirmed."),
 )}
