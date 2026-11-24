@@ -32,7 +32,7 @@ from demobox import checks
 from demobox.drafting import names
 from demobox.drafting import sheetkit as K
 from demobox.drafting.hlr import project, to_view
-from demobox.layout import (DESIGN_BANK, DESIGN_MONITOR, LASER_BED, LID_OPEN_DEG, MAGNET_D,
+from demobox.layout import (LASER_BED, LID_OPEN_DEG, MAGNET_D,
                             MAGNET_T, PIN_ROD_D, ROUTES, SLACK, layout)
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.monitors import MONITORS
@@ -101,10 +101,10 @@ def parts_rows(route: str, lay) -> tuple[list[list[str]], dict[str, int]]:
         add("", n, what, "bought")
     add("", 1, "TT demo board v3.2 or v3.3", "Tiny Tapeout")
     add("", 1, "TinyVGA Pmod", "mole99/tiny-vga")
-    m, b = MONITORS[DESIGN_MONITOR], BATTERIES[DESIGN_BANK]
-    add("", 1, f"Monitor {DESIGN_MONITOR}", _where(m.sources, r"AliExpress (\d+)|(Taobao)"))
-    add("", 1, f"Power bank {DESIGN_BANK}", _where(b.sources))
-    for c in (checks.usb_cable(), checks.ADAPTER, checks.BOOST):
+    m, b = MONITORS[lay.monitor], BATTERIES[lay.bank]
+    add("", 1, f"Monitor {lay.monitor}", _where(m.sources, r"AliExpress (\d+)|(Taobao)"))
+    add("", 1, f"Power bank {lay.bank}", _where(b.sources))
+    for c in (checks.usb_cable(lay), checks.ADAPTER, checks.BOOST):
         if c.key != "bank-built-in":         # the bank's own cable comes with it
             add("", 1, re.sub(r" \(.*?\)", "", c.title), "spec")
     return rows, item

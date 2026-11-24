@@ -150,11 +150,11 @@ def board_pcb(lay: Layout, key: str) -> cq.Shape:
                       for h in board_spec(key).holes))
 
 
-def monitor_block(lay: Layout, monitor: str) -> cq.Solid:
-    """The monitor's panel taped to the lid, lid frame: centred in X on the
-    monitor space, SLACK in from its front edge, its back TAPE_T under the
-    inside face."""
-    mw, mh, md = MONITORS[monitor].panel
+def monitor_block(lay: Layout) -> cq.Solid:
+    """The layout's monitor's panel taped to the lid, lid frame: centred in X
+    on the monitor space, SLACK in from its front edge, its back TAPE_T under
+    the inside face."""
+    mw, mh, md = MONITORS[lay.monitor].panel
     ms = lay.monitor_space
     cx, y0 = (ms.x0 + ms.x1) / 2, ms.y0 + SLACK
     top = lay.lid_outer.z1 - lay.wall - TAPE_T
@@ -179,9 +179,10 @@ def hinge_rod(lay: Layout) -> cq.Solid:
                                  cq.Vector(1, 0, 0))
 
 
-def packed_bank(lay: Layout, bank: str) -> Box:
-    """Bank ``bank`` on the bay floor, centred in the bay (as
-    ``checks.packed_bank`` packs the design bank), base frame."""
+def packed_bank(lay: Layout) -> Box:
+    """The layout's bank on the bay floor, centred in the bay (as
+    ``checks.packed_bank`` packs it), base frame."""
+    bank = lay.bank
     l_, w, h = BATTERIES[bank].size
     bay = lay.bank_bay
     x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2

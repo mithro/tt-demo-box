@@ -323,6 +323,11 @@ def exit_edge(m: Monitor) -> str:
 @dataclass(frozen=True)
 class Layout:
     wall: float
+    #: R33: the kit it was laid out for (keys of ``BATTERIES`` and
+    #: ``MONITORS``).  Everything downstream reads them from here, never the
+    #: DESIGN_* defaults.
+    bank: str
+    monitor: str
     outer: Box                       # the base; outer.z1 == rim_z
     rim_z: float                     # the seam
     board_origin: tuple[float, float, float]
@@ -420,10 +425,10 @@ def _hinge_relief_r(lid: Box, base: Box, hy: float, hz: float) -> float:
 
 def base_contents(lay: Layout) -> dict[str, Box]:
     """Everything in the base a lid or knuckle must miss, base frame: the
-    board keep-outs, the plinth, the pins (as boxes), the design bank as
+    board keep-outs, the plinth, the pins (as boxes), the layout's bank as
     packed (centred in the bay), the boost module's pocket (when in the base),
     the port room (the bank cables' room) and the catch blocks."""
-    b = BATTERIES[DESIGN_BANK]
+    b = BATTERIES[lay.bank]
     bay = lay.bank_bay
     l_, w, h = b.size
     x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
@@ -627,7 +632,7 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     hinge_relief_r = _hinge_relief_r(lid_outer, outer, hy, hz)
 
     lay = Layout(
-        wall=wall, outer=outer, rim_z=rim_z, board_origin=origin,
+        wall=wall, bank=bank, monitor=monitor, outer=outer, rim_z=rim_z, board_origin=origin,
         board_keepouts=keepouts, vga_adapter=True, plinth=plinth,
         plinth_relief=plinth_relief, pins=pins,
         bank_bay=bank_bay, port_room=port_room, boost_pocket=boost_pocket,

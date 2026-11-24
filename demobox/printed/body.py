@@ -239,7 +239,7 @@ def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMB
     lay = layout(ROUTES[route], bank=bank, monitor=monitor)
     loc = lay.lid_location(angle_deg)
 
-    bank_box = _bx(packed_bank(lay, bank))
+    bank_box = _bx(packed_bank(lay))
     if bank_out:
         bank_box = bank_box.translate(cq.Vector(0, 0, lay.rim_z + BANK_OUT_LIFT - lay.bank_bay.z0))
     mt1 = lay.pins[f"{board}/MT1"]
@@ -250,7 +250,7 @@ def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMB
                   ("bank", bank_box), ("hw:hinge-rod", hinge_rod(lay))]
     base_items += [(f"hw:catch-magnet-base-{i}", _zcyl(c.cx, c.cy, c.z0, c.z1, MAGNET_D / 2))
                    for i, c in enumerate(lay.lid_catch, 1)]
-    lid_items = [("lid", lid(lay)), ("monitor", monitor_block(lay, monitor))]
+    lid_items = [("lid", lid(lay)), ("monitor", monitor_block(lay))]
     if lay.boost_in_lid:
         lid_items.append(("boost", boost_block(lay)))
     lid_items += [(f"hw:catch-magnet-lid-{i}", _zcyl(m.cx, m.cy, m.z0, m.z1, MAGNET_D / 2))

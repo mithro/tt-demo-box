@@ -65,8 +65,8 @@ def main() -> int:
         lay = L.layout(wall)
         o = lay.outer
         print(f"Demo box, {route} route: wall {wall} mm, base {o.size[0]:.2f} x "
-              f"{o.size[1]:.2f} x {o.size[2]:.2f} mm, kit {L.DESIGN_MONITOR} + "
-              f"{L.DESIGN_BANK}\n")
+              f"{o.size[1]:.2f} x {o.size[2]:.2f} mm, kit {lay.monitor} + "
+              f"{lay.bank}\n")
         report = checks.Report()
         for proof in checks.PROOFS:
             proof(report, lay)

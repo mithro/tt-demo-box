@@ -356,12 +356,29 @@ def test_port_room_and_bank_bay(lay):
     assert lay.port_room.x0 < j1 < lay.port_room.x1
 
 
+def test_layout_carries_its_kit(lay):
+    """R33: the layout records the bank and monitor it was laid out for."""
+    assert (lay.bank, lay.monitor) == (L.DESIGN_BANK, L.DESIGN_MONITOR)
+    other = L.layout(lay.wall, bank="iniu-p512")
+    assert (other.bank, other.monitor) == ("iniu-p512", L.DESIGN_MONITOR)
+
+
 @pytest.mark.parametrize("bank", sorted(BATTERIES))
 def test_every_bank_as_design_bank(bank):
+    """R33: ``layout(wall, bank=k)`` is a whole, proved box for bank k, in
+    both routes: its contents and knuckle ranges are its own bank's, and
+    every proof passes on it."""
+    from demobox import checks as C
     for wall in L.ROUTES.values():
         ref = L.layout(wall)
         lay = L.layout(wall, bank=bank)
         b = BATTERIES[bank]
+        assert f"bank {bank}" in L.base_contents(lay)
+        report = C.Report()
+        for proof in C.PROOFS:
+            proof(report, lay)
+        failed = [f"{what}: {detail}" for ok, what, detail in report.results if not ok]
+        assert not failed, (bank, wall, failed)
         assert lay.bank_bay.size[0] >= b.size[0] + 2 * L.SLACK - EPS
         assert lay.bank_bay.size[1] >= b.size[1] + 2 * L.SLACK - EPS
         assert lay.bank_bay.size[2] >= b.size[2] + L.SLACK - EPS
@@ -609,3 +626,14 @@ def test_tinyvga_offset_places_the_keepout(lay):
         k = lay.board_keepouts[f"{key}/tinyvga"]
         lo = _to_base(lay, u.x0 + dx, u.y1 + dy, u.z0 + dz)
         assert (k.x0, k.y0, k.z0) == pytest.approx(lo)
+
+
+def test_knuckle_x_is_the_kits_own():
+    """R33: the knuckles of a box laid out for the INIU start FIT past the
+    INIU's bay, not past a phantom design bank's: wall + port room + the
+    bank's length + 2 SLACK + FIT (2.4 + 23 + 104 + 2 + 0.5 = 131.9, printed)."""
+    lay = L.layout(L.ROUTES["printed"], bank="iniu-p512")
+    port = max(max(CABLES[k].plug[0] for k in L.BANK_SIDE_PLUGS) + L.SLACK, L.FINGERTIP_D)
+    assert port == pytest.approx(23.0)
+    first = min(a for a, b in lay.knuckle_x if b - a >= L.KNUCKLE_LEN)
+    assert first == pytest.approx(2.4 + 23.0 + 104.0 + 2.0 + 0.5)

@@ -205,7 +205,7 @@ def assembly(angle_deg: float, bank_out: bool, monitor: str = ASSEMBLY_MONITOR,
     loc = lay.lid_location(angle_deg)
     mag_base, mag_lid = _magnet_blocks(lay)
 
-    bank_box = S.bx(S.packed_bank(lay, bank))
+    bank_box = S.bx(S.packed_bank(lay))
     if bank_out:
         bank_box = bank_box.translate(
             cq.Vector(0, 0, lay.rim_z + S.BANK_OUT_LIFT - lay.bank_bay.z0))
@@ -222,7 +222,7 @@ def assembly(angle_deg: float, bank_out: bool, monitor: str = ASSEMBLY_MONITOR,
                    for i, c in enumerate(lay.lid_catch, 1)]
     lid_items = [(n, p.solid()) for n, p in body.panels.items() if p.frame == "lid"]
     lid_items += [("knuckles-lid", knuckles_lid(lay, t)), *mag_lid,
-                  ("monitor", S.monitor_block(lay, monitor))]
+                  ("monitor", S.monitor_block(lay))]
     if lay.boost_in_lid:
         lid_items.append(("boost", S.boost_block(lay)))
     lid_items += [(f"hw:catch-magnet-lid-{i}", S.zcyl(m.cx, m.cy, m.z0, m.z1, MAGNET_D / 2))

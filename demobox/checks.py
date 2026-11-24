@@ -7,8 +7,9 @@ build route and prints the ``Report``.  A proof records
 an UNCONFIRMED figure is printed, never trusted silently and never a failure
 on its own.
 
-The box is sized for one kit (``layout.DESIGN_MONITOR``, ``DESIGN_BANK``, both
-board revisions), so the proofs are about that kit.  ``monitor_fit_report``
+The box is sized for one kit (the layout's ``bank`` and ``monitor``, both
+board revisions), so the proofs are about that kit (R33: always the one the
+layout records, never the DESIGN_* defaults).  ``monitor_fit_report``
 and ``bank_fit_report`` say which of the other listed parts would also fit;
 they are information, never a failure.
 
@@ -216,7 +217,7 @@ def pigtail_exit(lay: Layout) -> tuple[float, float, float]:
     """Where the monitor's cable leaves its panel (lid frame, closed): on the
     cable edge (the hinge side of the panel), ``pigtail_exit_u`` from the
     panel's left, half-way through the panel's depth."""
-    m = MONITORS[L.DESIGN_MONITOR]
+    m = MONITORS[lay.monitor]
     ms = lay.monitor_space
     return (ms.x0 + SLACK + m.pigtail_exit_u, ms.y1 - SLACK, (ms.z0 + ms.z1) / 2)
 
@@ -358,8 +359,8 @@ def usb_path(lay: Layout, rev: str) -> list[tuple[float, float, float]]:
     5. along the plug to J1.
 
     The legs 0..4 are cable; 4..5 is the plug."""
-    b = BATTERIES[L.DESIGN_BANK]
-    c = usb_cable()
+    b = BATTERIES[lay.bank]
+    c = usb_cable(lay)
     bay, k = lay.bank_bay, lay.board_keepouts[f"{rev}/usb_plug"]
     port = (bay.x0 + SLACK, bay.y0 + SLACK + b.size[1] / 2, bay.z0 + b.size[2] / 2)
     zc = (k.z0 + k.z1) / 2
@@ -369,10 +370,10 @@ def usb_path(lay: Layout, rev: str) -> list[tuple[float, float, float]]:
             (exit_[0], exit_[1] + c.dia, zc), exit_, (k.x1, (k.y0 + k.y1) / 2, zc)]
 
 
-def usb_cable():
-    """The design bank's cable to the board: its own built-in cable, or the
+def usb_cable(lay: Layout):
+    """The layout's bank's cable to the board: its own built-in cable, or the
     box's right-angle USB-C cable in its socket."""
-    b = BATTERIES[L.DESIGN_BANK]
+    b = BATTERIES[lay.bank]
     return CABLES["bank-built-in" if b.cable == "built-in" else "usb-c-right-angle"]
 
 
@@ -409,9 +410,9 @@ def bank_fit_report(lay: Layout) -> list[tuple[str, bool, str]]:
 # --- the proofs ------------------------------------------------------------------
 
 def kit_fits(report: Report, lay: Layout) -> None:
-    """The design monitor in ``monitor_space`` and the design bank in
+    """The layout's monitor in ``monitor_space`` and its bank in
     ``bank_bay``, each with SLACK."""
-    m = MONITORS[L.DESIGN_MONITOR]
+    m = MONITORS[lay.monitor]
     if not m.confirmed:
         report.unconfirmed(f"monitor {m.key}", _placeholders(m.sources))
     ms = lay.monitor_space
@@ -423,7 +424,7 @@ def kit_fits(report: Report, lay: Layout) -> None:
                  f"{_f(ms.size[2])}: {_f(room[0] / 2)}, {_f(room[1] / 2)} a side >= {SLACK}, "
                  f"depth {_f(room[2])} to spare")
 
-    b = BATTERIES[L.DESIGN_BANK]
+    b = BATTERIES[lay.bank]
     if not b.confirmed:
         report.unconfirmed(f"battery {b.key}", _placeholders(b.sources))
     bay = lay.bank_bay
@@ -521,9 +522,9 @@ def boards_seat(report: Report, lay: Layout) -> None:
 
 
 def packed_bank(lay: Layout) -> Box:
-    """The design bank as packed: on the bay floor, centred in the bay in X
+    """The layout's bank as packed: on the bay floor, centred in the bay in X
     and Y (SLACK each side), base frame."""
-    b, bay = BATTERIES[L.DESIGN_BANK], lay.bank_bay
+    b, bay = BATTERIES[lay.bank], lay.bank_bay
     l_, w, h = b.size
     x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
     return Box(x0, y0, bay.z0, x0 + l_, y0 + w, bay.z0 + h, f"bank {b.key}")
@@ -531,7 +532,7 @@ def packed_bank(lay: Layout) -> Box:
 
 def bank_lifts_out(report: Report, lay: Layout) -> None:
     """R12: with the lid at LID_OPEN_DEG nothing (the lid and the hinge's
-    seal bead included) is over the design bank's own footprint, as packed in
+    seal bead included) is over the layout's bank's own footprint, as packed in
     the bay, above the rim: the bank lifts straight out.  (The swinging lid against the bank, and every
     other base content, is ``hinge_sweep``'s.)"""
     bank, a = packed_bank(lay), L.LID_OPEN_DEG
@@ -564,9 +565,9 @@ def bank_lifts_out(report: Report, lay: Layout) -> None:
 
 
 def button_reachable(report: Report, lay: Layout) -> None:
-    """The design bank's button is at the port room end, and the port room
+    """The layout's bank's button is at the port room end, and the port room
     takes a fingertip on it."""
-    b = BATTERIES[L.DESIGN_BANK]
+    b = BATTERIES[lay.bank]
     pr, bay = lay.port_room, lay.bank_bay
     if b.button is None:
         report.check(True, f"{b.key}: no button to reach", "the bank has no power button")
@@ -608,7 +609,7 @@ def lid_closed_clears(report: Report, lay: Layout) -> None:
     if not board_mod.TALLEST_COMPONENT_CONFIRMED:
         report.unconfirmed("TALLEST_COMPONENT", f"{board_mod.TALLEST_COMPONENT} mm: "
                            f"{board_mod.TALLEST_COMPONENT_SOURCE.note}")
-    m = MONITORS[L.DESIGN_MONITOR]
+    m = MONITORS[lay.monitor]
     hz = lay.hinge_axis[1]
     face = hz + lay.lid_outer.z1 - lay.wall - L.TAPE_T - m.panel[2]
     need = L.CLOSED_CLEARANCE
@@ -620,7 +621,7 @@ def lid_closed_clears(report: Report, lay: Layout) -> None:
         tops[f"{k} tallest component"] = lay.board_origin[2] + board_mod.TALLEST_COMPONENT
     for p in lay.pins.values():
         tops[p.what] = p.z1
-    b = BATTERIES[L.DESIGN_BANK]
+    b = BATTERIES[lay.bank]
     tops[f"bank {b.key}"] = lay.bank_bay.z0 + b.size[2]
     if not lay.boost_in_lid:
         tops["boost module"] = lay.boost_pocket.z0 + BOOST.plug[2]
@@ -813,7 +814,7 @@ def cables_route(report: Report, lay: Layout) -> None:
     for c in CABLES.values():
         if not c.confirmed:
             report.unconfirmed(f"cable {c.key}", _placeholders(c.sources))
-    m = MONITORS[L.DESIGN_MONITOR]
+    m = MONITORS[lay.monitor]
     r = PIGTAIL.dia / 2
     ms, n, strip = lay.monitor_space, lay.hinge_notch, lay.lid_strip
     ex = pigtail_exit(lay)
@@ -871,7 +872,7 @@ def cables_route(report: Report, lay: Layout) -> None:
                      f"(z {_f(end[2])}) allows {_f((lid_top - end[2]) / 2)}, the room behind the "
                      f"run's end (y {_f(end[1])} to {_f(yd)}) {_f(yd - end[1])}")
 
-        c = usb_cable()
+        c = usb_cable(lay)
         path = usb_path(lay, k)
         length = manhattan_length(path)
         bend = max_bend_r(path[:-1])
@@ -917,8 +918,8 @@ def _budget(lay: Layout) -> dict[str, float]:
     keep-outs, not the VGA plug), port room + bay, the VGA plug's keep-out
     in the bank row's corner (from the part data) + SLACK, the monitor."""
     w, s = lay.wall, SLACK
-    b = BATTERIES[L.DESIGN_BANK]
-    mw, mh, md = MONITORS[L.DESIGN_MONITOR].panel
+    b = BATTERIES[lay.bank]
+    mw, mh, md = MONITORS[lay.monitor].panel
     ks = [v for key, v in lay.board_keepouts.items() if not key.endswith("/vga_plug")]
     u = ks[0]
     for k in ks[1:]:
