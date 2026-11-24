@@ -8,6 +8,9 @@ Open it and the lid stands at 100 degrees showing the VGA designs cycling; the b
 in front of it is what starts the conversation. Nothing to plug in. The power bank slides out
 of a drawer so it can be taken out at airport security.
 
+Shut, two pairs of 6 x 3 mm disc magnets in the front of the base and the lid hold it closed, so
+it survives a backpack.
+
 Two build routes from one design: 3D printed (220 x 220 mm bed) and laser-cut 3 mm plywood
 (300 x 200 mm bed).
 
@@ -67,6 +70,7 @@ Hardware, printed route (M3 throughout):
 <!-- hardware-printed:begin -->
 | Qty | Part |
 |---:|---|
+| 4 | 6 x 3 mm disc magnet |
 | 15 | M3 heat-set insert, D4.0 x 5.7 |
 | 2 | M3 x 40 bolt + nyloc (hinge pin) |
 | 1 | M3 x 6 pan-head (bezel clip) |
@@ -82,7 +86,7 @@ Hardware, laser route (3 mm plywood, plus the printed hinge, bezel, clip, pin an
 | Qty | Part |
 |---:|---|
 | 4 | 12 x 4 mm self-adhesive rubber foot |
-| 2 | 6 x 3 mm disc magnet |
+| 6 | 6 x 3 mm disc magnet |
 | 2 | M3 nyloc nut (hinge) |
 | 40 | M3 square nut |
 | 1 | M3 x 10 pan-head screw (bezel clip) |

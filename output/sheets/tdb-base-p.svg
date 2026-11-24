@@ -80,12 +80,22 @@
 <polyline points="39.5147,174.5755 38.5547,174.5755" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,174.5755 39.5147,181.16" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="121.2947,181.16 39.5147,181.16" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
-<polyline points="121.2947,97.28 121.2947,181.16" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,170.12 121.2947,181.16" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,170.12 117.2947,170.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="117.2947,170.12 117.2947,166.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,166.12 117.2947,166.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,112.32 121.2947,166.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,112.32 117.2947,112.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="117.2947,112.32 117.2947,108.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,108.32 117.2947,108.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,97.28 121.2947,108.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="121.2947,97.28 39.5147,97.28" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,97.28 39.5147,115.2355" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,115.2355 38.5547,115.2355" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="38.5547,115.2355 38.5547,96.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="122.2547,96.32 38.5547,96.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="119.2947,166.92 118.737,167.0574 118.3071,167.4383 118.1034,167.9754 118.1727,168.5455 118.4989,169.0182 119.0075,169.2851 119.5818,169.2851 120.0904,169.0182 120.4167,168.5455 120.4859,167.9754 120.2823,167.4383 119.8523,167.0574 119.2947,166.92" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="119.2947,109.12 118.737,109.2574 118.3071,109.6383 118.1034,110.1754 118.1727,110.7455 118.4989,111.2182 119.0075,111.4851 119.5818,111.4851 120.0904,111.2182 120.4167,110.7455 120.4859,110.1754 120.2823,109.6383 119.8523,109.2574 119.2947,109.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="38.5547,128.0355 38.5547,115.2355" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="38.5547,146.191 38.5547,128.0355" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="38.5547,154.991 38.5547,146.191" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
@@ -109,15 +119,21 @@
 <polyline points="39.5147,124.3955 39.5147,118.8755" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,118.8755 39.5147,115.9955" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,115.9955 39.5147,115.2355" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,153.733 121.2947,166.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,170.12 121.2947,181.16" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,97.28 121.2947,108.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="121.2947,112.32 121.2947,149.733" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,128.0355 38.5547,128.0355" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,146.191 38.5547,146.191" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,154.991 38.5547,154.991" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="39.5147,161.7755 38.5547,161.7755" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="120.0947,177.16 117.2947,177.16" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
-<polyline points="120.0947,177.16 120.0947,153.733" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="120.0947,177.16 120.0947,170.12" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="120.0947,166.12 120.0947,153.733" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="121.2947,153.733 120.0947,153.733" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="121.2947,149.733 120.0947,149.733" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
-<polyline points="120.0947,149.733 120.0947,101.28" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="120.0947,149.733 120.0947,112.32" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="120.0947,108.32 120.0947,101.28" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="120.0947,101.28 117.2947,101.28" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="77.1347,179.96 77.1347,155.92" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="86.1747,155.92 77.1347,155.92" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
@@ -252,15 +268,19 @@
 <text x="140.6547" y="86.4807" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">4.</text>
 <text x="145.1967" y="86.4807" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Drawer opening from the floor&#x27;s top (Z 2.40), topped by 45 deg peaks at 9.76 pitch.</text>
 <text x="140.6547" y="92.0074" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">5.</text>
-<text x="145.1967" y="92.0074" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">UNCONFIRMED inputs (placeholders; make verify lists each): all 3 monitors; board</text>
-<text x="145.1967" y="96.5342" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">USB_C_AXIS_ABOVE_PCB, TINYVGA_Z_OFFSET, TinyVGA heights,</text>
-<text x="145.1967" y="101.0609" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">TALLEST_COMPONENT; all 5 cables.</text>
-<text x="140.6547" y="107.5877" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">SOURCES</text>
-<line x1="140.6547" y1="108.9877" x2="279" y2="108.9877" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
-<text x="140.6547" y="113.6877" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
-<text x="145.1967" y="113.6877" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/printed/body.py: base_tub, opening_profile</text>
-<text x="140.6547" y="119.2144" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">2.</text>
-<text x="145.1967" y="119.2144" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/layout.py (layout(2.4))</text>
+<text x="145.1967" y="92.0074" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Lid catch: 2 magnet pockets D6.00 x 3.20 deep, open on the front wall&#x27;s rim, at Y</text>
+<text x="145.1967" y="96.5342" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">7.40, X 35.00, 179.50; each in a 10.00 square block 6.00 deep under the rim. The</text>
+<text x="145.1967" y="101.0609" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">6.00 x 3.00 mm disc magnet sits 0.20 below the rim.</text>
+<text x="140.6547" y="106.5877" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">6.</text>
+<text x="145.1967" y="106.5877" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">UNCONFIRMED inputs (placeholders; make verify lists each): all 3 monitors; board</text>
+<text x="145.1967" y="111.1144" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">USB_C_AXIS_ABOVE_PCB, TINYVGA_Z_OFFSET, TinyVGA heights,</text>
+<text x="145.1967" y="115.6412" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">TALLEST_COMPONENT; all 5 cables.</text>
+<text x="140.6547" y="122.1679" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">SOURCES</text>
+<line x1="140.6547" y1="123.5679" x2="279" y2="123.5679" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+<text x="140.6547" y="128.2679" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
+<text x="145.1967" y="128.2679" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/printed/body.py: base_tub, opening_profile</text>
+<text x="140.6547" y="133.7947" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">2.</text>
+<text x="145.1967" y="133.7947" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">demobox/layout.py (layout(2.4))</text>
 <rect x="151" y="150" width="134" height="48" fill="none" stroke="#000000" stroke-width="0.7"/>
 <line x1="151" y1="165" x2="285" y2="165" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
 <text x="153.5" y="158.8" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="6.8587" fill="#000000" text-anchor="start" font-weight="bold">BASE TUB</text>
@@ -269,7 +289,7 @@
 <text x="152.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">generated</text>
 <line x1="184.5" y1="176" x2="184.5" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
 <text x="186.1" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">VERSION</text>
-<text x="186.1" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">9165be3</text>
+<text x="186.1" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">71431adcd9</text>
 <line x1="218" y1="176" x2="218" y2="165" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
 <text x="219.6" y="168.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">UNITS</text>
 <text x="219.6" y="174.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">mm</text>

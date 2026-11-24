@@ -1,7 +1,7 @@
 Laser route hardware (3 mm plywood)
 
    4  12 x 4 mm self-adhesive rubber foot
-   2  6 x 3 mm disc magnet
+   6  6 x 3 mm disc magnet
    2  M3 nyloc nut (hinge)
   40  M3 square nut
    1  M3 x 10 pan-head screw (bezel clip)

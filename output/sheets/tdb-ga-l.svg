@@ -1250,12 +1250,11 @@
 <polyline points="254.9669,83.2054 256.1669,83.2054" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="256.1669,83.2054 256.1669,86.2188" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="256.1669,86.2188 254.9669,86.2188" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
-<polyline points="272.4669,88.8654 271.6669,88.8654" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
-<polyline points="271.0669,88.4054 271.0669,87.0454" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="271.6669,86.5854 272.4669,86.5854" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="266.6569,82.5921 266.6569,83.3921" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="266.1969,83.9921 264.8369,83.9921" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="264.3769,83.3921 264.3769,82.5921" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+<polyline points="272.4669,86.8321 271.6669,86.8321" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="191.8869,88.6321 190.6869,88.6321" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="190.6869,88.6321 190.6869,78.9921" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
 <polyline points="190.6869,78.9921 191.8869,78.9921" fill="none" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
@@ -1935,7 +1934,7 @@
 <text x="364.6754" y="31.4333" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">TDB-CUT-L</text>
 <rect x="279.0669" y="33.2111" width="120.5892" height="5.5556" fill="none" stroke="#000000" stroke-width="0.25"/>
 <text x="289.298" y="36.9889" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">2</text>
-<text x="299.8591" y="36.9889" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">17</text>
+<text x="299.8591" y="36.9889" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">21</text>
 <text x="303.4591" y="36.9889" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Printed fittings (blocks)</text>
 <text x="364.6754" y="36.9889" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">STEP</text>
 <rect x="279.0669" y="38.7667" width="120.5892" height="5.5556" fill="none" stroke="#000000" stroke-width="0.25"/>
@@ -1975,7 +1974,7 @@
 <text x="364.6754" y="75.8778" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">bought</text>
 <rect x="279.0669" y="77.6556" width="120.5892" height="5.5556" fill="none" stroke="#000000" stroke-width="0.25"/>
 <text x="289.298" y="81.4333" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">10</text>
-<text x="299.8591" y="81.4333" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">2</text>
+<text x="299.8591" y="81.4333" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">6</text>
 <text x="303.4591" y="81.4333" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">6 x 3 mm disc magnet</text>
 <text x="364.6754" y="81.4333" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">bought</text>
 <rect x="279.0669" y="83.2111" width="120.5892" height="5.5556" fill="none" stroke="#000000" stroke-width="0.25"/>
@@ -2121,7 +2120,7 @@
 <text x="140.3767" y="185.5326" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">drawer slides out of the left side by 166.50.</text>
 <text x="135.8347" y="191.0594" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">4.</text>
 <text x="140.3767" y="191.0594" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Bought parts are counted from the route&#x27;s data; monitor</text>
-<text x="140.3767" y="195.5861" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">listings are AliExpress item numbers. 1*: fit one monitor and</text>
+<text x="140.3767" y="195.5861" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">sources are listing numbers or shops. 1*: fit one monitor and</text>
 <text x="140.3767" y="200.1129" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">one power bank of those listed, with its insert and its packing.</text>
 <text x="140.3767" y="204.6396" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Hinge axis: the base&#x27;s back-top edge, Y 210.45, Z 92.85.</text>
 <text x="135.8347" y="210.1664" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">5.</text>
@@ -2147,7 +2146,7 @@
 <text x="244.6" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">generated</text>
 <line x1="284.25" y1="263" x2="284.25" y2="252" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
 <text x="285.85" y="255.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">VERSION</text>
-<text x="285.85" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">9165be3</text>
+<text x="285.85" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">71431adcd9</text>
 <line x1="325.5" y1="263" x2="325.5" y2="252" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
 <text x="327.1" y="255.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">UNITS</text>
 <text x="327.1" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">mm</text>
