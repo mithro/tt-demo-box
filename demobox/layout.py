@@ -40,22 +40,34 @@ Base rows
 * **Board row (front).**  Both revisions' keep-outs (``"<rev>/envelope"``,
   ``"<rev>/usb_plug"``, ``"<rev>/tinyvga"``) are placed together; their union
   starts at ``wall + SLACK`` in X and in Y.  The row is that union plus
-  ``SLACK`` at each X end.  ``vga_adapter`` is whichever of False/True gives
-  the shorter row (ties: False, no adapter part); the TinyVGA keep-out is
-  ``TINYVGA.plug_keepout(straight=not vga_adapter)``.
+  ``SLACK`` at each X end.  The TinyVGA keep-out is its PCB, its DE-15 and a
+  left/right-angle 90 degree VGA adapter (``vga_adapter`` is always True,
+  spec Decision 3, ruling R16a): ``CABLES["vga-90-adapter"].plug`` = 35 along
+  the D-sub's long axis (base Y), 17 out of the DE-15 face (base +X), 20 tall,
+  its socket on its end face towards the bank row (base +Y; assumed, see the
+  cable's Source).  The monitor's VGA plug goes into that socket from +Y:
+  ``"<rev>/vga_plug"`` is the plug (``PLUG_BODY_LEN``) and its stiff
+  ``STRAIGHT_RUN``, along +Y into the bank row's +X back corner, its hood
+  ``plug_width`` across X.
 * **Bank row (behind),** starting ``SLACK`` behind the board row, ``bank W +
   2*SLACK`` deep.  Along X from the left wall: ``port_room`` (by J1, so the
   bank-to-board cable is short; long enough for the longest bank-side plug +
   SLACK, and at least ``FINGERTIP_D`` for the bank's end button), then
-  ``bank_bay`` (the bank + SLACK each side), then ``boost_pocket`` (the boost
-  module + SLACK each side) at the row's +X end, on the floor: along X if the
-  row then stays within the width the board row and the monitor set, else
-  turned 90 degrees (its length along Y, within the bank row's depth) if
-  that fits.  Only if neither fits does it go in ``lid_strip``
-  (``boost_in_lid``).
-* **Width** = max(board row, bank row, monitor W + 2*SLACK) + 2*wall.
-  **Depth** = wall + SLACK + board row Y + SLACK + bank row Y + SLACK + wall,
-  and at least monitor H + 2*SLACK + 2*wall.
+  ``bank_bay`` (the bank + SLACK each side).  The VGA plug's keep-out sits
+  in the row's +X back corner (where the board puts it; it must clear the
+  bay and end within the row).  ``boost_pocket`` (the boost module + SLACK
+  each side) goes on the floor in room the bay and the plug leave -- between
+  them, or past the plug -- along X or turned 90 degrees (R10 as amended by
+  R16a); if none is left it goes in ``lid_strip`` (``boost_in_lid``).
+* **Width** = max(board row, port room + bay, the VGA plug's keep-out +
+  SLACK, monitor W + 2*SLACK) + 2*wall.
+  **Depth** = the largest of three terms: *rows* = wall + SLACK + board row
+  Y + SLACK + bank row Y + SLACK + wall; *monitor* = monitor H + 2*SLACK +
+  2*wall (+ CATCH_BLOCK only when the lid's catch blocks reach over the
+  monitor in X, R18b); *pigtail* = the VGA plug's stiff-run end + the
+  pigtail's ``min_bend_r`` + ``PIGTAIL_ROD_CLEAR`` + ``KNUCKLE_R`` (R18: the
+  pigtail drops ``PIGTAIL_ROD_CLEAR`` in front of the hinge rod and turns
+  forward into the run's end with a full bend radius of room).
 * **Height.**  ``rim_z = wall + max(bank H, board stack H) + SLACK``; the
   board stack is the keep-out union's z extent.  The board stands on
   ``plinth`` (floor to PCB underside), lifted so the union's top is at
@@ -74,7 +86,9 @@ Lid
 ---
 A tray over the base footprint, ``wall + TAPE_T + monitor depth +
 CLOSED_CLEARANCE`` deep.  The monitor is taped to the inside face, centred
-in X, against the free (front) edge wall, cable edge towards the hinge:
+in X, against the free (front) edge wall -- or, when the lid's catch blocks
+reach over it in X (a box barely wider than the monitor), ``CATCH_BLOCK``
+behind that wall, past them -- cable edge towards the hinge:
 ``monitor_space`` is the panel plus SLACK each side in X and Y, its depth
 exactly the panel's, its face ``CLOSED_CLEARANCE`` above the seam.
 ``lid_strip`` is the rest of the inside, between the monitor and the
@@ -85,8 +99,18 @@ Hinge and catch
 ---------------
 The hinge axis is on the seam, ``KNUCKLE_R`` in from the back face, so the
 knuckles stay inside base + lid.  ``hinge_notch`` is the gap in the knuckle
-line at the X of the monitor's pigtail exit, the pigtail's diameter (the VGA
-cable's) + 2*FIT wide; the plug does not pass, the cable is threaded first.
+line on the VGA plug's run axis (the pigtail drops straight to it there; in
+the lid it runs over from the monitor's exit), the pigtail's diameter
+(``CABLES["monitor-pigtail"]``) + 2*FIT wide; the plug does not pass, the
+cable is threaded first.  ``hinge_relief_r`` is the radius about the axis
+within which the hinge's two kinds of segment are relieved (ruling R11): the
+furthest any lid point that enters the base's YZ profile, at any angle of
+``sweep_angles()``, gets from the axis, plus FIT.  Along X there are three
+kinds of segment (ruling R15): lid-knuckle (the base cut back to
+``hinge_relief_r``, the lid whole), base-knuckle (the lid cut back, the base
+keeps a ``KNUCKLE_R`` knuckle) and open (both cut back).  Knuckles go only in
+``knuckle_x``: the X ranges with no ``base_contents`` within ``hinge_relief_r``
+of the axis in YZ, less the notch.
 ``lid_catch`` is two magnets under the front rim, each in a ``CATCH_BLOCK``
 block against the inside of the front wall, at the X nearest its front
 corner where the block clears every board-row keep-out in XY.
@@ -95,7 +119,7 @@ corner where the block clears every board-row keep-out in XY.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from tools.schema import Source
@@ -128,6 +152,8 @@ BANK_SIDE_PLUGS = ("usb-c-right-angle", "usb-a-c", "bank-built-in")
 # --- design choices ----------------------------------------------------------
 #: Hinge knuckle radius (``demobox.shared.hinge`` uses this one).
 KNUCKLE_R = 4.0
+#: Hinge knuckle length along X (``demobox.shared.hinge`` uses this one).
+KNUCKLE_LEN = 10.0
 #: The bought hinge rod: "3 mm steel rod or 2.85 mm filament".
 PIN_ROD_D = 3.0
 #: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
@@ -178,15 +204,21 @@ UNCONFIRMED: tuple[tuple[str, float, Source], ...] = (
 )
 
 _USB = CABLES["usb-c-right-angle"]   # bank to board, right-angle at J1
-_PIGTAIL = CABLES["vga-slim"]        # the monitor's own VGA cable: a slim VGA cable's figures
+_PIGTAIL = CABLES["monitor-pigtail"]  # the monitor's own VGA cable (ruling R13)
 _BOOST = CABLES["usb-12v-boost"]
+_ADAPTER = CABLES["vga-90-adapter"]
+#: R18: the pigtail's centre stays this far from the hinge axis, in front of
+#: the full-width hinge rod (cable radius + rod radius + FIT).
+PIGTAIL_ROD_CLEAR = _PIGTAIL.dia / 2 + PIN_ROD_D / 2 + FIT  # R16a: left/right-angle type (assumed; UNCONFIRMED)
 
 
 # --- board-frame keep-outs ---------------------------------------------------
 
 def _usb_plug(key: str) -> Box:
     """The right-angle USB-C plug in J1, board frame: out past the shell's
-    overhang along board +y, its cable leaving downward at the far end."""
+    overhang along board +y.  Its cable leaves the far end sideways, towards
+    the bank row (board +x, base +Y): the shortest run to the bank, and the
+    way ``checks.usb_path`` routes it."""
     spec = board_spec(key)
     j1 = next(f for f in spec.features if f.kind == "usb_power")
     length, width, height = _USB.plug
@@ -206,17 +238,45 @@ def tinyvga_offset(key: str) -> tuple[float, float, float]:
             pmod.body_y0, TINYVGA_Z_OFFSET)
 
 
-def _tinyvga(key: str, adapter: bool) -> Box:
-    """TinyVGA PCB + DE-15 + VGA plug keep-out in J13 (pmod3), board frame."""
-    u = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(straight=not adapter))
+def _adapter_frame() -> Box:
+    """R16a: the left/right-angle 90 degree VGA adapter on the DE-15, TinyVGA
+    frame: ``_ADAPTER.plug`` = (35 along the D-sub's long axis, 17 out of the
+    DE-15 face, 20 tall), centred on the socket and on the plug's axis."""
+    span, out, tall = _ADAPTER.plug
+    d = TINYVGA.de15
+    cx, zc = (d.x0 + d.x1) / 2, (TINYVGA.plug_z0 + TINYVGA.plug_z1) / 2
+    return Box(cx - span / 2, d.y0 - out, zc - tall / 2, cx + span / 2, d.y0, zc + tall / 2,
+               "VGA 90 degree adapter")
+
+
+def _vga_plug_frame() -> Box:
+    """R16a: the monitor's VGA plug in the adapter's socket, on the adapter's
+    end face towards the bank row (TinyVGA +x, base +Y), and its stiff
+    ``STRAIGHT_RUN`` behind it, TinyVGA frame.  The plug's hood (``plug_width``
+    wide, ``plug_z0..plug_z1``) is centred on the adapter's mid-depth."""
+    a, t = _adapter_frame(), TINYVGA
+    yc = (a.y0 + a.y1) / 2
+    return Box(a.x1, yc - t.plug_width / 2, t.plug_z0,
+               a.x1 + t.plug_body_len + t.straight_run, yc + t.plug_width / 2, t.plug_z1,
+               "VGA plug + stiff run")
+
+
+def _tinyvga(key: str) -> Box:
+    """TinyVGA PCB + DE-15 + the 90 degree adapter in J13 (pmod3), board frame."""
+    u = TINYVGA.pcb.union(TINYVGA.de15).union(_adapter_frame())
     return Box(u.x0, u.y0, u.z0, u.x1, u.y1, u.z1,
-               f"{key} TinyVGA + VGA plug").moved(*tinyvga_offset(key))
+               f"{key} TinyVGA + adapter").moved(*tinyvga_offset(key))
 
 
-def _board_frame(key: str, adapter: bool) -> dict[str, Box]:
+#: The board-row parts; ``vga_plug`` lies in the bank row's +X back corner.
+ROW_PARTS = ("envelope", "usb_plug", "tinyvga")
+
+
+def _board_frame(key: str) -> dict[str, Box]:
     return {"envelope": board_envelope(key),
             "usb_plug": _usb_plug(key),
-            "tinyvga": _tinyvga(key, adapter)}
+            "tinyvga": _tinyvga(key),
+            "vga_plug": _vga_plug_frame().moved(*tinyvga_offset(key))}
 
 
 def _union(boxes) -> Box:
@@ -227,8 +287,10 @@ def _union(boxes) -> Box:
     return u
 
 
-def _all_board_frame(adapter: bool) -> Box:
-    return _union(b for k in BOARD_KEYS for b in _board_frame(k, adapter).values())
+def _row_board_frame() -> Box:
+    """Both revisions' board-row keep-outs (not the VGA plug), board frame."""
+    return _union(b for k in BOARD_KEYS for part, b in _board_frame(k).items()
+                  if part in ROW_PARTS)
 
 
 def _to_base(b: Box, origin: tuple[float, float, float], what: str) -> Box:
@@ -237,10 +299,10 @@ def _to_base(b: Box, origin: tuple[float, float, float], what: str) -> Box:
     return Box(ox - b.y1, oy + b.x0, oz + b.z0, ox - b.y0, oy + b.x1, oz + b.z1, what)
 
 
-def _board_keepouts(origin: tuple[float, float, float], adapter: bool) -> dict[str, Box]:
+def _board_keepouts(origin: tuple[float, float, float]) -> dict[str, Box]:
     """Both revisions' keep-outs in the base frame, keyed ``"<rev>/<part>"``."""
     return {f"{k}/{part}": _to_base(b, origin, f"{k} {part}")
-            for k in BOARD_KEYS for part, b in _board_frame(k, adapter).items()}
+            for k in BOARD_KEYS for part, b in _board_frame(k).items()}
 
 
 def exit_edge(m: Monitor) -> str:
@@ -262,8 +324,9 @@ class Layout:
     outer: Box                       # the base; outer.z1 == rim_z
     rim_z: float                     # the seam
     board_origin: tuple[float, float, float]
-    board_keepouts: dict[str, Box]   # "<rev>/envelope", "<rev>/usb_plug", "<rev>/tinyvga"
-    vga_adapter: bool                # a 90 degree VGA adapter on the TinyVGA
+    board_keepouts: dict[str, Box]   # "<rev>/envelope", "<rev>/usb_plug", "<rev>/tinyvga",
+                                     # "<rev>/vga_plug" (in the bank row's +X back corner)
+    vga_adapter: bool                # R16a: always True, the 90 degree VGA adapter
     plinth: Box                      # floor to the PCB underside
     plinth_relief: Box               # notch in the plinth under the v3.2 J1 plug
     pins: dict[str, Cyl]             # "MT2" (fixed), "<rev>/MT1" (the loose pin's places)
@@ -273,10 +336,15 @@ class Layout:
     boost_in_lid: bool
     hinge_axis: tuple[float, float]  # (y, z)
     hinge_notch: Box
+    hinge_relief_r: float            # R11: knuckle-segment relief radius about the axis
     lid_outer: Box                   # lid frame, closed
     monitor_space: Box               # lid frame, closed
     lid_strip: Box                   # lid frame, closed
     lid_catch: tuple[Cyl, ...]       # the base-side catch magnets
+    #: R15: the X ranges where a knuckle may go: no base content
+    #: (``base_contents``) within ``hinge_relief_r`` of the axis in YZ, and
+    #: not the pigtail's notch.  Everywhere else is an open segment.
+    knuckle_x: tuple[tuple[float, float], ...] = ()
 
     def catch_base_block(self, c: Cyl) -> Box:
         """The block holding catch magnet ``c`` under the base's rim (base frame)."""
@@ -319,6 +387,76 @@ class Layout:
                 * cq.Location(cq.Vector(0.0, 0.0, 0.0), cq.Vector(1.0, 0.0, 0.0), -angle_deg))
 
 
+def sweep_angles() -> list[float]:
+    """Every whole degree from 0 to LID_OPEN_DEG, and the stop itself."""
+    angles = [float(a) for a in range(0, int(math.floor(LID_OPEN_DEG)) + 1)]
+    if angles[-1] != LID_OPEN_DEG:
+        angles.append(float(LID_OPEN_DEG))
+    return angles
+
+
+def _hinge_relief_r(lid: Box, base: Box, hy: float, hz: float) -> float:
+    """R11: the furthest from the axis (hy, hz) any lid point gets while
+    inside the base's YZ profile, over ``sweep_angles()``, plus FIT.  The lid
+    profile turned to each angle is clipped to the base's; the clip is convex,
+    so its furthest point from the axis is a vertex."""
+    from shapely.geometry import Polygon, box as sbox
+    region = sbox(base.y0, base.z0, base.y1, base.z1)
+    corners = ((lid.y0, lid.z0), (lid.y1, lid.z0), (lid.y1, lid.z1), (lid.y0, lid.z1))
+    far = 0.0
+    for a in sweep_angles():
+        t = math.radians(-a)
+        prof = Polygon([(hy + y * math.cos(t) - z * math.sin(t), hz + y * math.sin(t) + z * math.cos(t))
+                        for y, z in corners])
+        inside = prof.intersection(region)
+        if inside.area > 0:
+            far = max(far, max(math.hypot(y - hy, z - hz) for y, z in inside.exterior.coords))
+    return far + FIT
+
+
+def base_contents(lay: Layout) -> dict[str, Box]:
+    """Everything in the base a lid or knuckle must miss, base frame: the
+    board keep-outs, the plinth, the pins (as boxes), the design bank as
+    packed (centred in the bay), the boost module's pocket (when in the base),
+    the port room (the bank cables' room) and the catch blocks."""
+    b = BATTERIES[DESIGN_BANK]
+    bay = lay.bank_bay
+    l_, w, h = b.size
+    x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
+    out = dict(lay.board_keepouts)
+    out["plinth"] = lay.plinth
+    out.update({k: Box(p.cx - p.r, p.cy - p.r, p.z0, p.cx + p.r, p.cy + p.r, p.z1, p.what)
+                for k, p in lay.pins.items()})
+    out[f"bank {b.key}"] = Box(x0, y0, bay.z0, x0 + l_, y0 + w, bay.z0 + h, f"bank {b.key}")
+    if not lay.boost_in_lid:
+        out["boost pocket"] = lay.boost_pocket
+    out["port room"] = lay.port_room
+    for i, c in enumerate(lay.lid_catch, 1):
+        out[f"lid catch block {i}"] = lay.catch_base_block(c)
+    return out
+
+
+def _yz_distance(b: Box, y: float, z: float) -> float:
+    return math.hypot(max(b.y0 - y, 0.0, y - b.y1), max(b.z0 - z, 0.0, z - b.z1))
+
+
+def _knuckle_x(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """R15: X 0..width less every base content within ``hinge_relief_r`` of
+    the axis in YZ, and less the pigtail's notch."""
+    hy, hz = lay.hinge_axis
+    blocked = [(b.x0, b.x1) for b in base_contents(lay).values()
+               if _yz_distance(b, hy, hz) <= lay.hinge_relief_r]
+    blocked.append((lay.hinge_notch.x0, lay.hinge_notch.x1))
+    ranges, x = [], lay.outer.x0
+    for a, b in sorted(blocked):
+        if a > x:
+            ranges.append((x, a))
+        x = max(x, b)
+    if x < lay.outer.x1:
+        ranges.append((x, lay.outer.x1))
+    return tuple(ranges)
+
+
 def _catch_x0(keepouts: dict[str, Box], wall: float, width: float, from_left: bool) -> float:
     """The x0 of the catch block nearest its front corner whose footprint
     (front wall inside, CATCH_BLOCK square) clears every keep-out in XY."""
@@ -345,39 +483,46 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
                          "only a taped design-kit monitor can be laid out")
     mw, mh, md = m.panel
 
-    # --- board row: the VGA plug choice that gives the shorter row ------------
-    unions = {a: _all_board_frame(a) for a in (False, True)}
-    adapter = unions[True].size[1] < unions[False].size[1]
-    u = unions[adapter]
+    # --- board row (the adapter always fitted, R16a) -------------------------
+    u = _row_board_frame()
     board_row_x = u.size[1] + 2 * SLACK          # board y runs along base X
     board_row_y = u.size[0]
     stack_h = u.size[2]
+    # the VGA plug and its stiff run, relative to the board row's start (base X
+    # wall + SLACK at board y u.y1): base X = wall + SLACK + u.y1 - board y
+    vp = [_vga_plug_frame().moved(*tinyvga_offset(k)) for k in BOARD_KEYS]
+    plug_x0 = SLACK + u.y1 - max(v.y1 for v in vp)     # from the inside of the left wall
+    plug_x1 = SLACK + u.y1 - min(v.y0 for v in vp)
 
     # --- bank row ---------------------------------------------------------------
     port_len = max(max(CABLES[k].plug[0] for k in BANK_SIDE_PLUGS) + SLACK, FINGERTIP_D)
     bay_x, bay_y = b.size[0] + 2 * SLACK, b.size[1] + 2 * SLACK
+    if plug_x0 < port_len + bay_x:
+        raise ValueError(f"the VGA plug keep-out (X {plug_x0:.2f}..{plug_x1:.2f} inside the "
+                         f"wall) runs into the bank bay (to {port_len + bay_x:.2f})")
     boost = tuple(d + 2 * SLACK for d in _BOOST.plug)
-    # the boost at the bank row's +X end, along X or turned, within the width
-    # the board row and the monitor set; else in the lid
-    room = max(board_row_x, mw + 2 * SLACK) - (port_len + bay_x)
-    base_room_z = max(b.size[2], stack_h) + SLACK          # rim_z - wall
-    boost_xy = next(((fx, fy) for fx, fy in ((boost[0], boost[1]), (boost[1], boost[0]))
-                     if fx <= room and fy <= bay_y and boost[2] <= base_room_z), None)
-    boost_in_lid = boost_xy is None
-    bank_row_x = port_len + bay_x + (0.0 if boost_in_lid else boost_xy[0])
 
     # --- outer ------------------------------------------------------------------
-    width = max(board_row_x, bank_row_x, mw + 2 * SLACK) + 2 * wall
-    depth = max(wall + SLACK + board_row_y + SLACK + bay_y + SLACK + wall,
-                mh + 2 * SLACK + 2 * wall)
+    inner_x = max(board_row_x, port_len + bay_x, plug_x1 + SLACK, mw + 2 * SLACK)
+    width = inner_x + 2 * wall
     rim_z = wall + max(b.size[2], stack_h) + SLACK
-    outer = Box(0.0, 0.0, 0.0, width, depth, rim_z, "base")
+
+    # R10 as amended by R16a: the boost on the floor in bank-row room the bay
+    # and the plug leave (between them, or past the plug), along X or turned;
+    # else in the lid strip
+    base_room_z = rim_z - wall
+    zones = ((port_len + bay_x, plug_x0), (plug_x1, inner_x))
+    boost_at = next(((wall + z0, fx, fy) for z0, z1 in zones
+                     for fx, fy in ((boost[0], boost[1]), (boost[1], boost[0]))
+                     if fx <= z1 - z0 + 1e-9 and fy <= bay_y + 1e-9
+                     and boost[2] <= base_room_z + 1e-9), None)
+    boost_in_lid = boost_at is None
 
     # --- board on its plinth -------------------------------------------------
     # union: base X from wall + SLACK, base Y from wall + SLACK, top at rim - SLACK
     origin = (wall + SLACK + u.y1, wall + SLACK - u.x0, rim_z - SLACK - u.z1)
     ox, oy, oz = origin
-    keepouts = _board_keepouts(origin, adapter)
+    keepouts = _board_keepouts(origin)
     specs = {k: board_spec(k) for k in BOARD_KEYS}
     # both revisions' PCB outlines (board x 0..W, y 0..H)
     pcb = Box(0.0, 0.0, 0.0, max(s.outline.width for s in specs.values()),
@@ -416,13 +561,35 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     bank_bay = Box(port_room.x1, row_y0, wall, port_room.x1 + bay_x, row_y0 + bay_y, rim_z,
                    "bank bay")
 
+    # --- lid catch -----------------------------------------------------------
+    xs = (_catch_x0(keepouts, wall, width, True), _catch_x0(keepouts, wall, width, False))
+    if xs[0] + CATCH_BLOCK > xs[1]:
+        raise ValueError(f"the lid catch blocks overlap along the front wall: x0 = {xs}")
+    catch = tuple(Cyl(x + CATCH_BLOCK / 2, wall + CATCH_BLOCK / 2,
+                      rim_z - MAGNET_RECESS - MAGNET_T, rim_z - MAGNET_RECESS, MAGNET_D / 2,
+                      f"lid catch magnet (base) {i + 1}") for i, x in enumerate(xs))
+
+    # --- depth: the largest of three named terms (R18, R18b) --------------------
+    ms_x0 = (width - (mw + 2 * SLACK)) / 2
+    # the lid's catch blocks reach over the monitor in X: it sits behind them
+    over = any(x < ms_x0 + mw + 2 * SLACK and ms_x0 < x + CATCH_BLOCK for x in xs)
+    depth_rows = wall + SLACK + board_row_y + SLACK + bay_y + SLACK + wall
+    depth_monitor = mh + 2 * SLACK + 2 * wall + (CATCH_BLOCK if over else 0.0)
+    # the pigtail drops PIGTAIL_ROD_CLEAR in front of the hinge rod and turns
+    # forward into the stiff run's end with min_bend_r of room behind it
+    run_end = max(keepouts[f"{k}/vga_plug"].y1 for k in BOARD_KEYS)
+    depth_pigtail = run_end + _PIGTAIL.min_bend_r + PIGTAIL_ROD_CLEAR + KNUCKLE_R
+    depth = max(depth_rows, depth_monitor, depth_pigtail)
+    outer = Box(0.0, 0.0, 0.0, width, depth, rim_z, "base")
+
     # --- hinge and lid (lid frame, closed) --------------------------------------
     hy, hz = depth - KNUCKLE_R, rim_z
     lid_h = wall + TAPE_T + md + CLOSED_CLEARANCE
     lid_outer = Box(0.0, -hy, 0.0, width, depth - hy, lid_h, "lid")
     in_z1 = lid_h - wall                          # the inside face (tape side)
-    ms_x0 = (width - (mw + 2 * SLACK)) / 2
-    ms_y0 = lid_outer.y0 + wall
+    # against the front wall, unless the catch blocks in the lid's front rim
+    # reach over the monitor in X: then just behind them
+    ms_y0 = lid_outer.y0 + wall + (CATCH_BLOCK if over else 0.0)
     monitor_space = Box(ms_x0, ms_y0, CLOSED_CLEARANCE, ms_x0 + mw + 2 * SLACK,
                         ms_y0 + mh + 2 * SLACK, in_z1 - TAPE_T, f"monitor space ({monitor})")
     lid_strip = Box(wall, monitor_space.y1, 0.0, width - wall, lid_outer.y1 - wall, in_z1,
@@ -436,27 +603,28 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
             raise ValueError(f"boost module {_BOOST.plug} does not fit the lid strip "
                              f"{lid_strip.size}")
     else:
-        boost_pocket = Box(bank_bay.x1, row_y0, wall, bank_bay.x1 + boost_xy[0],
-                           row_y0 + boost_xy[1], wall + boost[2], "boost converter pocket")
+        bx0, fx, fy = boost_at
+        boost_pocket = Box(bx0, row_y0, wall, bx0 + fx, row_y0 + fy, wall + boost[2],
+                           "boost converter pocket")
 
-    exit_x = monitor_space.x0 + SLACK + m.pigtail_exit_u
+    plugs = [keepouts[f"{k}/vga_plug"] for k in BOARD_KEYS]
+    if max(p.y1 for p in plugs) > bank_bay.y1:
+        raise ValueError(f"the VGA plug's stiff run (to Y {max(p.y1 for p in plugs):.2f}) "
+                         f"runs past the bank row (to {bank_bay.y1:.2f})")
+    # the notch on the plug's run axis: the pigtail drops straight to it there
+    exit_x = (plugs[0].x0 + plugs[0].x1) / 2
     half = _PIGTAIL.dia / 2 + FIT
     hinge_notch = Box(exit_x - half, hy - KNUCKLE_R, hz - KNUCKLE_R,
                       exit_x + half, hy + KNUCKLE_R, hz + KNUCKLE_R, "hinge notch (pigtail)")
+    hinge_relief_r = _hinge_relief_r(lid_outer, outer, hy, hz)
 
-    # --- lid catch -----------------------------------------------------------
-    xs = (_catch_x0(keepouts, wall, width, True), _catch_x0(keepouts, wall, width, False))
-    if xs[0] + CATCH_BLOCK > xs[1]:
-        raise ValueError(f"the lid catch blocks overlap along the front wall: x0 = {xs}")
-    catch = tuple(Cyl(x + CATCH_BLOCK / 2, wall + CATCH_BLOCK / 2,
-                      rim_z - MAGNET_RECESS - MAGNET_T, rim_z - MAGNET_RECESS, MAGNET_D / 2,
-                      f"lid catch magnet (base) {i + 1}") for i, x in enumerate(xs))
-
-    return Layout(
+    lay = Layout(
         wall=wall, outer=outer, rim_z=rim_z, board_origin=origin,
-        board_keepouts=keepouts, vga_adapter=adapter, plinth=plinth,
+        board_keepouts=keepouts, vga_adapter=True, plinth=plinth,
         plinth_relief=plinth_relief, pins=pins,
         bank_bay=bank_bay, port_room=port_room, boost_pocket=boost_pocket,
         boost_in_lid=boost_in_lid, hinge_axis=(hy, hz), hinge_notch=hinge_notch,
+        hinge_relief_r=hinge_relief_r,
         lid_outer=lid_outer, monitor_space=monitor_space, lid_strip=lid_strip,
         lid_catch=catch)
+    return replace(lay, knuckle_x=_knuckle_x(lay))

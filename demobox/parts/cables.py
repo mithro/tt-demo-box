@@ -9,7 +9,7 @@ stated numbers (calipers on the plug, vendor spec for the bend radius).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from tools.schema import Source
 
@@ -54,4 +54,23 @@ CABLES: dict[str, Cable] = {c.key: c for c in (
            "Battery survey: UGREEN PB505, Xiaomi PB2020 and Anker Zolo list \"built-in C\"; "
            "cable and plug body are not stated, so the USB-C right-angle figures are used. "
            "Unconfirmed."),
+    # Ruling R13: the monitor's own cable, not a bought one.  Its plug is the
+    # slim VGA cable's typical body.
+    # Rulings R13, R17: the monitor's own cable, not a bought one.  Its plug
+    # is the slim VGA cable's typical body.
+    Cable("monitor-pigtail", "Monitor's own hard-wired VGA cable (pigtail)", 5.0, 15.0,
+          (45.0, 17.0, 20.0), (
+              Source("Placeholder: Tim's monitor's own hard-wired cable",
+                     "docs/measurements/2026-11-23-photo-measurements.md",
+                     "Placeholder: 3 x dia for a static bend; this value decides the layout "
+                     "(at 20 mm the VGA plug cannot sit in the bank-row corner and the box "
+                     "grows to about 208 x 209 mm); measure Tim's cable."),
+          ), confirmed=False),
 )}
+
+# Ruling R16a: the adapter's orientation is assumed, not read off a part.
+CABLES["vga-90-adapter"] = replace(CABLES["vga-90-adapter"], sources=CABLES[
+    "vga-90-adapter"].sources + (Source(
+        "Placeholder: adapter orientation", _SPEC,
+        "left/right-angle type assumed (socket on the D-sub's end, facing the back of the "
+        "box); check the one bought; an up/down type changes the layout"),))
