@@ -33,9 +33,6 @@ ACTIVE_7IN = (154.2, 85.9)
 @dataclass(frozen=True)
 class Monitor:
     key: str
-    #: Short code for drawing names (``TDB-INS-<code>``): upper-case letters
-    #: and digits, unique among MONITORS.
-    code: str
     title: str
     kind: Literal["kit", "cased"]
     panel: tuple[float, float, float]
@@ -71,7 +68,6 @@ def _centred_x(panel_w: float, active_w: float) -> float:
 
 _TAOBAO_TIM = Monitor(
     key="taobao-tim",
-    code="T7",
     title="Tim's 7-inch car-style 'TFT color monitor' (Taobao)",
     kind="cased",
     # T is unmeasured: 20.0 is survey item H's rim depth, a placeholder.
@@ -116,7 +112,6 @@ _TAOBAO_TIM = Monitor(
 
 _CAR_7 = Monitor(
     key="car-7-aliexpress",
-    code="C7",
     title="7-inch plastic car-style TFT monitor (AliExpress 1005004614276566)",
     kind="cased",
     panel=(173, 113, 20),
@@ -146,7 +141,6 @@ _KIT_DRIVER = Box(37.0, 17.0, 0.0, 37.0 + 90.6, 17.0 + 65.7, 12.0, "PCB800099 dr
 
 _KIT = Monitor(
     key="kit-at070tn92",
-    code="K7",
     title="AT070TN92 7-inch 800x480 panel + PCB800099 driver board (bare kit)",
     kind="kit",
     panel=(165, 100, 5.7),
