@@ -480,23 +480,25 @@ def test_hinge_relief_r_less_than_the_lid_depth(lay):
 def test_knuckle_x_design_kit():
     """R15, by hand (printed, R16a box).  Within hinge_relief_r = 6.72 of the
     axis (Y 170.755, Z 35.4) in YZ lie only the port room (X 2.4..25.4: it
-    runs to the back wall and the rim) and the packed bank (X 26.4..154.4,
-    back-top edge at Y 169.255, Z 34.4: 1.80 from the axis).  The VGA plug's
-    stiff run ends at Y 151.255, 19.5 in front of the axis; the boost is in
-    the lid.  The pigtail's notch is on the plug's run axis, X 178.35 +- 3.
-    So, of X 0..197.7:  0..2.4, 25.4..26.4, 154.4..175.35, 181.35..197.7."""
+    runs to the back wall and the rim) and the bank bay (R19: the whole bay,
+    X 25.4..155.4, since the bank slides in its SLACK; Y to 170.255, 0.5 in
+    front of the axis).  The VGA plug's stiff run ends at Y 151.255, 19.5 in
+    front of the axis; the boost is in the lid.  The pigtail's notch is on
+    the plug's run axis, X 178.35 +- 3.  So, of X 0..197.7:  0..2.4,
+    155.4..175.35, 181.35..197.7."""
     lay = L.layout(L.ROUTES["printed"])
-    want = ((0.0, 2.4), (25.4, 26.4), (154.4, 175.35), (181.35, 197.7))
+    want = ((0.0, 2.4), (155.4, 175.35), (181.35, 197.7))
     assert len(lay.knuckle_x) == len(want)
     for (a, b), (c, d) in zip(lay.knuckle_x, want):
         assert (a, b) == (pytest.approx(c, abs=1e-6), pytest.approx(d, abs=1e-6))
     assert sum(1 for a, b in lay.knuckle_x if b - a >= L.KNUCKLE_LEN) >= 2
-    assert L.KNUCKLE_LEN == 10.0
+    assert L.KNUCKLE_LEN == 9.0           # R19: the shortest knuckle
 
 
 def test_knuckle_x_clear_of_base_contents(lay):
     hy, hz = lay.hinge_axis
-    for key, b in L.base_contents(lay).items():
+    boxes = dict(L.base_contents(lay), bay=lay.bank_bay)        # R19: the whole bay
+    for key, b in boxes.items():
         near = math.hypot(max(b.y0 - hy, 0.0, hy - b.y1), max(b.z0 - hz, 0.0, hz - b.z1))
         if near <= lay.hinge_relief_r:
             assert all(b.x1 <= x0 or b.x0 >= x1 for x0, x1 in lay.knuckle_x), key

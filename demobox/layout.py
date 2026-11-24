@@ -106,11 +106,12 @@ cable is threaded first.  ``hinge_relief_r`` is the radius about the axis
 within which the hinge's two kinds of segment are relieved (ruling R11): the
 furthest any lid point that enters the base's YZ profile, at any angle of
 ``sweep_angles()``, gets from the axis, plus FIT.  Along X there are three
-kinds of segment (ruling R15): lid-knuckle (the base cut back to
+kinds of segment (rulings R15, R21): lid-knuckle (the base cut back to
 ``hinge_relief_r``, the lid whole), base-knuckle (the lid cut back, the base
-keeps a ``KNUCKLE_R`` knuckle) and open (both cut back).  Knuckles go only in
-``knuckle_x``: the X ranges with no ``base_contents`` within ``hinge_relief_r``
-of the axis in YZ, less the notch.
+keeps a ``KNUCKLE_R`` knuckle) and open (the lid cut back; the base whole,
+with a seal bead in the lid's relief).  Knuckles go only in ``knuckle_x``:
+the X ranges with no ``base_contents`` (nor, R19, any of the bank bay) within
+``hinge_relief_r`` of the axis in YZ, less the notch.
 ``lid_catch`` is two magnets under the front rim, each in a ``CATCH_BLOCK``
 block against the inside of the front wall, at the X nearest its front
 corner where the block clears every board-row keep-out in XY.
@@ -152,8 +153,9 @@ BANK_SIDE_PLUGS = ("usb-c-right-angle", "usb-a-c", "bank-built-in")
 # --- design choices ----------------------------------------------------------
 #: Hinge knuckle radius (``demobox.shared.hinge`` uses this one).
 KNUCKLE_R = 4.0
-#: Hinge knuckle length along X (``demobox.shared.hinge`` uses this one).
-KNUCKLE_LEN = 10.0
+#: The shortest hinge knuckle along X (``demobox.shared.hinge`` uses this
+#: one); knuckles share each ``knuckle_x`` range, so are usually longer (R19).
+KNUCKLE_LEN = 9.0
 #: The bought hinge rod: "3 mm steel rod or 2.85 mm filament".
 PIN_ROD_D = 3.0
 #: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
@@ -341,9 +343,10 @@ class Layout:
     monitor_space: Box               # lid frame, closed
     lid_strip: Box                   # lid frame, closed
     lid_catch: tuple[Cyl, ...]       # the base-side catch magnets
-    #: R15: the X ranges where a knuckle may go: no base content
-    #: (``base_contents``) within ``hinge_relief_r`` of the axis in YZ, and
-    #: not the pigtail's notch.  Everywhere else is an open segment.
+    #: R15, R19: the X ranges where a knuckle may go: no base content
+    #: (``base_contents``, and the whole bank bay) within ``hinge_relief_r``
+    #: of the axis in YZ, and not the pigtail's notch.  Everywhere else is
+    #: an open segment.
     knuckle_x: tuple[tuple[float, float], ...] = ()
 
     def catch_base_block(self, c: Cyl) -> Box:
@@ -442,10 +445,11 @@ def _yz_distance(b: Box, y: float, z: float) -> float:
 
 def _knuckle_x(lay: Layout) -> tuple[tuple[float, float], ...]:
     """R15: X 0..width less every base content within ``hinge_relief_r`` of
-    the axis in YZ, and less the pigtail's notch."""
+    the axis in YZ, and less the pigtail's notch.  R19: the whole bank bay
+    counts, not the bank as packed, since the bank slides in its SLACK."""
     hy, hz = lay.hinge_axis
-    blocked = [(b.x0, b.x1) for b in base_contents(lay).values()
-               if _yz_distance(b, hy, hz) <= lay.hinge_relief_r]
+    boxes = [*base_contents(lay).values(), lay.bank_bay]
+    blocked = [(b.x0, b.x1) for b in boxes if _yz_distance(b, hy, hz) <= lay.hinge_relief_r]
     blocked.append((lay.hinge_notch.x0, lay.hinge_notch.x1))
     ranges, x = [], lay.outer.x0
     for a, b in sorted(blocked):
