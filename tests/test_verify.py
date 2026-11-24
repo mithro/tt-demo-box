@@ -274,14 +274,30 @@ def test_pigtail_path_runs_exit_notch_plug(lay):
 
 
 def test_pigtail_takes_the_widest_closed_u_turn(lay):
-    """R13: closed, the loop spans the lid's inside face to the floor (cable
-    centrelines), and the route rounds it to half that: the widest U-turn the
-    closed box allows."""
+    """R13, R17: closed, the cable turns round from the lid's inside face to
+    the stiff run's height (cable centrelines), in the plane over the run, and
+    the route rounds it to half that: the widest U-turn the closed box allows,
+    15.75 against the 15 placeholder."""
     r = C.PIGTAIL.dia / 2
-    span = (lay.rim_z + lay.lid_strip.z1 - r) - (lay.wall + r)
-    assert C.max_bend_r(C.pigtail_path(lay, 0.0)[:-1]) == pytest.approx(span / 2, abs=1e-6)
-    assert span / 2 == pytest.approx(25.5, abs=0.01)
-    assert C.PIGTAIL.key == "monitor-pigtail"
+    end = C._plug_ends(lay, "v3.2")[0]
+    span = (lay.rim_z + lay.lid_strip.z1 - r) - end[2]
+    path = C.pigtail_path(lay, 0.0)
+    assert C.max_bend_r(path[:-1], stiff_last=True) == pytest.approx(span / 2, abs=1e-6)
+    assert span / 2 == pytest.approx(15.75, abs=0.01)
+    assert C.PIGTAIL.key == "monitor-pigtail" and C.PIGTAIL.min_bend_r == 15.0
+
+
+def test_pigtail_meets_the_stiff_run_in_line(lay):
+    """R16a: the cable runs into the stiff run's end along it (-Y), and the
+    run lies in the bank row's +X back corner, behind the bay's end."""
+    for a in C.sweep_angles():
+        path = C.pigtail_path(lay, a)
+        end, back, face = path[-3], path[-2], path[-1]
+        before = path[-4]
+        assert before[0] == pytest.approx(end[0]) and before[2] == pytest.approx(end[2])
+        assert before[1] > end[1] > back[1] > face[1]
+    v = lay.board_keepouts["v3.2/vga_plug"]
+    assert v.x0 >= lay.bank_bay.x1 and v.y1 <= lay.bank_bay.y1
 
 
 def test_pigtail_within_its_length_at_every_angle(lay):
@@ -301,6 +317,12 @@ def test_bend_radius_of_a_right_angle_corner():
     pts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0), (20.0, 10.0, 0.0)]
     assert C.max_bend_r(pts) == pytest.approx(5.0)
     assert C.max_bend_r([(0.0, 0.0, 0.0), (5.0, 0.0, 0.0), (9.0, 0.0, 0.0)]) == math.inf
+    # a stiff last leg takes no arc: met at an angle, nothing rounds it...
+    pts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0)]
+    assert C.max_bend_r(pts, stiff_last=True) == 0.0
+    # ...met in line, the corner before it has the whole flexible leg
+    pts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0), (10.0, 30.0, 0.0)]
+    assert C.max_bend_r(pts, stiff_last=True) == pytest.approx(10.0)
 
 
 # --- the bank lifts out ---------------------------------------------------------

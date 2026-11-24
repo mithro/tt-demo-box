@@ -144,13 +144,19 @@ def _turn(a, b, c) -> float:
     return math.acos(max(-1.0, min(1.0, cos)))
 
 
-def max_bend_r(pts) -> float:
+def max_bend_r(pts, stiff_last: bool = False) -> float:
     """The largest radius every interior corner of the polyline can be rounded
     to.  An arc of radius r round a corner turning by phi starts and ends
     r * tan(phi / 2) from the corner, along each leg; the two arcs at a leg's
     ends must not overlap, so each leg bounds r by its length over the sum of
     its ends' tan(phi / 2).  inf for a straight line.  A point the polyline
-    passes straight through is no corner and is dropped first."""
+    passes straight through is no corner and is dropped first.  With
+    ``stiff_last`` the last leg can't bend (a plug's stiff run): the cable
+    must meet it in line, else no radius will do (0)."""
+    if stiff_last and len(pts) > 2:
+        if _turn(*pts[-3:]) > 1e-9:
+            return 0.0
+        pts = pts[:-1]          # met in line: the cable ends straight at the stiff leg
     pts = [pts[0]] + [b for a, b, c in zip(pts, pts[1:], pts[2:]) if _turn(a, b, c) > 1e-9] \
         + [pts[-1]]
     k = [0.0] + [math.tan(_turn(a, b, c) / 2) for a, b, c in zip(pts, pts[1:], pts[2:])] + [0.0]
@@ -162,13 +168,43 @@ def max_bend_r(pts) -> float:
     return r
 
 
-def _plug_ends(lay: Layout, rev: str) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-    """The VGA plug in the TinyVGA's DE-15, from the part data (not the
-    keep-outs): (its cable end, its face at the socket), base frame, on the
-    plug's axis.  The cable end includes the adapter's run when there is one."""
-    k = TINYVGA.plug_keepout(straight=not lay.vga_adapter).moved(*tinyvga_offset(rev))
-    bx, bz = (k.x0 + k.x1) / 2, (k.z0 + k.z1) / 2
-    return _to_base(lay, bx, k.y0, bz), _to_base(lay, bx, k.y1, bz)
+#: R16a: the left/right-angle 90 degree VGA adapter (its figures, assumed
+#: orientation in its Source).
+ADAPTER = CABLES["vga-90-adapter"]
+
+
+def _plug_frame() -> tuple[float, float, float, float]:
+    """The monitor's VGA plug in the adapter, TinyVGA frame, from the part data
+    (not the keep-outs): ``(socket face x, axis y, axis z, hood width)``.  The
+    adapter (``ADAPTER.plug`` = 35 along the D-sub's long axis, 17 out of the
+    DE-15 face) has its socket on its +x end; the plug goes in along -x."""
+    span, out, _ = ADAPTER.plug
+    d = TINYVGA.de15
+    return ((d.x0 + d.x1) / 2 + span / 2, d.y0 - out / 2,
+            (TINYVGA.plug_z0 + TINYVGA.plug_z1) / 2, TINYVGA.plug_width)
+
+
+def _plug_ends(lay: Layout, rev: str):
+    """The monitor's VGA plug, base frame, on its axis: ``(cable end of the
+    stiff run, back of the plug body, plug face in the adapter's socket)``.
+    The run (``STRAIGHT_RUN``) and the body (``PLUG_BODY_LEN``) head +Y into
+    the bank row's +X back corner."""
+    sx, ay, az, _ = _plug_frame()
+    dx, dy, dz = tinyvga_offset(rev)
+    t = TINYVGA
+    face = _to_base(lay, sx + dx, ay + dy, az + dz)
+    back = _to_base(lay, sx + t.plug_body_len + dx, ay + dy, az + dz)
+    end = _to_base(lay, sx + t.plug_body_len + t.straight_run + dx, ay + dy, az + dz)
+    return end, back, face
+
+
+def vga_plug_box(lay: Layout, rev: str) -> Box:
+    """The plug + stiff run keep-out, base frame, from the part data."""
+    end, _, face = _plug_ends(lay, rev)
+    w = _plug_frame()[3]
+    return Box(face[0] - w / 2, face[1], TINYVGA.plug_z0 + lay.board_origin[2],
+               face[0] + w / 2, end[1], TINYVGA.plug_z1 + lay.board_origin[2],
+               f"{rev} VGA plug + stiff run")
 
 
 def pigtail_exit(lay: Layout) -> tuple[float, float, float]:
@@ -189,37 +225,52 @@ def _lid_from_base(lay: Layout, p, angle_deg: float) -> tuple[float, float, floa
     return (p[0], y * math.cos(t) - z * math.sin(t), y * math.sin(t) + z * math.cos(t))
 
 
-#: Heights (fractions of the lid strip's depth, cable centre) the pigtail's
-#: run along the lid strip is tried at, at each angle.
-PIGTAIL_RUN_HEIGHTS = tuple(i / 8 for i in range(9))
+#: Heights above the seam (mm, cable centre) of the points straight over the
+#: pigtail's drop that a route through them is tried at.
+PIGTAIL_OVER_DROP = tuple(2.5 * i for i in range(1, 25))
+
+
+def _drop_xy(lay: Layout, rev: str) -> tuple[float, float]:
+    """Where the pigtail goes down to the plug: straight over the plug's run
+    axis, as far back as the back wall allows, and no further back than the
+    hinge axis."""
+    end = _plug_ends(lay, rev)[0]
+    r = PIGTAIL.dia / 2
+    return end[0], min(lay.hinge_axis[0], lay.outer.y1 - lay.wall - r)
+
+
+def _in_free_room(lay: Layout, p_lid, angle_deg: float) -> bool:
+    """A lid-frame point the pigtail may pass: in the lid strip, or (lid
+    open) out past the lid's open face and above the rim, in free air."""
+    r = PIGTAIL.dia / 2
+    s = lay.lid_strip
+    x, y, z = p_lid
+    if not (s.x0 + r <= x <= s.x1 - r and y <= s.y1 - r):
+        return False
+    if r <= z <= s.z1 - r:
+        return True
+    return z < 0.0 and _lid_to_base(lay, p_lid, angle_deg)[2] >= lay.rim_z + r
 
 
 def _pigtail_routes(lay: Layout, rev: str, angle_deg: float):
     """Candidate pigtail routes at ``angle_deg``: ``(lid points, lid frame;
-    base points, base frame)``.  The base part is fixed; the cable is free in
-    the lid strip, so the lid part is one of several runs (see
-    ``pigtail_path``)."""
+    base points, base frame)`` (see ``pigtail_path``)."""
     r = PIGTAIL.dia / 2
     ex = pigtail_exit(lay)
-    x = ex[0]
-    hy, hz = lay.hinge_axis
-    yw = min(hy, lay.outer.y1 - lay.wall - r)       # inside the back wall
-    zf = lay.wall + r                                # on the floor
-    end, face = _plug_ends(lay, rev)
-    base = [(x, yw, hz), (x, yw, zf), (x, end[1] + (yw - end[1]) / 3, zf), end, face]
-    ya = yw - hy                                     # over the drop, closed
-    yield [ex], base
-    lo, hi = r, lay.lid_strip.z1 - r
-    t = math.radians(angle_deg)
-    for f in PIGTAIL_RUN_HEIGHTS:
-        h = lo + f * (hi - lo)
-        ends = [ya]                       # over the drop when closed
-        if math.cos(t) > EPS:             # and straight over the drop at this angle
-            z_up = (h - ya * math.sin(t)) / math.cos(t)
-            ends.append(ya * math.cos(t) - z_up * math.sin(t))
-        for y_end in ends:
-            if ex[1] < y_end <= lay.lid_strip.y1 - r:
-                yield [ex, (x, ex[1] + (y_end - ex[1]) / 4, h), (x, y_end, h)], base
+    hz = lay.hinge_axis[1]
+    x, yd = _drop_xy(lay, rev)
+    end, back, face = _plug_ends(lay, rev)
+    tail = [(x, yd, hz), (x, yd, end[2]), end, back, face]
+    yield [ex], tail
+    for d in PIGTAIL_OVER_DROP + (lay.lid_strip.z1 - r,):
+        v = (x, yd, hz + d)
+        vl = _lid_from_base(lay, v, angle_deg)
+        if not _in_free_room(lay, vl, angle_deg):
+            continue
+        yield [ex], [v] + tail
+        w = (x, ex[1] + (vl[1] - ex[1]) / 4, vl[2])        # level with it, a quarter along
+        if ex[1] < vl[1] and _in_free_room(lay, w, angle_deg):
+            yield [ex, w], [v] + tail
 
 
 def _pigtail_best(lay: Layout, angle_deg: float, rev: str):
@@ -228,7 +279,7 @@ def _pigtail_best(lay: Layout, angle_deg: float, rev: str):
     best = None
     for lid, base in _pigtail_routes(lay, rev, angle_deg):
         path = [_lid_to_base(lay, p, angle_deg) for p in lid] + base
-        bend = max_bend_r(path[:-1])
+        bend = max_bend_r(path[:-1], stiff_last=True)
         if best is None or bend > best[0] + EPS:
             best = (bend, lid, base, path)
     return best[1:]
@@ -239,27 +290,29 @@ def pigtail_path(lay: Layout, angle_deg: float,
     """The monitor's VGA pigtail with the lid ``angle_deg`` open, base frame:
 
     * the exit on the panel's cable edge (in the lid);
-    * along ``lid_strip`` towards the hinge: either straight to the notch, or
-      rising to a run at some height and along it to over the drop (lid
-      points, which turn with the lid);
-    * through ``hinge_notch`` at the seam, just inside the back wall;
-    * down inside the back wall to the floor (the bank row's free +X end),
-      forward along the floor, and up to the VGA plug's cable end (past the
-      adapter's run, when fitted);
-    * along the plug to its face in the TinyVGA's DE-15.
+    * along ``lid_strip`` towards the hinge, either straight to the notch or
+      to a point straight over the drop (closed: up at the lid's inside face;
+      open: wherever over the drop is still in the strip or in the free air
+      past the lid's open face), perhaps through a point level with it a
+      quarter of the way along;
+    * through ``hinge_notch`` at the seam, on the VGA plug's run axis, as
+      far back as the back wall allows;
+    * down to the run's height and forward (-Y) into the end of the plug's
+      stiff run (R16a: the plug sits in the bank row's +X back corner);
+    * along the stiff run and the plug body to the plug's face in the
+      adapter's socket.
 
-    The cable is free in the lid strip, so at each angle the run taken is the
-    one whose bends round widest (``max_bend_r``).  Closed, the highest run
-    makes the loop through the notch a U-turn from the lid's inside face to
-    the floor: the widest the closed box allows.  The last leg is the plug
-    (and adapter), counted once."""
+    The cable is free in the lid strip, so at each angle the route taken is
+    the one whose bends round widest (``max_bend_r``, every bend after the
+    stiff run; the run itself is stiff).  Closed, the widest is a U-turn from
+    the lid's inside face to the run's height, in the plane over the run."""
     return _pigtail_best(lay, angle_deg, rev)[2]
 
 
 def pigtail_length_bound(lay: Layout, angle_deg: float, rev: str = BOARD_KEYS[0]) -> float:
     """An upper bound on the cable ``pigtail_path`` needs at ``angle_deg``:
     |dx| + |dy| + |dz| per leg, the lid legs measured in the lid frame (where
-    they are rigid) up to the notch, the rest in the base frame."""
+    they are rigid) up to the first base point, the rest in the base frame."""
     lid, base, _ = _pigtail_best(lay, angle_deg, rev)
     return manhattan_length(lid + [_lid_from_base(lay, base[0], angle_deg)]) \
         + manhattan_length(base)
@@ -389,7 +442,8 @@ def boards_seat(report: Report, lay: Layout) -> None:
                      f"PCB {_f(pcb.x0)}..{_f(pcb.x1)} x {_f(pcb.y0)}..{_f(pcb.y1)}, underside z "
                      f"{_f(pcb.z0)}; plinth {_f(pl.x0)}..{_f(pl.x1)} x {_f(pl.y0)}..{_f(pl.y1)}, "
                      f"top z {_f(pl.z1)}")
-        parts = {p: lay.board_keepouts[f"{k}/{p}"] for p in ("envelope", "usb_plug", "tinyvga")}
+        parts = {key.split("/", 1)[1]: b for key, b in lay.board_keepouts.items()
+                 if key.startswith(f"{k}/")}
         for p, b in parts.items():
             inside = (b.x0 >= o.x0 + w - EPS and b.x1 <= o.x1 - w + EPS and b.y0 >= o.y0 + w - EPS
                       and b.y1 <= o.y1 - w + EPS and b.z0 >= w - EPS and b.z1 <= lay.rim_z + EPS)
@@ -530,8 +584,9 @@ def lid_closed_clears(report: Report, lay: Layout) -> None:
     need = L.CLOSED_CLEARANCE
     tops: dict[str, float] = {}
     for k in BOARD_KEYS:
-        for p in ("envelope", "usb_plug", "tinyvga"):
-            tops[f"{k} {p}"] = lay.board_keepouts[f"{k}/{p}"].z1
+        for key, b in lay.board_keepouts.items():
+            if key.startswith(f"{k}/"):
+                tops[f"{k} {key.split('/', 1)[1]}"] = b.z1
         tops[f"{k} tallest component"] = lay.board_origin[2] + board_mod.TALLEST_COMPONENT
     for p in lay.pins.values():
         tops[p.what] = p.z1
@@ -553,7 +608,7 @@ def lid_closed_clears(report: Report, lay: Layout) -> None:
 
     panel = _panel_base_xy(lay)
     for k in BOARD_KEYS:
-        parts = [lay.board_keepouts[f"{k}/{p}"] for p in ("envelope", "usb_plug", "tinyvga")]
+        parts = [b for key, b in lay.board_keepouts.items() if key.startswith(f"{k}/")]
         tall = max(parts, key=lambda x: x.z1)
         lift = face - tall.z1
         pcb_top = _pcb_base(lay, k).z1
@@ -665,11 +720,12 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
 
 def cables_route(report: Report, lay: Layout) -> None:
     """The monitor's pigtail from its exit, along the lid strip, through the
-    hinge notch, to the TinyVGA's plug: within its length, and its loop at
-    the notch rounds to at least its bend radius at every sweep angle.  The
-    bank-to-board USB cable: within USB_MAX_LEN, every bend at least its
-    radius.  (Routes and the bend rule: ``pigtail_path``, ``usb_path``,
-    ``max_bend_r``.)"""
+    hinge notch, down and into the VGA plug's stiff run in the bank row's +X
+    back corner: within its length, clear of everything in the base, and
+    every bend after the stiff run at least its bend radius, closed and at
+    every sweep angle.  The bank-to-board USB cable: within USB_MAX_LEN,
+    every bend at least its radius.  (Routes and the bend rule:
+    ``pigtail_path``, ``usb_path``, ``max_bend_r``.)"""
     for c in CABLES.values():
         if not c.confirmed:
             report.unconfirmed(f"cable {c.key}", _placeholders(c.sources))
@@ -678,47 +734,51 @@ def cables_route(report: Report, lay: Layout) -> None:
     ms, n, strip = lay.monitor_space, lay.hinge_notch, lay.lid_strip
     ex = pigtail_exit(lay)
     hy, hz = lay.hinge_axis
-    on_edge = ms.x0 + SLACK <= ex[0] <= ms.x1 - SLACK and abs(ex[1] - (ms.y1 - SLACK)) <= EPS
-    in_strip = strip.x0 + r <= ex[0] <= strip.x1 - r and strip.y0 <= 0.0 <= strip.y1
-    through = n.x0 <= ex[0] - r + EPS and ex[0] + r <= n.x1 + EPS \
-        and n.y0 <= hy <= n.y1 and n.z0 <= hz <= n.z1
-    report.check(on_edge and in_strip and through,
-                 f"{m.key} pigtail: exit, lid strip, hinge notch line up",
-                 f"exit x {_f(ex[0])} on the {exit_edge(m)} edge (u {m.pigtail_exit_u}); lid strip "
-                 f"x {_f(strip.x0)}..{_f(strip.x1)} reaches the axis; notch x {_f(n.x0)}.."
-                 f"{_f(n.x1)} round the {PIGTAIL.dia} cable, on the axis")
-
-    clear_of = {"bank bay": lay.bank_bay, "port room": lay.port_room}
-    if not lay.boost_in_lid:
-        clear_of["boost pocket"] = lay.boost_pocket
     o, w = lay.outer, lay.wall
-    span = (lay.rim_z + strip.z1 - r) - (w + r)
+    on_edge = ms.x0 + SLACK <= ex[0] <= ms.x1 - SLACK and abs(ex[1] - (ms.y1 - SLACK)) <= EPS
+    report.check(on_edge and strip.x0 + r <= ex[0] <= strip.x1 - r,
+                 f"{m.key} pigtail: exit on the panel's cable edge, over the lid strip",
+                 f"exit x {_f(ex[0])} on the {exit_edge(m)} edge (u {m.pigtail_exit_u}); lid strip "
+                 f"x {_f(strip.x0)}..{_f(strip.x1)}")
+
+    contents = L.base_contents(lay)
     for k in BOARD_KEYS:
-        closed = pigtail_path(lay, 0.0, k)
-        foot = [p for p in closed if p[2] <= w + r + EPS]          # the floor points
-        hits, inside = [], True
-        for fx, fy, _ in foot:
-            fb = Box(fx - r, fy - r, w, fx + r, fy + r, w + 2 * r)
-            hits += [nm for nm, b in clear_of.items() if _xy_overlap(fb, b) and nm not in hits]
-            inside &= fb.x0 >= w - EPS and fb.x1 <= o.x1 - w + EPS and fb.y1 <= o.y1 - w + EPS
-        report.check(inside and not hits, f"{m.key} pigtail ({k}): along the floor in free room",
-                     ", ".join(f"({_f(x)}, {_f(y)})" for x, y, _ in foot) + " inside the walls"
+        x, yd = _drop_xy(lay, k)
+        end, back, face = _plug_ends(lay, k)
+        through = n.x0 <= x - r + EPS and x + r <= n.x1 + EPS and n.y0 <= yd <= n.y1
+        report.check(through, f"{m.key} pigtail ({k}): drops through the hinge notch",
+                     f"over the plug's run axis x {_f(x)}, y {_f(yd)}: notch x {_f(n.x0)}.."
+                     f"{_f(n.x1)}, y {_f(n.y0)}..{_f(n.y1)} round the {PIGTAIL.dia} cable")
+        # the drop and the run in to the stiff run's end, as boxes round the cable
+        legs = {"drop": Box(x - r, yd - r, end[2] - r, x + r, yd + r, hz),
+                "run in": Box(x - r, end[1], end[2] - r, x + r, yd + r, end[2] + r)}
+        hits = sorted({f"{leg} / {nm}" for leg, b in legs.items()
+                       for nm, c in contents.items() if overlaps(b, c, EPS)})
+        inside = all(b.x0 >= w - EPS and b.x1 <= o.x1 - w + EPS and b.y1 <= o.y1 - w + EPS
+                     and b.z0 >= w - EPS for b in legs.values())
+        report.check(inside and not hits,
+                     f"{m.key} pigtail ({k}): its drop to the plug is in free room",
+                     f"drop at ({_f(x)}, {_f(yd)}) from the seam to z {_f(end[2])}, then to the "
+                     f"stiff run's end at y {_f(end[1])}: inside the walls"
                      + (f"; hits {', '.join(hits)}" if hits else
-                        f", clear of {', '.join(clear_of)}"))
+                        f", clear of all {len(contents)} base contents"))
         lengths = [(pigtail_length_bound(lay, a, k), a) for a in sweep_angles()]
         longest, at = max(lengths)
         report.check(longest <= m.pigtail_len + EPS, f"{m.key} pigtail ({k}): length",
                      f"exit to plug face, |dx|+|dy|+|dz| per leg: at most {_f(longest)} "
                      f"({at:g} deg) <= pigtail_len {_f(m.pigtail_len)} mm")
-        bends = [(max_bend_r(pigtail_path(lay, a, k)[:-1]), a) for a in sweep_angles()]
+        bends = [(max_bend_r(pigtail_path(lay, a, k)[:-1], stiff_last=True), a)
+                 for a in sweep_angles()]
         least, at = min(bends)
         closed_r = bends[0][0]
+        lid_top = lay.rim_z + strip.z1 - r
         report.check(least >= PIGTAIL.min_bend_r - EPS,
-                     f"{m.key} pigtail ({k}): bend at the hinge notch",
+                     f"{m.key} pigtail ({k}): every bend after the stiff run",
                      f"rounds to r {_f(least)} at worst ({at:g} deg) over {len(bends)} angles >= "
-                     f"{PIGTAIL.key} min bend r {PIGTAIL.min_bend_r}; closed U-turn r "
-                     f"{_f(closed_r)} (the closed box allows {_f(span / 2)}: half of {_f(span)} "
-                     f"from the lid's inside face to the floor)")
+                     f"{PIGTAIL.key} min bend r {PIGTAIL.min_bend_r}; closed r {_f(closed_r)}, "
+                     f"the U-turn from the lid's inside face (z {_f(lid_top)}) to the run "
+                     f"(z {_f(end[2])}) allows {_f((lid_top - end[2]) / 2)}, the room behind the "
+                     f"run's end (y {_f(end[1])} to {_f(yd)}) {_f(yd - end[1])}")
 
         c = usb_cable()
         path = usb_path(lay, k)
@@ -762,26 +822,22 @@ def lid_catch(report: Report, lay: Layout) -> None:
 
 def _budget(lay: Layout) -> dict[str, float]:
     """The box's dimensions from the part data by the spec's formula (layout
-    docstring, "Base rows" and "Lid"), recomputed here."""
+    docstring, "Base rows" and "Lid"), recomputed here: the board row (its
+    keep-outs, not the VGA plug), port room + bay, the VGA plug's keep-out
+    in the bank row's corner (from the part data) + SLACK, the monitor."""
     w, s = lay.wall, SLACK
     b = BATTERIES[L.DESIGN_BANK]
     mw, mh, md = MONITORS[L.DESIGN_MONITOR].panel
-    ks = list(lay.board_keepouts.values())
+    ks = [v for key, v in lay.board_keepouts.items() if not key.endswith("/vga_plug")]
     u = ks[0]
     for k in ks[1:]:
         u = u.union(k)
     board_x, board_y, stack = u.size[0] + 2 * s, u.size[1], u.size[2]
     port = max(max(CABLES[k].plug[0] for k in L.BANK_SIDE_PLUGS) + s, FINGERTIP_D)
     bay_x, bay_y = b.size[0] + 2 * s, b.size[1] + 2 * s
-    bank_x = port + bay_x
-    bl, bw, bh = (d + 2 * s for d in BOOST.plug)
-    room = max(board_x, mw + 2 * s) - bank_x
-    turns = [fx for fx, fy in ((bl, bw), (bw, bl))
-             if fx <= room + EPS and fy <= bay_y + EPS and bh <= max(b.size[2], stack) + s + EPS]
-    if turns:
-        bank_x += turns[0]
-    width = max(board_x, bank_x, mw + 2 * s) + 2 * w
-    depth = max(w + s + board_y + s + bay_y + s + w, mh + 2 * s + 2 * w)
+    plug_x = max(vga_plug_box(lay, k).x1 for k in BOARD_KEYS) - w + s
+    width = max(board_x, port + bay_x, plug_x, mw + 2 * s) + 2 * w
+    depth = max(w + s + board_y + s + bay_y + s + w, mh + 2 * s + 2 * w + L.CATCH_BLOCK)
     return {"width": width, "depth": depth, "height": w + max(b.size[2], stack) + s,
             "lid width": width, "lid depth": depth,
             "lid height": w + L.TAPE_T + md + L.CLOSED_CLEARANCE}

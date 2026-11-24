@@ -8,17 +8,18 @@ The claims, each a function in ``demobox.checks``, run against
   design bank the bank bay, each with SLACK;
 * ``boards_seat``: both board revisions sit on the plinth inside the walls,
   each pin in its PCB hole and its plinth hole, nothing overlapping;
-* ``bank_lifts_out``: with the lid at its stop nothing is over the bank bay
-  above the rim, so the bank lifts straight out;
+* ``bank_lifts_out``: with the lid at its stop nothing is over the bank, as
+  packed in its bay, above the rim, so it lifts straight out;
 * ``button_reachable``: the bank's button faces the port room, which takes
   a fingertip;
 * ``lid_closed_clears``: closed, the monitor face clears everything in the
   base, and the board can't lift off its pins;
-* ``hinge_sweep``: the lid's profile, every degree from closed to its open
-  angle, stays out of the base's;
-* ``cables_route``: the monitor's pigtail reaches the TinyVGA through the
-  hinge notch within its length and bend radius at every angle, and the
-  bank's USB cable reaches J1;
+* ``hinge_sweep``: every degree from closed to its open angle, the lid
+  misses everything in the base: whole where the knuckles go (``knuckle_x``),
+  cut back to the hinge relief elsewhere;
+* ``cables_route``: the monitor's pigtail reaches the VGA plug's stiff run
+  (in the bank row's back corner) through the hinge notch, within its length
+  and bend radius at every angle, and the bank's USB cable reaches J1;
 * ``lid_catch``: the catch magnets face each other when shut, their blocks
   clear of the board and the monitor;
 * ``size_budget``: the box is no bigger than its contents + SLACK + walls.
