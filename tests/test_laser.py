@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cadquery as cq
 import pytest
+from shapely.geometry import box as sbox
 
 from demobox import layout as L
 from demobox.clash import clashes
@@ -230,14 +231,16 @@ def test_every_joint_is_complementary(which, body, thin):
         assert solids[j.a].intersect(solids[j.b]).Volume() <= 1e-3, (j.a, j.b)
         for s0, s1, owner in j.segments:
             sb = j.segment_box(s0, s1)
-            want = _solid_box(sb)
-            for c in b.slab_cuts[owner]:
-                if overlaps(sb, c):
-                    want = want.cut(_solid_box(c))
+            # the owner has the whole segment, less its own feature cuts
+            # (in its plane; the zone spans its thickness)
+            u, v = P.PLANE[b.slab_panels[owner].normal]
+            rect = sbox(*(getattr(sb, f"{u}0"), getattr(sb, f"{v}0"),
+                          getattr(sb, f"{u}1"), getattr(sb, f"{v}1")))
+            want = rect.difference(b.slab_cuts[owner]).area * b.t
             got = solids[owner].intersect(_solid_box(sb)).Volume()
-            assert got == pytest.approx(want.Volume(), abs=1e-2), (j.a, j.b, s0, owner)
+            assert got == pytest.approx(want, abs=1e-2), (j.a, j.b, s0, owner)
             for n, s in solids.items():
-                if n != owner and overlaps(boxes[n], sb):
+                if n != owner and b.slab_panels[n].frame == j.frame and overlaps(boxes[n], sb):
                     assert s.intersect(_solid_box(sb)).Volume() <= 1e-3, (j.a, j.b, s0, n)
 
 
@@ -319,6 +322,18 @@ def test_plinth_top_has_the_pin_holes(body, lay):
         assert not _inside(s, (p.cx + L.PEG_DIA / 2 - 0.05, p.cy, zm)), key
         assert _inside(s, (p.cx + L.PEG_DIA / 2 + 0.3, p.cy, zm)), key
     assert len(top.holes) == len(lay.pins)
+
+
+def test_plinth_walls_leave_a_web_by_the_pin_holes(body, lay):
+    """The walls (and their mortises in the top) stay a panel thickness
+    clear of every pin hole: the front wall comes in behind the MT1 holes."""
+    for n in PLINTH[1:]:
+        b = body.slab_panels[n].box()
+        for key, p in lay.pins.items():
+            dx = max(b.x0 - p.cx, 0.0, p.cx - b.x1)
+            dy = max(b.y0 - p.cy, 0.0, p.cy - b.y1)
+            assert math.hypot(dx, dy) >= P.PIN_HOLE_D / 2 + WALL - 1e-6, (n, key)
+    assert body.slab_panels["plinth-front"].box().y0 > lay.plinth.y0     # set back
 
 
 def test_plinth_relief_is_clear(body, lay):
