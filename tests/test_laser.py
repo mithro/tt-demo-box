@@ -18,6 +18,7 @@ from demobox.laser import panels as P
 from demobox.parts.board import BOARD_KEYS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
+from demobox.shared import solids as S
 
 ROOT = Path(__file__).resolve().parent.parent
 WALL = L.ROUTES["laser"]
@@ -129,13 +130,15 @@ def test_hardware_exact(lay):
     assert F.hardware(lay, WALL) == {
         "6 x 3 mm disc magnet": 4,
         f"3 mm rod x {rod:.0f} mm (hinge pin)": 1,
-        "3 mm rod x 10 mm (board pins, MT2 + loose MT1)": 2,
+        "3 mm rod x 19.7 mm (board pins, MT2 + loose MT1)": 2,
         "wood glue": 1,
         "double-sided foam tape (VHB type), monitor back and boost module": 1,
     }
     assert lay.boost_in_lid
     # R22/R24: from the first knuckle's blind end (156.5 + 1.0) to x 198.9
     assert f"{rod:.0f}" == "41"
+    # R28: floor top (3.0) to the PCB top (17.15 + 1.561) + PIN_PROUD (4.0)
+    assert F.board_pin_length(lay) == pytest.approx(22.711 - 3.0)
 
 
 # --- panels -----------------------------------------------------------------------
@@ -311,16 +314,18 @@ def test_dxf_layers(body, tmp_path):
 # --- the plinth and the board pins ------------------------------------------------------
 
 def test_plinth_top_has_the_pin_holes(body, lay):
-    """MT2's rod is glued in, each revision's MT1 takes the loose rod: a
-    hole in plinth-top at every pin, PEG_DIA across."""
+    """MT2's rod is glued in a PEG_DIA hole, each revision's MT1 takes the
+    loose rod in a PEG_HOLE_D slip-fit hole, in plinth-top."""
     top = body.panels["plinth-top"]
     s = top.solid()
     assert top.box().z1 == pytest.approx(lay.plinth.z1)
     zm = lay.plinth.z1 - WALL / 2
     for key, p in lay.pins.items():
+        r = (L.PEG_DIA if key == "MT2" else L.PEG_HOLE_D) / 2
+        assert P.pin_hole_d(key) == 2 * r
         assert not _inside(s, (p.cx, p.cy, zm)), key
-        assert not _inside(s, (p.cx + L.PEG_DIA / 2 - 0.05, p.cy, zm)), key
-        assert _inside(s, (p.cx + L.PEG_DIA / 2 + 0.3, p.cy, zm)), key
+        assert not _inside(s, (p.cx + r - 0.05, p.cy, zm)), key
+        assert _inside(s, (p.cx + r + 0.05, p.cy, zm)), key
     assert len(top.holes) == len(lay.pins)
 
 
@@ -332,7 +337,7 @@ def test_plinth_walls_leave_a_web_by_the_pin_holes(body, lay):
         for key, p in lay.pins.items():
             dx = max(b.x0 - p.cx, 0.0, p.cx - b.x1)
             dy = max(b.y0 - p.cy, 0.0, p.cy - b.y1)
-            assert math.hypot(dx, dy) >= P.PIN_HOLE_D / 2 + WALL - 1e-6, (n, key)
+            assert math.hypot(dx, dy) >= P.pin_hole_d(key) / 2 + WALL - 1e-6, (n, key)
     assert body.slab_panels["plinth-front"].box().y0 > lay.plinth.y0     # set back
 
 
@@ -395,8 +400,39 @@ def test_knuckles_and_stop_are_in_the_blocks(lay, parts):
         assert _inside(kb, p), s
 
 
+def test_lid_back_is_fit_from_the_seal_bead(lay, body, parts):
+    """R29: shut, the lid's back is FIT from the seal bead all along the
+    open segments, as in the printed route: across the back wall's
+    thickness, just inside the bead's arc is bead and just FIT (+0.02)
+    outside it, at the same angle, is lid (knuckles-lid's strip, or lid-left
+    at the left wall)."""
+    hy, hz = lay.hinge_axis
+    rb = lay.hinge_relief_r - L.FIT
+    lid = [s for n, s, _ in _shut() if n in ("knuckles-lid", "lid-left", "lid-back")]
+    bead = parts["seal-bead"].solid
+    y_in = lay.lid_outer.y1 - WALL
+    worst = 0.0
+    for x0, x1 in H.bead_x(lay):
+        for x in (x0 + 1.5, (x0 + x1) / 2, x1 - 0.2):
+            for u in (y_in + 0.05, (y_in + H.KNUCKLE_R) / 2, H.KNUCKLE_R - 0.05):
+                a = math.acos(u / (rb + L.FIT + 0.02))
+                assert _inside(bead, (x, hy + (rb - 0.02) * math.cos(a),
+                                      hz + (rb - 0.02) * math.sin(a))), (x, u)
+                # the first lid material outward along the ray from the bead
+                gap = None
+                for i in range(1, 61):
+                    r = rb + 0.05 * i
+                    p = (x, hy + r * math.cos(a), hz + r * math.sin(a))
+                    if any(_inside(s, p) for s in lid):
+                        gap = r - rb
+                        break
+                assert gap is not None and gap <= L.FIT + 0.05 + 1e-9, (x, u, gap)
+                worst = max(worst, gap)
+    assert worst <= L.FIT + 0.05
+
+
 def test_rod_press_fit_only_in_the_lid_block(lay, parts):
-    rod = B._rod(lay)
+    rod = S.hinge_rod(lay)
     assert _common(rod, parts["knuckles-base"].solid) < 1e-3
     ring = math.pi * ((L.PIN_ROD_D / 2) ** 2 - (H.PRESS_D / 2) ** 2) * H.PRESS_LEN
     lid_block = parts["knuckles-lid"].solid.moved(lay.lid_location(0.0))
@@ -412,7 +448,7 @@ def test_printed_parts(parts):
     for name, p in parts.items():
         assert len(p.solid.Solids()) == 1 and p.solid.isValid(), name
         assert p.note, name
-        bb = B.posed(p).BoundingBox()
+        bb = S.posed(p).BoundingBox()
         assert bb.xlen <= L.PRINT_BED[0] and bb.ylen <= L.PRINT_BED[1], name
     assert "4" in parts["magnet-block"].note
 
@@ -467,19 +503,23 @@ def test_nothing_proud(lay):
         assert bb.zmin >= o.z0 - 1e-6 and bb.zmax <= top + 1e-6, (name, bb.zmin, bb.zmax)
 
 
-def test_board_pins_stand_proud_of_the_board(lay):
-    d = {n: s for n, s, _ in _shut()}
-    for key, n in (("MT2", "hw:board-pin-mt2"), (f"{F.ASSEMBLY_BOARD}/MT1", "hw:board-pin-mt1")):
+@pytest.mark.parametrize("rev", BOARD_KEYS)
+def test_board_pins_stand_on_the_floor(lay, rev):
+    """R28: both rods stand on the base floor (so neither can drop into the
+    plinth) and reach PIN_PROUD above the fitted revision's PCB top."""
+    d = {n: s for n, s, _ in F.assembly(0.0, False, board=rev)}
+    pcb_top = d["board"].BoundingBox().zmax
+    for n in ("hw:board-pin-mt2", "hw:board-pin-mt1"):
         bb = d[n].BoundingBox()
-        p = lay.pins[key]
-        assert bb.zmax == pytest.approx(p.z1)
-        assert bb.zlen == pytest.approx(F.BOARD_PIN_LEN)
-        assert bb.zmin < lay.plinth.z1 - WALL                 # right through the plinth top
+        assert bb.zmin == pytest.approx(lay.wall), n                    # the floor's top
+        assert _common(d[n], d["base-floor"]) < 1e-6, n                 # on it, not in it
+        assert bb.zmax == pytest.approx(pcb_top + L.PIN_PROUD), n
+        assert bb.zlen == pytest.approx(F.board_pin_length(lay)), n
 
 
 def test_assembly_bank_out_is_lifted(lay):
     out = {n: s for n, s, _ in F.assembly(L.LID_OPEN_DEG, True)}
-    assert out["bank"].BoundingBox().zmin == pytest.approx(lay.rim_z + B.BANK_OUT_LIFT)
+    assert out["bank"].BoundingBox().zmin == pytest.approx(lay.rim_z + S.BANK_OUT_LIFT)
 
 
 def test_only_the_press_fit_is_declared():

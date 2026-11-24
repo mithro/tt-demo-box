@@ -18,9 +18,10 @@ Panels
   the plinth's edge where a board pin's hole would be within a panel
   thickness of it (the MT1 holes are 4 mm from the plinth's front edge), so
   the top overhangs there (``plinth_walls``).  ``plinth_relief`` (R7) is cut out of the top
-  and of any wall it reaches.  ``plinth-top`` has a PIN_HOLE_D hole at each
-  of ``Layout.pins``: MT2's rod is glued in, the loose MT1 rod is pushed into
-  the hole of the board revision fitted.
+  and of any wall it reaches.  ``plinth-top`` has a hole at each of
+  ``Layout.pins`` (``pin_hole_d``): MT2's rod is glued in a tight one; the
+  loose MT1 rod drops into the slip-fit hole of the board revision fitted.
+  Both rods stand on the floor (R28, ``fittings.board_pin_length``).
 * Lid: a tray, ``lid-top`` (the outside top, the monitor taped under it) and
   four walls (``lid-front``, ``-back``, ``-left``, ``-right``) down to the seam.
 
@@ -31,13 +32,15 @@ The hinge (``demobox.shared.hinge``) is printed (``fittings``):
   the +X side, ``hinge_depth`` below and in front of the axis), and
   ``knuckles-base`` fills that cut-out flush with the outside faces: the
   base knuckle, the stop blocks and the relief round the lid knuckles;
-* the lid's back and right walls likewise at their bottom back corner, filled
-  by ``knuckles-lid`` (the lid knuckles and the bridge between them);
+* the lid's back wall is cut ``hinge_depth`` up along its whole bottom edge
+  (from the left wall's inner face) and the right wall at its bottom back
+  corner, filled by ``knuckles-lid``: the lid knuckles, and between them a
+  printed strip whose underside is the relief circle (radius
+  ``hinge_relief_r`` about the axis), FIT clear of the seal bead (R29; a
+  flat plywood edge clear of the circle would leave up to 1.9 mm);
 * elsewhere along X (open segments, R21) the base's back wall is whole up to
-  the rim and carries the printed ``seal-bead`` on its top edge; the lid is
-  relieved: ``lid-back``'s bottom edge is raised clear of the relief circle
-  (radius ``hinge_relief_r`` about the axis, ``lid_back_z0``) and
-  ``lid-left`` has that circle cut from its back bottom corner.
+  the rim and carries the printed ``seal-bead`` on its top edge; ``lid-left``
+  has the relief circle cut from its back bottom corner.
 
 Joints
 ------
@@ -75,7 +78,7 @@ no seam can split raises ``BedOverflow`` naming it and its size.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Mapping
 
@@ -85,7 +88,7 @@ from shapely.ops import unary_union
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.geom import BedOverflow, Box
-from demobox.layout import FIT, LASER_BED, PEG_DIA, Layout
+from demobox.layout import FIT, LASER_BED, PEG_DIA, PEG_HOLE_D, Layout
 from demobox.laser import joints as J
 from demobox.shared import hinge as H
 
@@ -101,10 +104,11 @@ SEAM_MARGIN = 2.0
 MIN_RUN_T = 3.0
 #: Engraved label height.
 LABEL_H = 4.0
-#: The board pins' holes in ``plinth-top``: the PEG_DIA rod's own diameter,
-#: so MT2's is a tight fit for the glue and the loose MT1 rod a push fit that
-#: holds it at height and pulls out by hand for the other revision.
-PIN_HOLE_D = PEG_DIA
+#: The board pins' holes in ``plinth-top``: MT2's the rod's own diameter, a
+#: tight fit for the glue; MT1's PEG_HOLE_D, a slip fit, so the loose rod
+#: (standing on the floor, R28) lifts out by hand for the other revision.
+MT2_HOLE_D = PEG_DIA
+MT1_HOLE_D = PEG_HOLE_D
 #: Segments of the lid's relief circle cut from ``lid-left`` (a polygon
 #: round the circle, never inside it).
 ARC_SEGMENTS = 64
@@ -294,8 +298,10 @@ def hinge_depth(lay: Layout, t: float) -> float:
 def hinge_cutouts(lay: Layout, t: float) -> dict[str, tuple[Box, Box]]:
     """The walls' hinge cut-outs, which the knuckle blocks fill exactly:
     ``"base"`` (base frame) and ``"lid"`` (lid frame, closed), each (the back
-    wall's, the right wall's).  Along X they run from FIT before the first
-    knuckle (where the base's relief round it starts) to the +X side face."""
+    wall's, the right wall's).  Along X the base's run from FIT before the
+    first knuckle (where the base's relief round it starts) to the +X side
+    face; the lid's from the left wall's inner face (R29: the block's strip
+    is the lid's back lip along the open segments too)."""
     o, lo = lay.outer, lay.lid_outer
     hy, hz = lay.hinge_axis
     d = hinge_depth(lay, t)
@@ -304,17 +310,9 @@ def hinge_cutouts(lay: Layout, t: float) -> dict[str, tuple[Box, Box]]:
         "base": (Box(x0, o.y1 - t, hz - d, o.x1, o.y1, o.z1, "base back wall hinge cut-out"),
                  Box(o.x1 - t, hy - d, hz - d, o.x1, o.y1, o.z1,
                      "base right wall hinge cut-out")),
-        "lid": (Box(x0, lo.y1 - t, lo.z0, lo.x1, lo.y1, d, "lid back wall hinge cut-out"),
+        "lid": (Box(lo.x0 + t, lo.y1 - t, lo.z0, lo.x1, lo.y1, d, "lid back wall hinge cut-out"),
                 Box(lo.x1 - t, -d, lo.z0, lo.x1, lo.y1, d, "lid right wall hinge cut-out")),
     }
-
-
-def lid_back_z0(lay: Layout, t: float) -> float:
-    """``lid-back``'s bottom edge in the open segments (lid frame): clear of
-    the relief circle across the wall's thickness."""
-    rr = lay.hinge_relief_r
-    y_in = lay.lid_outer.y1 - t
-    return math.sqrt(rr * rr - y_in * y_in) if 0.0 < y_in < rr else rr
 
 
 def _relief_polygon(r: float, n: int = ARC_SEGMENTS) -> list[tuple[float, float]]:
@@ -327,6 +325,11 @@ def _relief_polygon(r: float, n: int = ARC_SEGMENTS) -> list[tuple[float, float]
 
 # --- the plinth ---------------------------------------------------------------------------
 
+def pin_hole_d(key: str) -> float:
+    """The hole in ``plinth-top`` for board pin ``key`` (``Layout.pins``)."""
+    return MT2_HOLE_D if key == "MT2" else MT1_HOLE_D
+
+
 def plinth_walls(lay: Layout, t: float) -> tuple[float, float, float, float]:
     """(x_left, x_right, y_front, y_back): the plinth walls' outer faces.
     Each is at the plinth's edge unless a pin hole there would come within a
@@ -334,13 +337,12 @@ def plinth_walls(lay: Layout, t: float) -> tuple[float, float, float, float]:
     a web of plywood by the hole): then the wall comes in to ``t`` past the
     hole."""
     pl = lay.plinth
-    keep = PIN_HOLE_D / 2 + t
-    pins = list(lay.pins.values())
-    yf = max([pl.y0] + [p.cy + keep for p in pins if p.cy - keep < pl.y0 + t])
-    yb = min([pl.y1] + [p.cy - keep for p in pins if p.cy + keep > pl.y1 - t])
-    inner = [p for p in pins if yf + t < p.cy < yb - t]
-    xl = max([pl.x0] + [p.cx + keep for p in inner if p.cx - keep < pl.x0 + t])
-    xr = min([pl.x1] + [p.cx - keep for p in inner if p.cx + keep > pl.x1 - t])
+    pins = [(p, pin_hole_d(k) / 2 + t) for k, p in lay.pins.items()]
+    yf = max([pl.y0] + [p.cy + k for p, k in pins if p.cy - k < pl.y0 + t])
+    yb = min([pl.y1] + [p.cy - k for p, k in pins if p.cy + k > pl.y1 - t])
+    inner = [(p, k) for p, k in pins if yf + t < p.cy < yb - t]
+    xl = max([pl.x0] + [p.cx + k for p, k in inner if p.cx - k < pl.x0 + t])
+    xr = min([pl.x1] + [p.cx - k for p, k in inner if p.cx + k > pl.x1 - t])
     if xr - xl < 3 * t or yb - yf < 3 * t:
         raise ValueError(f"the board pins leave no room for the plinth's walls: "
                          f"x {xl:.2f}..{xr:.2f}, y {yf:.2f}..{yb:.2f}")
@@ -400,7 +402,7 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
             add("plinth-right", "base", "x", Box(xr - t, yf, 0, xr, yb, z1), 1,
                 "Plinth right wall."),
         )
-        top.holes += [(p.cx, p.cy, PIN_HOLE_D) for p in lay.pins.values()]
+        top.holes += [(p.cx, p.cy, pin_hole_d(k)) for k, p in lay.pins.items()]
         r = lay.plinth_relief
         for sl in (top, *walls):
             if _overlap(sl.box, r):
@@ -420,9 +422,7 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
                 "Lid left wall; its back corner is cut round the hinge relief.")
     lright = add("lid-right", "lid", "x", Box(W - t, lo.y0, 0, W, lo.y1, Lz), 3,
                  "Lid right wall; knuckles-lid fills its bottom back cut-out.")
-    lback.cuts += [cut["lid"][0],
-                   Box(-1.0, lo.y1 - t, -1.0, cut["lid"][0].x0, lo.y1, lid_back_z0(lay, t),
-                       "lid relief")]
+    lback.cuts.append(replace(cut["lid"][0], x0=lo.x0 - 1.0, z0=lo.z0 - 1.0))
     lright.cuts.append(cut["lid"][1])
     lleft.polys.append(_relief_polygon(lay.hinge_relief_r))     # (u, v) = (y, z) about the axis
     for c in lay.lid_catch:
@@ -450,7 +450,7 @@ def _joint_specs(lay: Layout, t: float, slabs: dict[str, _Slab]) -> list[_Spec]:
         S("lid-top", "lid-right", "lid-top"),
         S("lid-front", "lid-left", "lid-front"),
         S("lid-front", "lid-right", "lid-front"),
-        S("lid-back", "lid-left", "lid-back", ((0.0, lay.hinge_relief_r, "lid-left"),)),
+        S("lid-back", "lid-left", "lid-back", ((0.0, cut["lid"][0].z1, "lid-left"),)),
         S("lid-back", "lid-right", "lid-back", ((0.0, cut["lid"][0].z1, "lid-right"),)),
     ]
     if "plinth-top" in slabs:
@@ -696,5 +696,5 @@ def panels(lay: Layout, t: float = 3.0, kerf: float = KERF) -> dict[str, Panel]:
 
 
 __all__ = ["Panel", "Joint", "Seam", "LaserBody", "build", "panels", "hinge_cutouts",
-           "hinge_depth", "lid_back_z0", "plinth_walls", "BedOverflow", "KERF",
+           "hinge_depth", "pin_hole_d", "plinth_walls", "BedOverflow", "KERF",
            "DECLARED_OVERLAPS"]
