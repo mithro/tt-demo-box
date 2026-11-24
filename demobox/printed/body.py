@@ -26,7 +26,8 @@ A tub: floor and four walls ``wall`` thick, up to ``rim_z``.  It has:
   MAGNET_POCKET_DEPTH deep, open at the rim: the magnet sits MAGNET_RECESS
   under the seam (flush);
 * the hinge (``demobox.shared.hinge``): ``(body - knuckle_cut) | knuckles |
-  seal_bead``, then the pigtail's ``hinge_notch`` cut out.
+  seal_bead``, then the pigtail's ``hinge_notch`` cut out above the rim
+  only (R26: the seal bead's notch; the back wall under it stays whole).
 
 The bank bay, port room and the VGA plug's corner are plain floor (spec
 non-goal: no shaped pockets).  If a kit's boost module sits on the floor
@@ -232,7 +233,11 @@ def _base(lay: Layout) -> cq.Solid:
                  *(_catch_block(lay.catch_base_block(c), rim, -1.0) for c in lay.lid_catch))
     body = _cut(body, H.knuckle_cut(lay, "base").val())
     body = _fuse(body, *H.knuckles(lay, "base").vals(), *H.seal_bead(lay).vals())
-    cuts = [_bx(lay.plinth_relief), *_mt1_holes(lay), _bx(lay.hinge_notch)]
+    # R26: the notch only above the rim, where the pigtail passes (the seal
+    # bead's notch); the back wall under it stays whole
+    n = lay.hinge_notch
+    cuts = [_bx(lay.plinth_relief), *_mt1_holes(lay),
+            _box(n.x0, n.y0, max(n.z0, rim), n.x1, n.y1, n.z1)]
     cuts += [_pocket(c.cx, c.cy, rim, -1.0) for c in lay.lid_catch]
     cavity = _plinth_cavity(lay)
     if cavity is not None:

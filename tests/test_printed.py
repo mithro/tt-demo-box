@@ -281,14 +281,30 @@ def test_seal_bead_on_the_base(lay, base):
 
 
 def test_notch_is_clear(lay, base, lid):
+    """The notch is open above the seam (the seal bead's notch, where the
+    pigtail passes) in both parts (R26)."""
     n = lay.hinge_notch
     hy, hz = lay.hinge_axis
     xm = (n.x0 + n.x1) / 2
     for dy in (-3.5, 0.0, 2.0, 3.5):
-        for dz in (-3.5, -0.5, 0.5, 3.5):
+        for dz in (0.5, 3.5):
             p = (xm, hy + dy, hz + dz)
             assert not _inside(base, p), p
             assert not _inside(lid, _in_lid_frame(lay, p)), p
+
+
+def test_back_wall_solid_below_the_rim_at_the_notch(lay, base):
+    """R26: no slot in the base's back wall under the notch (across its X
+    range, less the hinge's own relief FIT past a lid knuckle's end)."""
+    n, o, w = lay.hinge_notch, lay.outer, lay.wall
+    x1 = min([n.x1] + [k.x0 - L.FIT for k in H.knuckle_plan(lay)
+                       if k.part == "lid" and k.x0 >= n.x0])
+    assert x1 - n.x0 > 0.8 * (n.x1 - n.x0)
+    for fx in (0.05, 0.5, 0.95):
+        x = n.x0 + fx * (x1 - n.x0)
+        for y in (o.y1 - w + 0.1, o.y1 - w / 2, o.y1 - 0.1):
+            for z in (lay.rim_z - 0.1, lay.rim_z - 2.0, n.z0 - 0.5):
+                assert _inside(base, (x, y, z)), (x, y, z)
 
 
 # --- the lid --------------------------------------------------------------------------
