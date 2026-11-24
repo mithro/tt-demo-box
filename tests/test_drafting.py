@@ -305,7 +305,7 @@ def test_ga_rod_length_is_the_hardware_lists(route):
     board = f"{LF.board_pin_length(lay):.1f}" if route == "laser" else None
     want = f"{H.pin_length(lay):.1f}"
     for n in sheets:
-        found = [v for v in re.findall(r"3 mm (?:rod )?x (\d+(?:\.\d+)?) mm",
+        found = [v for v in re.findall(r"3 mm (?:steel rod |rod )?x (\d+(?:\.\d+)?) mm",
                                        _sheet_words(n)) if v != board]
         assert found and set(found) == {want}, (n, found)
 
