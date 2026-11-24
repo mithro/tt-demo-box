@@ -339,12 +339,13 @@ def test_base_sheet_dimensions_its_features():
 def test_lid_sheet_dimensions_its_features():
     """The lid sheet shows the tray, the knuckles and the magnet pockets."""
     from demobox.layout import ROUTES, layout
+    from demobox.geom import mm
     from demobox.shared import hinge as H
     lay = layout(ROUTES["printed"])
     words = _sheet_words("TDB-LID-P")
     for k in H.knuckle_plan(lay):
         if k.part == "lid":
-            assert f"{k.x1 - k.x0:.2f}" in words, k
+            assert mm(k.x1 - k.x0) in words, k      # the sheets' one rounding: 9.475 -> 9.48
     for word in ("KNUCKLE", "MAGNET", "tape"):
         assert word in words, word
     assert "TRAY" in words
