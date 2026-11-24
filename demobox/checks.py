@@ -529,9 +529,9 @@ def packed_bank(lay: Layout) -> Box:
 
 
 def bank_lifts_out(report: Report, lay: Layout) -> None:
-    """R12: with the lid at LID_OPEN_DEG nothing (the lid included) is over
-    the design bank's own footprint, as packed in the bay, above the rim: the
-    bank lifts straight out.  (The swinging lid against the bank, and every
+    """R12: with the lid at LID_OPEN_DEG nothing (the lid and the hinge's
+    seal bead included) is over the design bank's own footprint, as packed in
+    the bay, above the rim: the bank lifts straight out.  (The swinging lid against the bank, and every
     other base content, is ``hinge_sweep``'s.)"""
     bank, a = packed_bank(lay), L.LID_OPEN_DEG
     lid, rim = lay.lid_outer, lay.rim_z
@@ -552,6 +552,10 @@ def bank_lifts_out(report: Report, lay: Layout) -> None:
     things.update({"plinth": lay.plinth, "port room": lay.port_room})
     if not lay.boost_in_lid:
         things["boost pocket"] = lay.boost_pocket
+    bys, bzs = zip(*H.bead_yz(lay))                      # R21: the base's seal bead
+    for i, (x0, x1) in enumerate(H.bead_x(lay), 1):
+        things[f"seal bead {i}"] = Box(x0, min(bys), min(bzs), x1, max(bys), max(bzs),
+                                       f"seal bead {i}")
     hits = [n for n, b in things.items() if b.z1 > rim + EPS and _xy_overlap(b, bank)]
     report.check(not hits, f"{bank.what} in the bank bay: nothing in the base over it",
                  "over it: " + ", ".join(hits) if hits else
@@ -679,8 +683,9 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
       there), and at least two ranges of ``KNUCKLE_LEN``.
     * At every angle from closed to LID_OPEN_DEG, inside ``knuckle_x`` the
       whole lid misses every base content there.
-    * In open segments, the lid cut back to ``hinge_relief_r`` misses every
-      base content there, and the base's walls cut back the same.
+    * In open segments (R21), the lid cut back to ``hinge_relief_r`` misses
+      every base content there, the base's intact walls (its whole YZ
+      profile: nothing cut back) and the seal bead (``hinge.bead_yz``).
 
     Closed, the lid rests on the base: contact (below AREA_TOL), not a
     collision.  The profile turns about the hinge axis (checked against an
@@ -691,7 +696,8 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
     hy, hz = lay.hinge_axis
     rr = lay.hinge_relief_r
     relief = Point(hy, hz).buffer(rr, quad_segs=64)
-    walls = sbox(o.y0, o.z0, o.y1, o.z1).difference(relief)
+    walls = sbox(o.y0, o.z0, o.y1, o.z1)                 # R21: intact in open segments
+    bead = Polygon(H.bead_yz(lay))
     knuckles, opens = list(lay.knuckle_x), _open_x(lay)
     contents = L.base_contents(lay)
 
@@ -719,7 +725,8 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
                                for y, z in corners))
         cut = prof.difference(relief)
         for kind, shape, things in (("knuckle", prof, in_k),
-                                    ("open", cut, {**in_o, "base walls": walls})):
+                                    ("open", cut, {**in_o, "base walls": walls,
+                                                   "seal bead": bead})):
             for n, t in things.items():
                 area = shape.intersection(t).area
                 if area > worst[kind][0]:
@@ -735,7 +742,7 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
             ("knuckle", "knuckle segments: whole lid misses every base content in knuckle_x",
              len(in_k)),
             ("open", "open segments: lid cut back to the hinge relief misses every base "
-                     "content and the cut base walls", len(in_o) + 1)):
+                     "content, the intact base walls and the seal bead", len(in_o) + 2)):
         area, a, n = worst[kind]
         report.check(area <= AREA_TOL, what,
                      f"{n_things} parts, {len(angles)} angles; largest YZ overlap {area:.3g} mm^2"

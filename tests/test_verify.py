@@ -299,6 +299,45 @@ def test_hinge_sweep_fails_with_no_lid_knuckle(lay):
     assert any("stop" in f for f in failed), failed
 
 
+def _bead_scaled(k, du=0.0):
+    """``hinge.bead_yz`` scaled by k about the axis, its front moved du."""
+    from demobox.shared import hinge as H
+    real = H.bead_yz
+
+    def scaled(lay):
+        hy, hz = lay.hinge_axis
+        return tuple((hy + k * (y - hy) + (du if y - hy < EPS_U else 0.0), hz + k * (z - hz))
+                     for y, z in real(lay))
+    return scaled
+
+
+EPS_U = -0.4     # bead points in front of this u (only its front edge) move by du
+
+
+def test_hinge_sweep_open_segments_take_the_intact_base_and_bead(lay):
+    """R21: the open-segment check names the intact base walls and the bead."""
+    r = _run(C.hinge_sweep, lay)
+    opens = [what for ok, what, _ in r.results if what.startswith("open segments")]
+    assert opens and all("intact" in w and "seal bead" in w for w in opens), opens
+
+
+def test_hinge_sweep_fails_with_the_bead_too_big(lay, monkeypatch):
+    """The bead grown past the lid's relief: the lid meets it, hinge_sweep fails."""
+    from demobox.shared import hinge as H
+    monkeypatch.setattr(H, "bead_yz", _bead_scaled(1.15))
+    failed = _failed(_run(C.hinge_sweep, lay))
+    assert failed and all("open segments" in f for f in failed), failed
+    assert any("(seal bead at" in f for f in failed), failed
+
+
+def test_bank_lifts_out_fails_with_the_bead_over_the_bank(lay, monkeypatch):
+    """The bead reaching 3 mm over the bank row: the bank can't lift straight out."""
+    from demobox.shared import hinge as H
+    monkeypatch.setattr(H, "bead_yz", _bead_scaled(1.0, du=-3.0))
+    failed = _failed(_run(C.bank_lifts_out, lay))
+    assert failed and any("seal bead" in f for f in failed), failed
+
+
 # --- the pigtail path ---------------------------------------------------------------
 
 def test_pigtail_path_runs_exit_notch_plug(lay):

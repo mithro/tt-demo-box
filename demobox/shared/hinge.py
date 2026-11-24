@@ -1,48 +1,63 @@
-"""The lid hinge: printed knuckles on one straight full-width rod, no screws.
+"""The lid hinge: printed knuckles on one straight rod, no screws.
 
-Frames are ``demobox.layout``'s.  ``knuckles(lay, "base")`` and
-``knuckle_cut(lay, "base")`` are in the base frame; the lid's are in the lid
-frame (closed), so ``lay.lid_location(a)`` places them ``a`` degrees open.
-Every solid here is a prism along X of a profile in the YZ plane about the
-hinge axis, which is on the seam, ``KNUCKLE_R`` in from the back face
-(``lay.hinge_axis``).  Below, (u, v) is a point of that plane relative to the
-axis: u backwards (+Y, away from the visitor), v up (+Z).  Opening turns the
-lid's (u, v) by -angle about the axis.
+Frames are ``demobox.layout``'s.  ``knuckles(lay, "base")``,
+``knuckle_cut(lay, "base")`` and ``seal_bead`` are in the base frame; the
+lid's are in the lid frame (closed), so ``lay.lid_location(a)`` places them
+``a`` degrees open.  Every solid here is a prism along X of a profile in the
+YZ plane about the hinge axis, which is on the seam, ``KNUCKLE_R`` in from
+the back face (``lay.hinge_axis``).  Below, (u, v) is a point of that plane
+relative to the axis: u backwards (+Y, away from the visitor), v up (+Z).
+Opening turns the lid's (u, v) by -angle about the axis.
 
-Each part is built as ``(body - knuckle_cut(lay, part)) | knuckles(lay, part)``.
+Each part is built as ``(body - knuckle_cut(lay, part)) | knuckles(lay,
+part)``, and the base also ``| seal_bead(lay)``.
 
-Segments (ruling R15)
----------------------
+Segments (rulings R15, R21)
+---------------------------
 Along X there are three kinds of segment:
 
 * lid knuckle: the lid whole, plus its knuckle; the base cut back to
   ``lay.hinge_relief_r`` round the axis (the whole lid's back corner swings
-  through there), less the stop block the base keeps under the knuckle;
+  through there), FIT past each end of the knuckle, less the stop block the
+  base keeps under the knuckle;
 * base knuckle: the base whole, plus its knuckle; the lid cut back;
-* open: both cut back.
+* open: the lid cut back; the base whole, its back wall intact, with the
+  seal bead filling the lid's relief above the seam.
 
-``knuckle_plan`` puts the knuckles, KNUCKLE_LEN long and FIT apart, only in
-``lay.knuckle_x`` (no base content within the relief radius, not the
-pigtail's notch); every other X, the FIT gaps included, is open.  Each range
-takes as many knuckles as fit.  A range that reaches a side face has its
-knuckles flush with it; otherwise one that ends at the notch has them pushed
-against the notch (whose own width already holds the cable's FIT, while the
-range's other end is base content); otherwise they are centred.  Along X
-they alternate, lid first: with an odd count both ends are lid knuckles, each
+``knuckle_plan`` (R19) fills each ``lay.knuckle_x`` range (no base content,
+nor the bank bay, within the relief radius; not the pigtail's notch) that is
+at least KNUCKLE_LEN long with as many knuckles of at least KNUCKLE_LEN as
+fit, sharing it equally, FIT apart; every other X is open.  Along X they
+alternate, lid first: with an odd count both ends are lid knuckles, each
 carrying a stop, and every base knuckle is caught between two lid knuckles.
 ``knuckle_cut(lay, part)`` is the relief, a radius ``hinge_relief_r``
-cylinder, everywhere along X but at that part's own knuckles, plus the rod's
-bore the full width.
+cylinder -- the base's at each lid knuckle (FIT past its ends), the lid's
+everywhere along X but at its own knuckles -- with the rod's bore along the
+rod.
 
-Knuckles
---------
+Knuckles and rod
+----------------
 A knuckle is a radius KNUCKLE_R disc round the axis, bored PIN_HOLE_D for the
 rod, with a web to its part's hinge-end wall: the base knuckle's web is the
 square u 0..R, v -R..0 under the axis; the lid knuckle's is its tab, u 0..R,
 v 0..TAB_H over it.  The disc reaches the back face (u = R) and is half in
-the base, half in the lid, so nothing is proud of the closed box.  The rod is
-``pin_length`` long, the box's full width, flush with both side faces; over
-the open segments and the notch it runs through the relief, touching nothing.
+the base, half in the lid, so nothing is proud of the closed box.  The rod
+(R22) runs from the first knuckle's -X end to the +X side face, flush there
+and pushed in from there, one piece across the notch: ``pin_length``.  It is
+in a knuckle all along but the notch and the FIT gaps.  (A full-width rod
+would cross the port room and the bank bay, which reach 0.5 mm in front of
+the axis: the bank, slid back in its SLACK, would hit it.)
+
+Seal bead
+---------
+``seal_bead`` (R21) fills the lid's relief in the open segments so the closed
+box's back is shut: its profile is the disc of radius ``hinge_relief_r -
+FIT`` about the axis, above the seam (v >= 0), no further back than the
+outline (u <= R) and -- so the bank still lifts straight out (R12) -- not
+over the bank row (Y >= its back edge; u >= -0.5 in the design kit).  It
+runs along X wherever there is no knuckle (nor FIT either side of one) and
+no notch: the pigtail drops through the notch.  The lid's relief is FIT
+outside it all the way round, at every angle.
 
 Stop
 ----
@@ -83,6 +98,8 @@ TAB_H = KNUCKLE_R * math.tan(math.radians(LID_OPEN_DEG) / 2) + FIT
 STOP_R0 = KNUCKLE_R + 2 * FIT
 #: The first knuckle from -X; they alternate from it.
 FIRST_PART: Part = "lid"
+#: Segments of the seal bead's arc (a polygon inscribed in its circle).
+BEAD_ARC_SEGMENTS = 32
 
 _EPS = 1e-6
 _PARTS: tuple[Part, Part] = ("base", "lid")
@@ -114,44 +131,30 @@ def _check_part(part: str) -> None:
         raise ValueError(f"part must be one of {_PARTS}, not {part!r}")
 
 
-def _start(lay: Layout, x0: float, x1: float, span: float) -> float:
-    """Where a run of knuckles ``span`` long starts in the range x0..x1."""
-    def at(a: float, b: float) -> bool:
-        return abs(a - b) <= _EPS
-    o, n = lay.outer, lay.hinge_notch
-    if at(x1, o.x1):
-        return x1 - span
-    if at(x0, o.x0):
-        return x0
-    if at(x1, n.x0):
-        return x1 - span
-    if at(x0, n.x1):
-        return x0
-    return (x0 + x1 - span) / 2
-
-
 def knuckle_plan(lay: Layout) -> tuple[Knuckle, ...]:
     """Every knuckle, left to right (see the module docstring)."""
-    xs: list[float] = []
+    spans: list[tuple[float, float]] = []
     for x0, x1 in sorted(lay.knuckle_x):
         n = math.floor((x1 - x0 + FIT) / (KNUCKLE_LEN + FIT) + _EPS)
         if n:
-            start = _start(lay, x0, x1, n * KNUCKLE_LEN + (n - 1) * FIT)
-            xs += [start + i * (KNUCKLE_LEN + FIT) for i in range(n)]
+            length = (x1 - x0 - (n - 1) * FIT) / n
+            spans += [(x0 + i * (length + FIT), x0 + i * (length + FIT) + length)
+                      for i in range(n)]
     first = _PARTS.index(FIRST_PART)
-    plan = tuple(Knuckle(x, x + KNUCKLE_LEN, _PARTS[(first + i) % 2]) for i, x in enumerate(xs))
+    plan = tuple(Knuckle(a, b, _PARTS[(first + i) % 2]) for i, (a, b) in enumerate(spans))
     for a, b in zip(plan, plan[1:]):
         if b.x0 - a.x1 < FIT - _EPS:
             raise ValueError(f"knuckles at x {a.x0:.2f} and {b.x0:.2f} are under FIT apart")
     if {k.part for k in plan} != set(_PARTS):
-        raise ValueError(f"knuckle_x {lay.knuckle_x} holds {len(plan)} knuckle(s) of "
-                         f"KNUCKLE_LEN {KNUCKLE_LEN:g}: the hinge needs a base and a lid one")
+        raise ValueError(f"knuckle_x {lay.knuckle_x} holds {len(plan)} knuckle(s) of at "
+                         f"least KNUCKLE_LEN {KNUCKLE_LEN:g}: the hinge needs a base and a "
+                         "lid one")
     return plan
 
 
 def pin_length(lay: Layout) -> float:
-    """The rod: one piece, the box's full width, flush with both side faces."""
-    return lay.outer.size[0]
+    """The rod (R22): from the first knuckle's -X end to the +X side face."""
+    return lay.outer.x1 - knuckle_plan(lay)[0].x0
 
 
 def _dir(deg: float) -> tuple[float, float]:
@@ -191,6 +194,37 @@ def stop_faces(lay: Layout) -> tuple[Stop, ...]:
                  for k in knuckle_plan(lay) if k.part == "lid")
 
 
+def bead_yz(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """The seal bead's YZ profile, base frame (see the module docstring): a
+    polygon inscribed in the radius ``hinge_relief_r - FIT`` circle."""
+    hy, hz = lay.hinge_axis
+    rb = lay.hinge_relief_r - FIT
+    u0 = max(lay.bank_bay.y1, lay.port_room.y1) - hy      # the bank row's back edge
+    u1 = min(KNUCKLE_R, rb)
+    if not -rb < u0 < u1:
+        raise ValueError(f"the bank row's back edge (u {u0:.2f}) leaves no seal bead "
+                         f"inside radius {rb:.2f}, u < {u1:.2f}")
+    t1, t0 = math.acos(u1 / rb), math.acos(u0 / rb)
+    ts = [t1 + (t0 - t1) * i / BEAD_ARC_SEGMENTS for i in range(BEAD_ARC_SEGMENTS + 1)]
+    uv = [(u0, 0.0), (u1, 0.0), *((rb * math.cos(t), rb * math.sin(t)) for t in ts)]
+    return tuple((hy + u, hz + v) for u, v in uv)
+
+
+def bead_x(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """The seal bead's X ranges: the box's width less each knuckle (FIT past
+    its ends) and the pigtail's notch."""
+    n = lay.hinge_notch
+    blocked = sorted([(k.x0 - FIT, k.x1 + FIT) for k in knuckle_plan(lay)] + [(n.x0, n.x1)])
+    out, x = [], lay.outer.x0
+    for a, b in blocked:
+        if a > x + _EPS:
+            out.append((x, min(a, lay.outer.x1)))
+        x = max(x, b)
+    if x < lay.outer.x1 - _EPS:
+        out.append((x, lay.outer.x1))
+    return tuple(out)
+
+
 def _axis_yz(lay: Layout, part: Part) -> tuple[float, float]:
     return lay.hinge_axis if part == "base" else (0.0, 0.0)
 
@@ -224,19 +258,36 @@ def knuckles(lay: Layout, part: Part) -> cq.Workplane:
 def knuckle_cut(lay: Layout, part: Part) -> cq.Workplane:
     """What ``part`` gives up so the other part's knuckles (and its whole
     body there) turn: the relief cylinder, radius ``hinge_relief_r`` about
-    the axis, everywhere along X but at ``part``'s own knuckles (so at the
-    other part's, in the FIT gaps and in the open segments), and the rod's
-    bore the full width.  Runs 1 mm past each side face."""
+    the axis -- the base's at each lid knuckle, FIT past its ends; the lid's
+    everywhere along X but at its own knuckles (so at the base knuckles, in
+    the FIT gaps and in the open segments), 1 mm past each side face -- and
+    the rod's bore along the rod (1 mm past the +X face)."""
     _check_part(part)
     ax = _axis_yz(lay, part)
+    plan = knuckle_plan(lay)
     x0, x1 = lay.outer.x0 - 1.0, lay.outer.x1 + 1.0
-    cut = _prism(ax, x0, x1, r=PIN_HOLE_D / 2)
-    x = x0
-    for k in knuckle_plan(lay):
-        if k.part == part:
-            if k.x0 > x:
-                cut = cut.fuse(_prism(ax, x, k.x0, r=lay.hinge_relief_r))
-            x = k.x1
-    if x < x1:
-        cut = cut.fuse(_prism(ax, x, x1, r=lay.hinge_relief_r))
+    rr = lay.hinge_relief_r
+    cuts = [_prism(ax, lay.outer.x1 - pin_length(lay), x1, r=PIN_HOLE_D / 2)]
+    if part == "base":
+        cuts += [_prism(ax, k.x0 - FIT, k.x1 + FIT, r=rr) for k in plan if k.part == "lid"]
+    else:
+        x = x0
+        for k in plan:
+            if k.part == "lid":
+                if k.x0 > x:
+                    cuts.append(_prism(ax, x, k.x0, r=rr))
+                x = k.x1
+        if x < x1:
+            cuts.append(_prism(ax, x, x1, r=rr))
+    cut = cuts[0]
+    for c in cuts[1:]:
+        cut = cut.fuse(c)
     return cq.Workplane("XY").newObject([cut.clean()])
+
+
+def seal_bead(lay: Layout) -> cq.Workplane:
+    """The base's seal bead (base frame): ``bead_yz`` along each of
+    ``bead_x``."""
+    hy, hz = lay.hinge_axis
+    uv = [(y - hy, z - hz) for y, z in bead_yz(lay)]
+    return cq.Workplane("XY").newObject([_prism((hy, hz), a, b, uv) for a, b in bead_x(lay)])
