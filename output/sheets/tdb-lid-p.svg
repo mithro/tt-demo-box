@@ -190,7 +190,7 @@
 <line x1="34.367" y1="171.3868" x2="34.367" y2="84.0093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
 <polygon points="34.367,171.3868 35.267,168.3868 33.467,168.3868" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
 <polygon points="34.367,84.0093 33.467,87.0093 35.267,87.0093" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
-<text x="31.8124" y="127.6981" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 31.8124 127.6981)">174.75</text>
+<text x="31.8124" y="127.6981" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="middle" transform="rotate(-90 31.8124 127.6981)">174.76</text>
 <line x1="41.367" y1="52.5093" x2="41.367" y2="44.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
 <line x1="119.317" y1="52.5093" x2="119.317" y2="44.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
 <line x1="41.367" y1="46.7093" x2="119.317" y2="46.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
@@ -204,7 +204,7 @@
 <polygon points="124.0545,38.7093 127.0545,39.6093 127.0545,37.8093" fill="#004c99" stroke="#004c99" stroke-width="0.05" stroke-linejoin="round"/>
 <line x1="112.717" y1="38.7093" x2="119.317" y2="38.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
 <line x1="124.0545" y1="38.7093" x2="130.6545" y2="38.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
-<text x="111.317" y="37" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="end">9.47</text>
+<text x="111.317" y="37" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#004c99" text-anchor="end">9.48</text>
 <line x1="41.367" y1="52.5093" x2="41.367" y2="28.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
 <line x1="132.042" y1="52.5093" x2="132.042" y2="28.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
 <line x1="41.367" y1="30.7093" x2="132.042" y2="30.7093" stroke="#004c99" stroke-width="0.25" stroke-linecap="round"/>
@@ -258,13 +258,13 @@
 <rect x="211.5" y="31.6667" width="100.0125" height="5.5556" fill="none" stroke="#000000" stroke-width="0.25"/>
 <text x="213.3" y="35.4444" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Magnet pocket</text>
 <text x="263.3142" y="35.4444" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">7.40</text>
-<text x="277.7062" y="35.4444" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">163.35</text>
+<text x="277.7062" y="35.4444" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">163.36</text>
 <text x="290.5494" y="35.4444" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">D6.20</text>
 <text x="309.7125" y="35.4444" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">3.20 deep</text>
 <rect x="211.5" y="37.2222" width="100.0125" height="5.5556" fill="none" stroke="#000000" stroke-width="0.25"/>
 <text x="213.3" y="41" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Magnet pocket</text>
 <text x="263.3142" y="41" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">190.30</text>
-<text x="277.7062" y="41" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">163.35</text>
+<text x="277.7062" y="41" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">163.36</text>
 <text x="290.5494" y="41" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">D6.20</text>
 <text x="309.7125" y="41" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="end">3.20 deep</text>
 <line x1="237.9711" y1="15" x2="237.9711" y2="42.7778" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
@@ -305,15 +305,15 @@
 <text x="196.5693" y="134.8058" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">5.</text>
 <text x="201.1113" y="134.8058" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">Lid: print top plate down. Supports under the hinge knuckles</text>
 <text x="201.1113" y="139.3325" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">only. Press two 6 x 3 mm magnets into the catch pockets,</text>
-<text x="201.1113" y="143.8593" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">flush. Hinge: lid on the base, push the 3 mm x 40.8 mm rod</text>
-<text x="201.1113" y="148.386" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">in from the right side face until flush (the last 5 mm is a</text>
-<text x="201.1113" y="152.9128" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">press fit). Tape the monitor&#x27;s back to the flat inside face, and</text>
-<text x="201.1113" y="157.4395" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">the boost module beside it in the cable strip.</text>
+<text x="201.1113" y="143.8593" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">flush. Hinge: lid on the base, push the 3 mm x 40.8 mm</text>
+<text x="201.1113" y="148.386" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">steel rod in from the right side face until flush (the last 5</text>
+<text x="201.1113" y="152.9128" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">mm is a press fit). Tape the monitor&#x27;s back to the flat inside</text>
+<text x="201.1113" y="157.4395" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">face, and the boost module beside it in the cable strip.</text>
 <text x="196.5693" y="162.9663" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">6.</text>
 <text x="201.1113" y="162.9663" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">UNCONFIRMED inputs (placeholders; make verify lists each):</text>
 <text x="201.1113" y="167.493" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">monitors taobao-tim; power banks xiaomi-pb2020; board</text>
 <text x="201.1113" y="172.0198" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">USB_C_AXIS_ABOVE_PCB, TINYVGA_Z_OFFSET, TAPE_T,</text>
-<text x="201.1113" y="176.5465" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">TinyVGA heights, TALLEST_COMPONENT; all 7 cables.</text>
+<text x="201.1113" y="176.5465" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">TinyVGA heights, TALLEST_COMPONENT; all 6 cables.</text>
 <text x="196.5693" y="183.0733" font-family="DejaVu Sans, Liberation Sans, sans-serif" font-size="4.8011" fill="#000000" text-anchor="start" font-weight="bold">SOURCES</text>
 <line x1="196.5693" y1="184.4733" x2="295.2846" y2="184.4733" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
 <text x="196.5693" y="189.1733" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start">1.</text>
@@ -330,7 +330,7 @@
 <text x="244.6" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">generated</text>
 <line x1="284.25" y1="263" x2="284.25" y2="252" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
 <text x="285.85" y="255.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">VERSION</text>
-<text x="285.85" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">21925c610d</text>
+<text x="285.85" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">c55b0a35f4</text>
 <line x1="325.5" y1="263" x2="325.5" y2="252" stroke="#000000" stroke-width="0.25" stroke-linecap="round"/>
 <text x="327.1" y="255.5" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#666666" text-anchor="start">UNITS</text>
 <text x="327.1" y="261.4" font-family="DejaVu Sans Condensed, DejaVu Sans, Liberation Sans, sans-serif" font-size="3.4294" fill="#000000" text-anchor="start" font-weight="bold">mm</text>
