@@ -57,9 +57,11 @@ Base rows
   board stack is the keep-out union's z extent.  The board stands on
   ``plinth`` (floor to PCB underside), lifted so the union's top is at
   ``rim_z - SLACK``: level with the rim, in view over the front wall.  The
-  plinth covers the PCBs but stops short, along X, of every keep-out that
-  hangs below the PCB underside (the J1 plugs; the TinyVGA is past the Pmod
-  edge anyway).  ``outer`` is the base only: ``outer.z1 == rim_z``.
+  plinth covers both revisions' PCB outlines.  ``plinth_relief`` is the notch
+  cut from it under a J1 plug that hangs below the PCB underside over the
+  plinth (v3.2's, under v3.3's longer PCB): the plug's footprint + FIT, down
+  from the plinth top to FIT below the plug.  (The TinyVGA is past the Pmod
+  edge, off the plinth.)  ``outer`` is the base only: ``outer.z1 == rim_z``.
 * **Pins.**  ``pins["MT2"]`` is the fixed pin both revisions share;
   ``pins["<rev>/MT1"]`` is where the one loose pin goes for that revision (the
   plinth has a ``PEG_HOLE_D`` hole at each).  Each is ``PEG_DIA``, from the
@@ -140,8 +142,11 @@ PEG_DIA = 3.0
 #: The plinth's hole for the loose MT1 pin: PEG_DIA plus a slip clearance, so
 #: the pin pushes in by hand and comes out again for the other revision.
 PEG_HOLE_D = PEG_DIA + 0.2
-#: How far the board pins stand above the PCB top.
-PIN_PROUD = CLOSED_CLEARANCE + 1.0
+#: How far the board pins stand above the PCB top.  Closed, the board can
+#: lift only together with its TinyVGA and plug, whose top is SLACK +
+#: CLOSED_CLEARANCE below the monitor face; the pins are 1 mm longer than
+#: that, so they never leave the board's holes.
+PIN_PROUD = CLOSED_CLEARANCE + SLACK + 1.0
 #: A fingertip on a bank's end button (the port room is at least this long).
 FINGERTIP_D = 16.0
 
@@ -257,6 +262,7 @@ class Layout:
     board_keepouts: dict[str, Box]   # "<rev>/envelope", "<rev>/usb_plug", "<rev>/tinyvga"
     vga_adapter: bool                # a 90 degree VGA adapter on the TinyVGA
     plinth: Box                      # floor to the PCB underside
+    plinth_relief: Box               # notch in the plinth under the v3.2 J1 plug
     pins: dict[str, Cyl]             # "MT2" (fixed), "<rev>/MT1" (the loose pin's places)
     bank_bay: Box
     port_room: Box
@@ -364,13 +370,21 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     ox, oy, oz = origin
     keepouts = _board_keepouts(origin, adapter)
     specs = {k: board_spec(k) for k in BOARD_KEYS}
-    # PCBs (board x 0..W, y 0..H), stopping short of the J1 plugs, which hang
-    # below the PCB underside past the J1 edge
-    pcb_y1 = min(max(s.outline.height for s in specs.values()),
-                 min(_usb_plug(k).y0 for k in BOARD_KEYS))
-    pcb = Box(0.0, 0.0, 0.0, max(s.outline.width for s in specs.values()), pcb_y1, 0.0)
+    # both revisions' PCB outlines (board x 0..W, y 0..H)
+    pcb = Box(0.0, 0.0, 0.0, max(s.outline.width for s in specs.values()),
+              max(s.outline.height for s in specs.values()), 0.0)
     p = _to_base(pcb, origin, "")
     plinth = Box(p.x0, p.y0, wall, p.x1, p.y1, max(oz, wall), "board plinth")
+    # J1 plugs hanging below the PCB underside over the plinth (v3.2's plug,
+    # under v3.3's longer PCB): notched out, FIT round and below them
+    hanging = [keepouts[f"{k}/usb_plug"] for k in BOARD_KEYS]
+    hanging = [h for h in hanging if h.z0 < plinth.z1
+               and h.x0 < plinth.x1 and plinth.x0 < h.x1 and h.y0 < plinth.y1 and plinth.y0 < h.y1]
+    if len(hanging) != 1:
+        raise ValueError(f"expected one J1 plug over the plinth, found {len(hanging)}")
+    h = hanging[0]
+    plinth_relief = Box(h.x0 - FIT, h.y0 - FIT, h.z0 - FIT, h.x1 + FIT, h.y1 + FIT, plinth.z1,
+                        f"plinth relief ({h.what})")
 
     def pin(h, key: str, what: str) -> Cyl:
         top = oz + specs[key].outline.thickness + PIN_PROUD
@@ -431,7 +445,8 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
 
     return Layout(
         wall=wall, outer=outer, rim_z=rim_z, board_origin=origin,
-        board_keepouts=keepouts, vga_adapter=adapter, plinth=plinth, pins=pins,
+        board_keepouts=keepouts, vga_adapter=adapter, plinth=plinth,
+        plinth_relief=plinth_relief, pins=pins,
         bank_bay=bank_bay, port_room=port_room, boost_pocket=boost_pocket,
         boost_in_lid=boost_in_lid, hinge_axis=(hy, hz), hinge_notch=hinge_notch,
         lid_outer=lid_outer, monitor_space=monitor_space, lid_strip=lid_strip,

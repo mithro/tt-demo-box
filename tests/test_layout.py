@@ -63,7 +63,7 @@ def test_spec_constants():
     assert L.ROUTES == {"printed": 2.4, "laser": 3.0}
     assert L.SLACK == 1.0 and L.FIT == 0.5 and L.CLOSED_CLEARANCE == 2.0
     assert L.DESIGN_MONITOR == "taobao-tim" and L.DESIGN_BANK == "xiaomi-pb2020"
-    assert L.PIN_ROD_D == 3.0 and L.PIN_PROUD == L.CLOSED_CLEARANCE + 1.0
+    assert L.PIN_ROD_D == 3.0 and L.PIN_PROUD == L.CLOSED_CLEARANCE + L.SLACK + 1.0
     assert L.FINGERTIP_D == 16.0 and L.KNUCKLE_R == 4.0
     assert L.BANK_SIDE_PLUGS == ("usb-c-right-angle", "usb-a-c", "bank-built-in")
     assert L.MAGNET_D == 6.0 and L.MAGNET_T == 3.0
@@ -180,17 +180,64 @@ def test_board_top_level_with_rim(lay):
         assert lay.board_keepouts[f"{k}/envelope"].z0 == pytest.approx(p.z1)
 
 
-def test_plinth_is_under_the_boards_and_clear_of_hanging_parts(lay):
-    """The plinth lies under the PCBs and stops short of every keep-out that
-    hangs below the PCB underside (J1 plug, TinyVGA)."""
-    p = lay.plinth
-    oz = lay.board_origin[2]
+def _pcb_union_base(lay) -> Box:
+    xs, ys = [], []
     for k in BOARD_KEYS:
-        assert _xy_overlap(p, lay.board_keepouts[f"{k}/envelope"])
-        for part in ("usb_plug", "tinyvga"):
-            b = lay.board_keepouts[f"{k}/{part}"]
-            assert b.z0 < oz                         # it does hang below the PCB
-            assert not _xy_overlap(p, b), (k, part)
+        o = board_spec(k).outline
+        for x in (0.0, o.width):
+            for y in (0.0, o.height):
+                bx, by, _ = _to_base(lay, x, y)
+                xs.append(bx)
+                ys.append(by)
+    return Box(min(xs), min(ys), 0.0, max(xs), max(ys), 0.0)
+
+
+def test_plinth_covers_both_pcb_outlines(lay):
+    """R7: the plinth is the union of both revisions' PCB outlines."""
+    p, u = lay.plinth, _pcb_union_base(lay)
+    assert (p.x0, p.y0, p.x1, p.y1) == pytest.approx((u.x0, u.y0, u.x1, u.y1))
+
+
+def test_plinth_relief_takes_the_hanging_j1_plug(lay):
+    """R7: the relief holds the v3.2 J1 plug's part below the PCB underside,
+    with FIT round it; the TinyVGA is past the plinth altogether."""
+    oz = lay.board_origin[2]
+    r, p = lay.plinth_relief, lay.plinth
+    plug = lay.board_keepouts["v3.2/usb_plug"]
+    assert plug.z0 < oz and _xy_overlap(plug, p)      # it would hit the plinth
+    below = Box(plug.x0, plug.y0, plug.z0, plug.x1, plug.y1, oz)
+    assert _inside(below, r)
+    assert r.x0 == pytest.approx(plug.x0 - L.FIT) and r.x1 == pytest.approx(plug.x1 + L.FIT)
+    assert r.y0 == pytest.approx(plug.y0 - L.FIT) and r.y1 == pytest.approx(plug.y1 + L.FIT)
+    assert r.z1 == pytest.approx(p.z1)
+    assert r.z0 == pytest.approx(plug.z0 - L.FIT)
+    for k in BOARD_KEYS:
+        assert not _xy_overlap(p, lay.board_keepouts[f"{k}/tinyvga"])
+        other = lay.board_keepouts[f"{k}/usb_plug"]
+        if _xy_overlap(p, other):
+            assert _inside(Box(other.x0, other.y0, other.z0, other.x1, other.y1, oz), r), k
+
+
+def test_pin_holes_inside_the_plinth(lay):
+    """R7: every pin hole is inside the plinth, at least 1.5 mm from each
+    plinth edge and from the relief."""
+    p, r = lay.plinth, lay.plinth_relief
+    rh = L.PEG_HOLE_D / 2
+    for key, pin in lay.pins.items():
+        edges = (pin.cx - p.x0, p.x1 - pin.cx, pin.cy - p.y0, p.y1 - pin.cy)
+        assert min(edges) - rh >= 1.5 - EPS, (key, edges)
+        dx = max(r.x0 - pin.cx, pin.cx - r.x1, 0.0)
+        dy = max(r.y0 - pin.cy, pin.cy - r.y1, 0.0)
+        assert math.hypot(dx, dy) - rh >= 1.5 - EPS, key
+
+
+def test_board_cannot_leave_pins(lay):
+    """R8: closed, the board (with its TinyVGA and plug) can lift at most to
+    the monitor face; at least 1 mm of every pin stays in its hole."""
+    hz = lay.hinge_axis[1]
+    face = hz + lay.monitor_space.z0
+    top = max(b.z1 for b in lay.board_keepouts.values())
+    assert face - top <= L.PIN_PROUD - 1.0 + EPS
 
 
 def test_board_turn_is_a_rotation_not_a_mirror(lay):
@@ -268,8 +315,12 @@ def test_every_bank_as_design_bank(bank):
         assert lay.bank_bay.size[0] >= b.size[0] + 2 * L.SLACK - EPS
         assert lay.bank_bay.size[1] >= b.size[1] + 2 * L.SLACK - EPS
         assert lay.bank_bay.size[2] >= b.size[2] + L.SLACK - EPS
+        xiaomi = BATTERIES[L.DESIGN_BANK].size
         for i in range(3):
-            assert lay.outer.size[i] <= ref.outer.size[i] + EPS, (bank, wall, "xyz"[i])
+            # R6: never larger than the Xiaomi box by more than the bank's own
+            # excess over the Xiaomi (the Anker is 0.4 mm wider)
+            excess = max(0.0, b.size[i] - xiaomi[i])
+            assert lay.outer.size[i] <= ref.outer.size[i] + excess + EPS, (bank, wall, "xyz"[i])
 
 
 def test_boost_pocket(lay):
