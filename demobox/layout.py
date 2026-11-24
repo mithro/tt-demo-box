@@ -156,7 +156,8 @@ KNUCKLE_R = 4.0
 #: The shortest hinge knuckle along X (``demobox.shared.hinge`` uses this
 #: one); knuckles share each ``knuckle_x`` range, so are usually longer (R19).
 KNUCKLE_LEN = 9.0
-#: The bought hinge rod: "3 mm steel rod or 2.85 mm filament".
+#: The bought hinge rod: 3 mm steel rod only (R35: a 2.85 mm filament rod is
+#: smaller than the hinge's 2.9 mm press zone, so nothing would hold it).
 PIN_ROD_D = 3.0
 #: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
 #: under the base's front rim and in the lid's front rim, MAGNET_RECESS below

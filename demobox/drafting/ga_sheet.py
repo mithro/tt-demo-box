@@ -129,8 +129,8 @@ def _projections(route: str):
 
 
 def rod_text(lay) -> str:
-    """The hinge rod as the hardware lists it: ``3 mm rod x 40.8 mm``."""
-    return f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.1f} mm"
+    """The hinge rod as the hardware lists it: ``3 mm steel rod x 40.8 mm``."""
+    return f"{PIN_ROD_D:g} mm steel rod x {H.pin_length(lay):.1f} mm"
 
 
 def size_note(lay) -> str:

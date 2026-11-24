@@ -129,7 +129,7 @@ def test_hardware_exact(lay):
     rod = H.pin_length(lay)
     assert F.hardware(lay, WALL) == {
         "6 x 3 mm disc magnet": 4,
-        "3 mm rod x 41.4 mm (hinge pin)": 1,
+        "3 mm steel rod x 41.4 mm (hinge pin)": 1,
         "3 mm rod x 19.7 mm (board pins, MT2 + loose MT1)": 2,
         "wood glue": 1,
         "double-sided foam tape (VHB type), monitor back and boost module": 1,

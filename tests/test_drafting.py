@@ -295,7 +295,7 @@ def test_ga_rod_length_is_the_hardware_lists(route):
     hw = B.hardware(lay) if route == "printed" else LF.hardware(lay, lay.wall)
     keys = [k for k in hw if "(hinge pin" in k]
     assert len(keys) == 1
-    rod = re.match(r"(\S+ mm rod x \d+\.\d mm) \(hinge pin", keys[0]).group(1)
+    rod = re.match(r"(\S+ mm steel rod x \d+\.\d mm) \(hinge pin", keys[0]).group(1)
     words = _sheet_words("TDB-GA-" + route[0].upper())
     assert f"knuckles on one {rod}, pressed in" in words
     assert words.count(rod) == 2, words.count(rod)     # the note and the parts list
