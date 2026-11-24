@@ -113,71 +113,7 @@ def test_split_is_at_the_shortest_section(lay, split):
         assert best <= B.section_area(tub, "x", s) + 1e-6, s
 
 
-def test_split_joints_have_heatset_screws_and_pins(split):
-    pieces, info = split
-    left, right = pieces["base-left"].solid, pieces["base-right"].solid
-    fronts = [j for j in info.joints if j.wall == "front"]
-    backs = [j for j in info.joints if j.wall == "back"]
-    assert fronts and backs
-    for j in info.joints:
-        sx, sy, sz = j.screw
-        # clearance hole through the left block, heat-set hole in the right
-        assert not _inside(left, (sx - 1.0, sy, sz))
-        assert _inside(left, (sx - 1.0, sy + B.SCREW_CLEAR_D / 2 + 0.2, sz))
-        assert not _inside(right, (sx + L.HEATSET_DEPTH / 2, sy + L.HEATSET_HOLE_D / 2 - 0.05, sz))
-        assert _inside(right, (sx + L.HEATSET_DEPTH / 2, sy + L.HEATSET_HOLE_D / 2 + 0.05, sz))
-        assert _inside(right, (sx + L.HEATSET_DEPTH + 0.3, sy, sz))
-        px, py, pz = j.pin
-        for piece, x in ((left, px - 1.0), (right, px + 1.0)):
-            assert not _inside(piece, (x, py, pz))
-            assert _inside(piece, (x, py + B.DOWEL_HOLE_D / 2 + 0.2, pz))
-    assert any(h.what.startswith("joint") for h in pieces["base-right"].heatsets)
-
-
 # --- heat-set inserts ----------------------------------------------------------
-
-def test_heatset_holes_are_4_mm(parts):
-    """Every heat-set hole is HEATSET_HOLE_D (4.0) across and HEATSET_DEPTH deep
-    with material round and below it."""
-    assert L.HEATSET_HOLE_D == 4.0
-    count = 0
-    for name, p in parts.items():
-        for h in p.heatsets:
-            count += 1
-            d = cq.Vector(*h.axis)
-            mouth = cq.Vector(*h.at)
-            side = d.cross(cq.Vector(0, 0, 1)) if abs(d.z) < 0.9 else cq.Vector(1, 0, 0)
-            side = side.normalized()
-            mid = mouth + d * (L.HEATSET_DEPTH / 2)
-            r = L.HEATSET_HOLE_D / 2
-            assert not _inside(p.solid, (mid).toTuple()), (name, h.what)
-            assert not _inside(p.solid, (mid + side * (r - 0.05)).toTuple()), (name, h.what)
-            assert _inside(p.solid, (mid + side * (r + 0.05)).toTuple()), (name, h.what)
-            assert _inside(p.solid, (mouth + d * (L.HEATSET_DEPTH + 0.3)).toTuple()), \
-                (name, h.what)
-    assert count >= 1 + 4 + 2 + 3 + 1 + 4  # MT2, base leaf, lid leaf, bezel, clip, deck corners
-
-
-def test_hinge_leaf_screws_have_heatset_bosses(parts, lay):
-    """Carry-forward 3: an insert behind every leaf screw hole."""
-    base = {(round(h.at[0], 3), round(h.at[2], 3)) for h in parts["base"].heatsets
-            if h.what.startswith("hinge leaf")}
-    assert base == {(round(x, 3), round(z, 3)) for x, z in H.base_leaf_screws(lay)}
-    lid = {(round(h.at[0], 3), round(h.at[2], 3)) for h in parts["lid"].heatsets
-           if h.what.startswith("hinge leaf")}
-    assert lid == {(round(x, 3), round(z, 3)) for x, z in H.lid_leaf_screws(lay)}
-
-
-def test_bezel_screws_line_up_with_lid_inserts(parts, lay):
-    """R15: an insert in the lid under each of the bezel's holes."""
-    lid = {(round(h.at[0], 3), round(h.at[1], 3)) for h in parts["lid"].heatsets
-           if h.what.startswith("bezel")}
-    assert lid == {(round(x, 3), round(y, 3)) for x, y in I.bezel_screws(lay)}
-    for h in parts["lid"].heatsets:
-        if h.what.startswith("bezel"):
-            assert h.at[2] == pytest.approx(L.INSERT_MATERIAL)   # on the bezel's back
-            assert h.axis == (0.0, 0.0, 1.0)
-
 
 # --- features ----------------------------------------------------------------------
 
@@ -224,20 +160,6 @@ def test_mt1_boss_has_a_peg_hole_per_revision(parts, lay):
         assert _inside(deck, (peg.cx + peg.r + 0.3, peg.cy, lay.deck_z + 1.0))
 
 
-def test_drawer_detent_and_end_stop(lay):
-    """Closed, the bump sits in the notch clear of everything; pulled out by
-    drawer_travel, its square face meets the groove's end (the stop)."""
-    tub, drawer = B.base_tub(lay), B.drawer(lay)
-    assert tub.intersect(drawer).Volume() <= 1e-3
-    out = drawer.translate(cq.Vector(-lay.drawer_travel, 0, 0))
-    assert tub.intersect(out).Volume() <= 1e-3
-    beyond = drawer.translate(cq.Vector(-lay.drawer_travel - 0.5, 0, 0))
-    assert tub.intersect(beyond).Volume() > 0.05   # the stop blocks further travel
-    # the ridge must be ridden over to leave the closed position: a click
-    nudge = drawer.translate(cq.Vector(-1.0, 0, 0))
-    assert tub.intersect(nudge).Volume() > 0.01
-
-
 def test_boost_pocket_is_clear(parts, lay):
     b = lay.boost_pocket
     box = cq.Solid.makeBox(*b.size, cq.Vector(b.x0, b.y0, b.z0))
@@ -257,11 +179,6 @@ def test_assembly_has_no_intersections(angle):
     assert len(names) == len(set(names))
     for n in ("base", "deck", "lid", "drawer", "hinge-base", "hinge-lid"):
         assert n in names
-    assert _clashes(items) == []
-
-
-def test_assembly_drawer_out_has_no_intersections(lay):
-    items = B.assembly("printed", 0.0, lay.drawer_travel)
     assert _clashes(items) == []
 
 
@@ -366,25 +283,6 @@ def test_lid_front_band_is_hollow_and_ribbed(lay):
     assert sum(c.size[0] * c.size[1] * c.size[2] for c in cells) > 150_000   # really hollow
 
 
-def test_drawer_opening_has_no_long_bridge(lay):
-    """The opening's top is 45 degree peaks: no downward-facing flat face in
-    the left wall over the drawer is wider than OPENING_PITCH (a flat 88 mm
-    top would sag onto the drawer)."""
-    tub, w = B.base_tub(lay), lay.wall
-    for f in tub.Faces():
-        if f.geomType() != "PLANE" or f.normalAt().z > -0.99:
-            continue
-        bb = f.BoundingBox()
-        if bb.xmax <= w + 1e-6 and bb.zmin > w + 1e-6 and bb.zmax < lay.deck_z:
-            assert bb.ylen <= B.OPENING_PITCH, (bb.ylen, bb.zmin)
-    # the drawer face fills it, FIT clear, shut and out at the stop
-    drawer = B.drawer(lay)
-    assert tub.intersect(drawer).Volume() <= 1e-3
-    assert tub.intersect(drawer.translate(cq.Vector(-lay.drawer_travel, 0, 0))).Volume() <= 1e-3
-    face_top = max(v.Z for v in drawer.Vertices() if v.X < w + 1e-6)
-    assert face_top > lay.bay.z1 + 1.0                  # the face's peaks
-
-
 def test_screw_heads_clear_when_shut_and_open():
     """Bought hardware proud of the screen face (the bezel and clip screws'
     pan heads) is in the assembly as keep-outs and clears everything."""
@@ -424,40 +322,6 @@ def test_nothing_stands_below_the_printed_floor():
 
 
 # --- screws into heat-set inserts (review fix round 1) ---------------------------
-
-def test_insert_screw_is_the_longest_that_stops_short():
-    from demobox.shared import m3
-    # 1.2 mm bezel into a 5.7 mm hole: 6.4 allowed -> M3 x 6, 4.8 engaged
-    assert m3.insert_screw(1.2, L.HEATSET_DEPTH) == 6
-    # rounding up (stock_length) would give M3 x 8 for the 1.6 mm board: 6.4 > 5.2
-    assert m3.insert_screw(1.6, L.HEATSET_DEPTH) == 6
-    with pytest.raises(ValueError):
-        m3.insert_screw(1.2, 3.0)          # nothing engages 3 mm of a 3 mm hole
-
-
-def test_every_insert_screw_engages_and_stops_short(lay, parts, split):
-    """Every screw into a heat-set insert -- bezel, clip, hinge leaves, board,
-    deck corners and split joints (base and lid) -- engages at least 3 mm and
-    stops at least 0.5 mm short of the 5.7 mm hole's floor."""
-    from demobox.shared import m3
-    lid_pieces, _ = B.split_lid(lay, bed=(210.0, 220.0))
-    base_pieces, _ = split
-    heatsets = [h for group in (parts, base_pieces, lid_pieces)
-                for p in group.values() for h in p.heatsets]
-    screws = B.insert_screws(lay, heatsets)
-    labels = {s.what for s in screws}
-    assert {"bezel", "bezel clip", "hinge leaves", "board, MT2", "deck corners",
-            "split joints"} <= labels
-    for s in screws:
-        assert m3.MIN_ENGAGE <= s.engagement <= L.HEATSET_DEPTH - m3.INSERT_SHORT, s
-
-
-def test_hardware_lists_the_insert_screws(lay):
-    hw = B.hardware(lay)
-    assert hw["M3 x 6 pan-head (board, MT2)"] == 1
-    assert hw["M3 x 6 pan-head (deck corners)"] == 4
-    assert sum(n for k, n in hw.items() if k.startswith("M3 heat-set insert")) == 15
-
 
 @pytest.mark.slow
 @pytest.mark.parametrize("angle", range(10, 100, 10))

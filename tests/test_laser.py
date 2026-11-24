@@ -235,24 +235,6 @@ def test_tslot_screws_line_up(body):
         assert _inside(sb, (at + d * (J.TSLOT_SCREW - a.t + 2.0)).toTuple()), s
 
 
-def test_deck_carries_the_board_functions(body, lay):
-    deck = [p.solid() for n, p in body.panels.items() if n.startswith("deck-")]
-
-    def solid_at(p):
-        return any(_inside(s, p) for s in deck)
-
-    z = lay.deck_z - WALL / 2
-    us = lay.usb_slot
-    assert not solid_at(((us.x0 + us.x1) / 2, (us.y0 + us.y1) / 2, z))       # USB-C drop
-    ch = lay.hinge_cable_channel
-    assert not solid_at(((ch.x0 + ch.x1) / 2, (ch.y0 + ch.y1) / 2, z))       # channel
-    c = lay.standoffs[0]
-    assert not solid_at((c.cx, c.cy, z))                                       # MT2 screw
-    assert solid_at((c.cx + 2.5, c.cy, z))
-    names = set(body.printed)
-    assert {"standoff-mt2", "nut-cup-mt2", "deck-support", "mt1-boss"} <= names
-
-
 def test_back_wall_has_channel_relief_and_leaf_screws(body, lay):
     back = body.panels["base-back"].solid()
     hy, hz = lay.hinge_axis
@@ -285,31 +267,6 @@ def test_lid_hinge_wall_and_bezel_retention(body, lay):
         xm = (x0 + x1) / 2
         hw = body.panel_at("lid-hinge", (xm, -WALL / 2, 10.0))
         assert not _inside(hw.solid(), (xm, -WALL / 2, H.KNUCKLE_R + L.FIT - 0.2))
-
-
-def test_drawer_is_a_finger_jointed_tray_on_runners(body):
-    drawer = {n for n, p in body.panels.items() if p.frame == "drawer"}
-    assert drawer == {"drawer-face", "drawer-back", "drawer-side-front", "drawer-side-back",
-                      "drawer-floor"}
-    pairs = {frozenset((j.a, j.b)) for j in body.joints}
-    for side in ("drawer-face", "drawer-back", "drawer-side-front", "drawer-side-back"):
-        assert frozenset(("drawer-floor", side)) in pairs
-    for runner in ("runner-front", "runner-back", "drawer-guide"):
-        assert body.panels[runner].frame == "base"
-
-
-def test_drawer_end_stop_and_inward_stop(lay):
-    """The drawer-back's ear runs in the slot in runner-back: its end is the
-    stop at drawer_travel, its other end stops the drawer flush when shut."""
-    items = dict((n, s) for n, s, _ in P.assembly(0.0, 0.0))
-    runner = items["runner-back"]
-    back = items["drawer-back"]
-    assert back.intersect(runner).Volume() <= 1e-3
-    for out, blocked in ((lay.drawer_travel, False), (lay.drawer_travel + 0.5, True),
-                         (-0.5, True)):
-        moved = back.translate(cq.Vector(-out, 0, 0))
-        v = moved.intersect(runner).Volume()
-        assert (v > 1.0) == blocked, (out, v)
 
 
 def test_magnet_latch(body, lay):

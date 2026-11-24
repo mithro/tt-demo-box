@@ -69,7 +69,8 @@ one-box-fits-every-part layout took the rest.
      fit the generated lid, not a pass/fail.
    - **Power bank:** not chosen yet (Tim: "No idea on which power bank yet"). The bay is sized
      for the largest listed bank, the Xiaomi PB2020 (128 x 73 x 32). It is one value
-     (`DESIGN_BANK`): when Tim picks a bank, the box regenerates around it and can only shrink.
+     (`DESIGN_BANK`): when Tim picks a bank, the box regenerates around it
+     (the Xiaomi is the longest listed bank; the Anker is 0.4 mm wider, so its box is 0.4 mm deeper).
      `verify.py` reports which listed banks fit.
    - **Board:** both ETR revisions (v3.2 and v3.3). They differ by 5 mm on the long run; keeping
      both is cheap and the board in hand may be either.
