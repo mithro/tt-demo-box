@@ -295,7 +295,7 @@ def test_ga_rod_length_is_the_hardware_lists(route):
     hw = B.hardware(lay) if route == "printed" else LF.hardware(lay, lay.wall)
     keys = [k for k in hw if "(hinge pin" in k]
     assert len(keys) == 1
-    rod = re.match(r"(\S+ mm rod x \d+\.\d mm) \(hinge pin", keys[0]).group(1)
+    rod = re.match(r"(\S+ mm steel rod x \d+\.\d mm) \(hinge pin", keys[0]).group(1)
     words = _sheet_words("TDB-GA-" + route[0].upper())
     assert f"knuckles on one {rod}, pressed in" in words
     assert words.count(rod) == 2, words.count(rod)     # the note and the parts list
@@ -305,7 +305,7 @@ def test_ga_rod_length_is_the_hardware_lists(route):
     board = f"{LF.board_pin_length(lay):.1f}" if route == "laser" else None
     want = f"{H.pin_length(lay):.1f}"
     for n in sheets:
-        found = [v for v in re.findall(r"3 mm (?:rod )?x (\d+(?:\.\d+)?) mm",
+        found = [v for v in re.findall(r"3 mm (?:steel rod |rod )?x (\d+(?:\.\d+)?) mm",
                                        _sheet_words(n)) if v != board]
         assert found and set(found) == {want}, (n, found)
 
@@ -339,12 +339,13 @@ def test_base_sheet_dimensions_its_features():
 def test_lid_sheet_dimensions_its_features():
     """The lid sheet shows the tray, the knuckles and the magnet pockets."""
     from demobox.layout import ROUTES, layout
+    from demobox.geom import mm
     from demobox.shared import hinge as H
     lay = layout(ROUTES["printed"])
     words = _sheet_words("TDB-LID-P")
     for k in H.knuckle_plan(lay):
         if k.part == "lid":
-            assert f"{k.x1 - k.x0:.2f}" in words, k
+            assert mm(k.x1 - k.x0) in words, k      # the sheets' one rounding: 9.475 -> 9.48
     for word in ("KNUCKLE", "MAGNET", "tape"):
         assert word in words, word
     assert "TRAY" in words
@@ -419,3 +420,18 @@ def test_stamp_is_order_independent_and_short():
     a = K.stamp({"demobox": "1" * 40, "Makefile": "2" * 40})
     assert a == K.stamp({"Makefile": "2" * 40, "demobox": "1" * 40})
     assert len(a) == K.STAMP_LEN and a != K.stamp({"demobox": "1" * 40, "Makefile": "3" * 40})
+
+
+def test_base_depth_reads_the_same_on_every_sheet():
+    """The printed base's depth (174.755) once read 174.75 on BASE-P and
+    LID-P (a solid's bounding box) and 174.76 on the GA (the layout): one
+    rounding source now, so every sheet carries one figure."""
+    from demobox.geom import mm
+    from demobox.layout import ROUTES, layout
+    d = layout(ROUTES["printed"]).outer.size[1]
+    want, lo = mm(d), f"{d - 0.005:.2f}"
+    assert want == "174.76"
+    for n in ("TDB-GA-P", "TDB-BASE-P", "TDB-LID-P"):
+        words = _sheet_words(n)
+        assert want in words, n
+        assert lo not in words, n

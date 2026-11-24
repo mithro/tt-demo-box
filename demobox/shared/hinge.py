@@ -49,7 +49,8 @@ axially: the first knuckle's bore is blind, stopping ROD_BLIND short of that
 knuckle's -X face, so the rod goes no further -X; and the last PRESS_LEN of
 the +X knuckle's bore, at the side face, is PRESS_D, a press fit, so it
 can't walk out.  Everywhere else the bore is a PIN_HOLE_D slip fit.  Press
-the rod in from +X; filament can be heat-set.  (A full-width rod
+the 3 mm steel rod in from +X (R35: steel only; a 2.85 mm filament rod is
+smaller than PRESS_D and would not be held).  (A full-width rod
 would cross the port room and the bank bay, which reach 0.5 mm in front of
 the axis: the bank, slid back in its SLACK, would hit it.)
 

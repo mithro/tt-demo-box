@@ -396,7 +396,7 @@ def test_bank_built_in_cable_data():
   - The base shows the plinth, pins, notch and magnet pockets, dimensioned.
   - The lid shows the tray, knuckles and magnet pockets.
   - The drawing note's "100 deg" uses `LID_OPEN_DEG` (review finding).
-  - No requirement IDs (R1–R23) or "finding N" text on any sheet or in comments (review finding).
+  - No requirement IDs (R1–R23) or "finding N" text on any sheet. In comments, ruling IDs are allowed only because they are defined in the committed `docs/superpowers/specs/2026-11-24-compact-box-rulings.md` (amended by R36).
 
 - [ ] **Step 1: Write failing tests:**
   - `test_sheet_set_exact`;

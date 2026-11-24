@@ -4,7 +4,9 @@ One layout, two bodies: the printed route calls ``layout(2.4)``, the laser
 route ``layout(3.0)``.  ``verify.py`` proves the fits from the same numbers.
 Every placement below is computed from ``demobox.parts``; the only numbers
 typed here are the spec's (``LID_OPEN_DEG`` .. ``CLOSED_CLEARANCE``), the
-machine beds, ``SLACK`` and a few named design choices.  The box is sized for
+machine beds, ``SLACK`` and a few named design choices.  Ruling IDs in the
+comments (R1 .. R36) are defined in
+docs/superpowers/specs/2026-11-24-compact-box-rulings.md.  The box is sized for
 one kit (``DESIGN_MONITOR``, ``DESIGN_BANK``, both board revisions): every
 dimension is that kit plus ``SLACK`` plus the walls, and nothing else.
 
@@ -156,7 +158,8 @@ KNUCKLE_R = 4.0
 #: The shortest hinge knuckle along X (``demobox.shared.hinge`` uses this
 #: one); knuckles share each ``knuckle_x`` range, so are usually longer (R19).
 KNUCKLE_LEN = 9.0
-#: The bought hinge rod: "3 mm steel rod or 2.85 mm filament".
+#: The bought hinge rod: 3 mm steel rod only (R35: a 2.85 mm filament rod is
+#: smaller than the hinge's 2.9 mm press zone, so nothing would hold it).
 PIN_ROD_D = 3.0
 #: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
 #: under the base's front rim and in the lid's front rim, MAGNET_RECESS below
@@ -323,6 +326,11 @@ def exit_edge(m: Monitor) -> str:
 @dataclass(frozen=True)
 class Layout:
     wall: float
+    #: R33: the kit it was laid out for (keys of ``BATTERIES`` and
+    #: ``MONITORS``).  Everything downstream reads them from here, never the
+    #: DESIGN_* defaults.
+    bank: str
+    monitor: str
     outer: Box                       # the base; outer.z1 == rim_z
     rim_z: float                     # the seam
     board_origin: tuple[float, float, float]
@@ -420,10 +428,10 @@ def _hinge_relief_r(lid: Box, base: Box, hy: float, hz: float) -> float:
 
 def base_contents(lay: Layout) -> dict[str, Box]:
     """Everything in the base a lid or knuckle must miss, base frame: the
-    board keep-outs, the plinth, the pins (as boxes), the design bank as
+    board keep-outs, the plinth, the pins (as boxes), the layout's bank as
     packed (centred in the bay), the boost module's pocket (when in the base),
     the port room (the bank cables' room) and the catch blocks."""
-    b = BATTERIES[DESIGN_BANK]
+    b = BATTERIES[lay.bank]
     bay = lay.bank_bay
     l_, w, h = b.size
     x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
@@ -486,6 +494,9 @@ def _catch_x0(keepouts: dict[str, Box], wall: float, width: float, from_left: bo
 def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) -> Layout:
     b = BATTERIES[bank]
     m = MONITORS[monitor]
+    if b.port_face != "end":
+        raise ValueError(f"bank {bank!r} has its ports on its {b.port_face} face: the layout "
+                         "puts them on the end facing the port room")
     if exit_edge(m) != "bottom" or m.pigtail_exit_u is None:
         raise ValueError(f"monitor {monitor!r} has no pigtail exit on its bottom edge: "
                          "only a taped design-kit monitor can be laid out")
@@ -627,7 +638,7 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     hinge_relief_r = _hinge_relief_r(lid_outer, outer, hy, hz)
 
     lay = Layout(
-        wall=wall, outer=outer, rim_z=rim_z, board_origin=origin,
+        wall=wall, bank=bank, monitor=monitor, outer=outer, rim_z=rim_z, board_origin=origin,
         board_keepouts=keepouts, vga_adapter=True, plinth=plinth,
         plinth_relief=plinth_relief, pins=pins,
         bank_bay=bank_bay, port_room=port_room, boost_pocket=boost_pocket,

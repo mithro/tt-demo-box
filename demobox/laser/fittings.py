@@ -26,7 +26,8 @@ which are printed and glued in:
   the seam: two glued in the base's front corners under the rim (pocket up),
   two in the lid's over them (the same part, pocket down).
 
-The board's pins are bought rod (R28, ``board_pin_length``), standing on
+The board's pins are bought rod (ruling R28 in
+docs/superpowers/specs/2026-11-24-compact-box-rulings.md; ``board_pin_length``), standing on
 the base floor through ``plinth-top``'s holes: MT2's glued, MT1's loose.  The hinge rod is the printed route's
 (``hinge.pin_length``), pushed in from the +X side face.
 """
@@ -150,7 +151,7 @@ def printed_parts(lay: Layout, t: float = 3.0, bed=PRINT_BED) -> dict[str, S.Pri
             "wall's cut-out, flush with both outside faces; along the open segments it is "
             "the lid's lip round the seal bead. The glue areas carry the stop load; use a "
             "gap-filling glue. Hinge: lid on the base, push the "
-            f"{PIN_ROD_D:g} mm x {rod:.1f} mm rod in from the right side face until flush "
+            f"{PIN_ROD_D:g} mm x {rod:.1f} mm steel rod in from the right side face until flush "
             "(the last 5 mm is a press fit).")),
         **{name: S.Printed(s, S.FLAT, (
             "Seal bead: print flat side down. Glue it along the base back wall's top edge, "
@@ -176,7 +177,7 @@ def hardware(lay: Layout, t: float = 3.0) -> dict[str, int]:
         tape += " and boost module"
     return {
         f"{MAGNET_D:g} x {MAGNET_T:g} mm disc magnet": 2 * len(lay.lid_catch),
-        f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.1f} mm (hinge pin)": 1,
+        f"{PIN_ROD_D:g} mm steel rod x {H.pin_length(lay):.1f} mm (hinge pin)": 1,
         f"{PEG_DIA:g} mm rod x {board_pin_length(lay):.1f} mm (board pins, MT2 + loose MT1)": 2,
         "wood glue": 1,
         tape: 1,
@@ -205,7 +206,7 @@ def assembly(angle_deg: float, bank_out: bool, monitor: str = ASSEMBLY_MONITOR,
     loc = lay.lid_location(angle_deg)
     mag_base, mag_lid = _magnet_blocks(lay)
 
-    bank_box = S.bx(S.packed_bank(lay, bank))
+    bank_box = S.bx(S.packed_bank(lay))
     if bank_out:
         bank_box = bank_box.translate(
             cq.Vector(0, 0, lay.rim_z + S.BANK_OUT_LIFT - lay.bank_bay.z0))
@@ -222,7 +223,7 @@ def assembly(angle_deg: float, bank_out: bool, monitor: str = ASSEMBLY_MONITOR,
                    for i, c in enumerate(lay.lid_catch, 1)]
     lid_items = [(n, p.solid()) for n, p in body.panels.items() if p.frame == "lid"]
     lid_items += [("knuckles-lid", knuckles_lid(lay, t)), *mag_lid,
-                  ("monitor", S.monitor_block(lay, monitor))]
+                  ("monitor", S.monitor_block(lay))]
     if lay.boost_in_lid:
         lid_items.append(("boost", S.boost_block(lay)))
     lid_items += [(f"hw:catch-magnet-lid-{i}", S.zcyl(m.cx, m.cy, m.z0, m.z1, MAGNET_D / 2))

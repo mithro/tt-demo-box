@@ -50,9 +50,10 @@ def test_main_prints_both_routes_and_unconfirmed(capsys):
     for route in L.ROUTES:
         assert route in out
     assert "UNCONFIRMED" in out
-    for name in ("TAPE_T", "TALLEST_COMPONENT", "USB_C_AXIS_ABOVE_PCB", "vga-slim",
+    for name in ("TAPE_T", "TALLEST_COMPONENT", "USB_C_AXIS_ABOVE_PCB", "usb-12v-boost",
                  L.DESIGN_MONITOR, L.DESIGN_BANK):
         assert name in out, name
+    assert "vga-slim" not in out      # R34: unused, so not a figure to measure
 
 
 def test_verify_docstring_lists_exactly_the_proofs():
@@ -79,8 +80,9 @@ def test_unconfirmed_listed(lay):
         proof(r, lay)
     names = " ".join(what for what, _ in r.unconfirmed)
     for name in ("TALLEST_COMPONENT", "USB_C_AXIS_ABOVE_PCB", "TINYVGA_Z_OFFSET", "TAPE_T",
-                 "vga-slim", "monitor-pigtail", L.DESIGN_MONITOR, L.DESIGN_BANK):
+                 "usb-12v-boost", "monitor-pigtail", L.DESIGN_MONITOR, L.DESIGN_BANK):
         assert name in names, name
+    assert "vga-slim" not in names
 
 
 # --- each proof can fail ---------------------------------------------------------

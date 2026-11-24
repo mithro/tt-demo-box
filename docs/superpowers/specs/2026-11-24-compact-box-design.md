@@ -2,6 +2,10 @@
 
 Status: approved by Tim, 2026-11-24.
 
+The rulings made while building it (R1 to R36, cited by ID in the code) are in
+[`2026-11-24-compact-box-rulings.md`](2026-11-24-compact-box-rulings.md); where a ruling and this
+document disagree, the ruling is the later decision.
+
 Supersedes `2026-11-23-tt-demo-box-design.md` (the "first design", merged in PR #1) where the two
 disagree. Everything in the first design that this document does not change still holds: the
 intent (open the lid and it is a working demo), the 5 V power scheme, the 20,000 mAh-class bank,
@@ -119,7 +123,8 @@ one-box-fits-every-part layout took the rest.
 5. **No fasteners.**
    - **Hinge:** printed knuckles on a single straight pin, cut flush with the outside faces. The
      pin is steel rod or 1.75 mm filament (builder's call; prefer filament, since no bought
-     part).
+     part). *Amended by ruling R35: 3 mm steel rod only; the hinge holds it with a press fit
+     that a filament rod would not meet.*
    - **Printed route:** the knuckles are printed with the base and the lid.
    - **Laser route:** printed knuckle blocks glued into the plywood.
    - **Stop:** the lid's 100-degree stop stays, built into the knuckles.

@@ -95,7 +95,7 @@ def test_battery_keys_and_sources():
 
 
 def test_cable_data():
-    assert set(CABLES) == {"vga-slim", "vga-90-adapter", "usb-c-right-angle",
+    assert set(CABLES) == {"vga-90-adapter", "usb-c-right-angle",
                            "usb-a-c", "usb-12v-boost", "bank-built-in", "monitor-pigtail"}
     for c in CABLES.values():
         assert c.sources and all(isinstance(s, Source) for s in c.sources)

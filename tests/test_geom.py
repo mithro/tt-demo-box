@@ -68,3 +68,12 @@ def test_stadium_along_x_covers_its_plane_and_sizes():
     assert s.width == pytest.approx(20.0) and s.length == pytest.approx(21.5)
     with pytest.raises(ValueError):
         Stadium(0, 0, 0, 0, 1, 0, 1, "bad", axis="w")
+
+
+def test_mm_rounds_once_whatever_the_float_noise():
+    """One rounding source for every printed figure: 174.755 reached from a
+    solid's bounding box (174.75499999) and from the layout (174.75500002)
+    reads the same, half up, never "-0.00"."""
+    from demobox.geom import mm
+    assert mm(174.75499999999) == mm(174.75500000002) == "174.76"
+    assert mm(0.125) == "0.13" and mm(-0.001) == "0.00" and mm(197.7) == "197.70"

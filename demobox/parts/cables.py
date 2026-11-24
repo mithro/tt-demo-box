@@ -37,8 +37,6 @@ def _cable(key, title, dia, bend, plug, quote):
 
 
 CABLES: dict[str, Cable] = {c.key: c for c in (
-    _cable("vga-slim", "Slim VGA cable, <= 0.5 m", 5.0, 30.0, (45.0, 17.0, 20.0),
-           "Cable sourcing: \"a slim, short (<= 0.5 m) VGA cable\"."),
     _cable("vga-90-adapter", "VGA 90 degree adapter", 5.0, 30.0, (35.0, 17.0, 20.0),
            "Cable sourcing: \"with a 90 degree adapter where a monitor's socket faces "
            "backwards\"; the ~20 mm run behind it is the tinyvga.py ANGLED_RUN (paraphrase)."),
@@ -54,10 +52,9 @@ CABLES: dict[str, Cable] = {c.key: c for c in (
            "Battery survey: UGREEN PB505, Xiaomi PB2020 and Anker Zolo list \"built-in C\"; "
            "cable and plug body are not stated, so the USB-C right-angle figures are used. "
            "Unconfirmed."),
-    # Ruling R13: the monitor's own cable, not a bought one.  Its plug is the
-    # slim VGA cable's typical body.
-    # Rulings R13, R17: the monitor's own cable, not a bought one.  Its plug
-    # is the slim VGA cable's typical body.
+    # Rulings R13, R17: the monitor's own cable, not a bought one (R34: the
+    # first design's slim VGA cable is gone; the pigtail plugs straight into
+    # the adapter).  Its plug is a typical VGA plug body, 45 x 17 x 20.
     Cable("monitor-pigtail", "Monitor's own hard-wired VGA cable (pigtail)", 5.0, 15.0,
           (45.0, 17.0, 20.0), (
               Source("Placeholder: Tim's monitor's own hard-wired cable",

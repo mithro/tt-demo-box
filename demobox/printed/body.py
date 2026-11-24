@@ -189,7 +189,7 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
         "lid": _printed("lid", lid(lay), (
             "Lid: print top plate down. Supports under the hinge knuckles only. Press two "
             f"{MAGNET_D:g} x {MAGNET_T:g} mm magnets into the catch pockets, flush. Hinge: "
-            f"lid on the base, push the {PIN_ROD_D:g} mm x {rod:.1f} mm rod in from the right "
+            f"lid on the base, push the {PIN_ROD_D:g} mm x {rod:.1f} mm steel rod in from the right "
             "side face until flush (the last 5 mm is a press fit). Tape the monitor's back "
             "to the flat inside face"
             + (", and the boost module beside it in the cable strip." if lay.boost_in_lid
@@ -212,8 +212,7 @@ def hardware(lay: Layout) -> dict[str, int]:
         tape += " and boost module"
     return {
         f"{MAGNET_D:g} x {MAGNET_T:g} mm disc magnet": 2 * len(lay.lid_catch),
-        f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.1f} mm (hinge pin; steel, or 2.85 mm "
-        "filament)": 1,
+        f"{PIN_ROD_D:g} mm steel rod x {H.pin_length(lay):.1f} mm (hinge pin)": 1,
         tape: 1,
     }
 
@@ -239,7 +238,7 @@ def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMB
     lay = layout(ROUTES[route], bank=bank, monitor=monitor)
     loc = lay.lid_location(angle_deg)
 
-    bank_box = _bx(packed_bank(lay, bank))
+    bank_box = _bx(packed_bank(lay))
     if bank_out:
         bank_box = bank_box.translate(cq.Vector(0, 0, lay.rim_z + BANK_OUT_LIFT - lay.bank_bay.z0))
     mt1 = lay.pins[f"{board}/MT1"]
@@ -250,7 +249,7 @@ def assembly(route: str, angle_deg: float, bank_out: bool, monitor: str = ASSEMB
                   ("bank", bank_box), ("hw:hinge-rod", hinge_rod(lay))]
     base_items += [(f"hw:catch-magnet-base-{i}", _zcyl(c.cx, c.cy, c.z0, c.z1, MAGNET_D / 2))
                    for i, c in enumerate(lay.lid_catch, 1)]
-    lid_items = [("lid", lid(lay)), ("monitor", monitor_block(lay, monitor))]
+    lid_items = [("lid", lid(lay)), ("monitor", monitor_block(lay))]
     if lay.boost_in_lid:
         lid_items.append(("boost", boost_block(lay)))
     lid_items += [(f"hw:catch-magnet-lid-{i}", _zcyl(m.cx, m.cy, m.z0, m.z1, MAGNET_D / 2))

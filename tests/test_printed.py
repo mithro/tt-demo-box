@@ -106,7 +106,7 @@ def test_hardware_exact(lay):
     rod = H.pin_length(lay)
     assert B.hardware(lay) == {
         "6 x 3 mm disc magnet": 4,
-        "3 mm rod x 40.8 mm (hinge pin; steel, or 2.85 mm filament)": 1,
+        "3 mm steel rod x 40.8 mm (hinge pin)": 1,
         "double-sided foam tape (VHB type), monitor back and boost module": 1,
     }
     assert f"{rod:.1f}" == "40.8"     # R24: 156.9 .. 197.7
@@ -419,3 +419,20 @@ def test_assembly_no_clash(rev, angle, bank_out):
     the rod in the lid knuckle's R24 press fit."""
     items = B.assembly("printed", angle, bank_out, board=rev)
     assert clashes(items, B.DECLARED_OVERLAPS) == []
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_hinge_rod_is_steel_only(route):
+    """R35: the hinge rod is 3 mm steel only.  A 2.85 mm filament rod is
+    smaller than the 2.9 mm press zone (R24), so nothing would hold it; no
+    hardware key or build note may offer filament."""
+    from demobox.laser import fittings as LF
+    lay = L.layout(L.ROUTES[route])
+    hw = B.hardware(lay) if route == "printed" else LF.hardware(lay, lay.wall)
+    parts = B.printed_parts(lay) if route == "printed" else LF.printed_parts(lay, lay.wall)
+    keys = [k for k in hw if "hinge pin" in k]
+    assert len(keys) == 1 and keys[0].startswith(f"{L.PIN_ROD_D:g} mm steel rod x "), keys
+    text = " ".join(list(hw) + [p.note for p in parts.values()])
+    assert "filament" not in text.replace("saves the filament", "")
+    assert "2.85" not in text
+    assert H.PRESS_D < L.PIN_ROD_D

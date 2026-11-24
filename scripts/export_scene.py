@@ -356,19 +356,19 @@ def bought_parts(lay: Layout, board: str = body.ASSEMBLY_BOARD):
     # they come out with the bank
     add("usb-c-plug", _box(lay.board_keepouts[f"{board}/usb_plug"]), "plastic", "moulded",
         "bank")
-    for i, s in enumerate(_tube(usb_path(lay, board)[:-1], usb_cable().dia / 2)):
+    for i, s in enumerate(_tube(usb_path(lay, board)[:-1], usb_cable(lay).dia / 2)):
         add(f"usb-c-cable-{i}", s, "rubber", "black", "bank")
     return out
 
 
-def screen_quad(lay: Layout, monitor: str = body.ASSEMBLY_MONITOR):
+def screen_quad(lay: Layout):
     """The monitor's active area with the lid shut, in the base frame (the
     lid frame + the hinge axis), like the part STLs: four corners (mm), image
     lower-left, lower-right, upper-right, upper-left, SCREEN_PROUD under the
     taped panel's face (``monitor_block``; screen down, its cable edge -- the
     image's bottom -- towards the hinge: panel u -> +x, v -> -y)."""
-    m = MONITORS[monitor]
-    pb = monitor_block(lay, monitor).BoundingBox()
+    m = MONITORS[lay.monitor]
+    pb = monitor_block(lay).BoundingBox()
     (aw, ah), (au, av) = m.active, m.active_offset
     hy, hz = lay.hinge_axis
     z = hz + pb.zmin - SCREEN_PROUD
@@ -477,8 +477,8 @@ def view_manifest(route: str, view: str, entries: list[dict], pig: list[dict],
     screen = {"part": "screen", "quad": screen_quad(lay), "image": pattern,
               "transform": frame_matrix(lay, "lid", v.lid_deg, v.bank_out)}
     return {"name": f"{route}-{view}", "route": route, "view": view, "lid_deg": v.lid_deg,
-            "bank_out": v.bank_out, "monitor": body.ASSEMBLY_MONITOR,
-            "bank": body.ASSEMBLY_BANK, "board": body.ASSEMBLY_BOARD,
+            "bank_out": v.bank_out, "monitor": lay.monitor,
+            "bank": lay.bank, "board": body.ASSEMBLY_BOARD,
             "camera": {"azimuth_deg": v.azimuth_deg, "elevation_deg": v.elevation_deg,
                        "lens_mm": LENS_MM},
             "resolution": list(RESOLUTION), "samples": SAMPLES,

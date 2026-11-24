@@ -4,6 +4,9 @@
 Each sits between ``<!-- <name>:begin -->`` and ``<!-- <name>:end -->``:
 
 * ``unconfirmed``: the UNCONFIRMED list, from ``verify.py``'s output;
+* ``size``: the closed size and volume of each route (``layout``, rounded by
+  ``geom.mm`` as the sheets are);
+* ``rods``: the hinge rod's length in each route (``hinge.pin_length``);
 * ``hardware-printed``: the printed route's bought hardware
   (``demobox.printed.body.hardware``);
 * ``hardware-laser``: the laser route's (``demobox.laser.fittings.hardware``).
@@ -69,8 +72,40 @@ def hardware_laser() -> list[str]:
     return table(fittings.hardware(layout(t), t))
 
 
-SECTIONS = {"unconfirmed": unconfirmed, "hardware-printed": hardware_printed,
-            "hardware-laser": hardware_laser}
+#: The size table's route labels.
+ROUTE_TITLES = {"printed": "3D printed, {wall:g} mm walls ({bed} mm bed)",
+                "laser": "Laser-cut {wall:g} mm plywood ({bed} mm bed)"}
+
+
+def size() -> list[str]:
+    """The closed box per route: W x D x H (base + lid) and its volume."""
+    import demobox  # noqa: F401
+    from demobox.geom import mm
+    from demobox.layout import LASER_BED, PRINT_BED, ROUTES, layout
+    beds = {"printed": PRINT_BED, "laser": LASER_BED}
+    rows = ["| Route | Closed (W x D x H) | Volume |", "|---|---|---|"]
+    for route, wall in ROUTES.items():
+        lay = layout(wall)
+        o, lid = lay.outer, lay.lid_outer
+        h = o.size[2] + lid.size[2]
+        bed = " x ".join(f"{v:g}" for v in beds[route])
+        rows.append(f"| {ROUTE_TITLES[route].format(wall=wall, bed=bed)} | {mm(o.size[0])} x "
+                    f"{mm(o.size[1])} x {mm(h)} mm | {o.size[0] * o.size[1] * h / 1e6:.2f} L |")
+    return rows
+
+
+def rods() -> list[str]:
+    """The hinge rod per route, as the hardware lists give it."""
+    import demobox  # noqa: F401
+    from demobox.layout import PIN_ROD_D, ROUTES, layout
+    from demobox.shared import hinge as H
+    lengths = ", ".join(f"{H.pin_length(layout(w)):.1f} mm {r}" for r, w in ROUTES.items())
+    return [f"The hinge rod is {PIN_ROD_D:g} mm steel rod ({lengths}), pressed in from the "
+            f"right-hand side face until flush; its last {H.PRESS_LEN:g} mm is a press fit."]
+
+
+SECTIONS = {"size": size, "rods": rods, "unconfirmed": unconfirmed,
+            "hardware-printed": hardware_printed, "hardware-laser": hardware_laser}
 
 
 def rewrite(text: str, made: dict[str, list[str]]) -> str:
