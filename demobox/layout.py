@@ -48,8 +48,11 @@ Base rows
   bank-to-board cable is short; long enough for the longest bank-side plug +
   SLACK, and at least ``FINGERTIP_D`` for the bank's end button), then
   ``bank_bay`` (the bank + SLACK each side), then ``boost_pocket`` (the boost
-  module + SLACK each side) if the bank row stays no longer than the board
-  row.  Otherwise the boost module goes in ``lid_strip`` (``boost_in_lid``).
+  module + SLACK each side) at the row's +X end, on the floor: along X if the
+  row then stays within the width the board row and the monitor set, else
+  turned 90 degrees (its length along Y, within the bank row's depth) if
+  that fits.  Only if neither fits does it go in ``lid_strip``
+  (``boost_in_lid``).
 * **Width** = max(board row, bank row, monitor W + 2*SLACK) + 2*wall.
   **Depth** = wall + SLACK + board row Y + SLACK + bank row Y + SLACK + wall,
   and at least monitor H + 2*SLACK + 2*wall.
@@ -354,8 +357,14 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
     port_len = max(max(CABLES[k].plug[0] for k in BANK_SIDE_PLUGS) + SLACK, FINGERTIP_D)
     bay_x, bay_y = b.size[0] + 2 * SLACK, b.size[1] + 2 * SLACK
     boost = tuple(d + 2 * SLACK for d in _BOOST.plug)
-    boost_in_lid = port_len + bay_x + boost[0] > board_row_x
-    bank_row_x = port_len + bay_x + (0.0 if boost_in_lid else boost[0])
+    # the boost at the bank row's +X end, along X or turned, within the width
+    # the board row and the monitor set; else in the lid
+    room = max(board_row_x, mw + 2 * SLACK) - (port_len + bay_x)
+    base_room_z = max(b.size[2], stack_h) + SLACK          # rim_z - wall
+    boost_xy = next(((fx, fy) for fx, fy in ((boost[0], boost[1]), (boost[1], boost[0]))
+                     if fx <= room and fy <= bay_y and boost[2] <= base_room_z), None)
+    boost_in_lid = boost_xy is None
+    bank_row_x = port_len + bay_x + (0.0 if boost_in_lid else boost_xy[0])
 
     # --- outer ------------------------------------------------------------------
     width = max(board_row_x, bank_row_x, mw + 2 * SLACK) + 2 * wall
@@ -427,8 +436,8 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
             raise ValueError(f"boost module {_BOOST.plug} does not fit the lid strip "
                              f"{lid_strip.size}")
     else:
-        boost_pocket = Box(bank_bay.x1, row_y0, wall, bank_bay.x1 + boost[0],
-                           row_y0 + boost[1], wall + boost[2], "boost converter pocket")
+        boost_pocket = Box(bank_bay.x1, row_y0, wall, bank_bay.x1 + boost_xy[0],
+                           row_y0 + boost_xy[1], wall + boost[2], "boost converter pocket")
 
     exit_x = monitor_space.x0 + SLACK + m.pigtail_exit_u
     half = _PIGTAIL.dia / 2 + FIT

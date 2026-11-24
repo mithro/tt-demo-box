@@ -100,11 +100,17 @@ def test_size_budget(lay):
 
     port = max(max(CABLES[k].plug[0] for k in L.BANK_SIDE_PLUGS) + s, L.FINGERTIP_D)
     bank_row_x = port + bank.size[0] + 2 * s
-    boost = CABLES["usb-12v-boost"].plug[0] + 2 * s
-    assert lay.boost_in_lid is (bank_row_x + boost > board_row_x)
-    if not lay.boost_in_lid:
-        bank_row_x += boost
     bank_row_y = bank.size[1] + 2 * s
+    # R10: the boost goes at the bank row's +X end, along X or turned, if
+    # either fits the width the other rows set; else in the lid
+    bl, bw, bh = (d + 2 * s for d in CABLES["usb-12v-boost"].plug)
+    room = max(board_row_x, panel[0] + 2 * s) - bank_row_x
+    fits = [(fx, fy) for fx, fy in ((bl, bw), (bw, bl))
+            if fx <= room and fy <= bank_row_y and bh <= lay.rim_z - w]
+    assert lay.boost_in_lid is (not fits)
+    if fits:
+        assert lay.boost_pocket.size[:2] == pytest.approx(fits[0])
+        bank_row_x += fits[0][0]
 
     width = max(board_row_x, bank_row_x, panel[0] + 2 * s) + 2 * w
     depth = max(w + s + board_row_y + s + bank_row_y + s + w, panel[1] + 2 * s + 2 * w)
@@ -125,16 +131,18 @@ def test_size_budget_printed_literals():
         -> 203.45 with the adapter, 223.45 straight: vga_adapter = True.
       board x (base Y): PCB 0 .. TinyVGA x1 (56.855 + 33.0) = 89.855.
       z: TinyVGA plug hood 1.6 + 12.5/2 - 20/2 = -2.15 .. 1.6 + 6.25 + 10 = 17.85 -> 20.0.
-    Width  = max(203.45 + 2*1 = 205.45, bank row 23 + 128 + 2 = 153, panel 182 + 2 = 184)
-             + 2*2.4 = 210.25   (board row wins; boost 62 would make the bank row 215 > 205.45,
-             so it goes in the lid).
+    Width  = max(203.45 + 2*1 = 205.45, bank row 23 + 128 + 2 + 22 = 175, panel 182 + 2 = 184)
+             + 2*2.4 = 210.25   (board row wins).
              port room = max(max(20, 22, 20) + 1, 16) = 23.
+             boost (60 x 20 x 15 + 2*1): along X 153 + 62 = 215 > 205.45, so it is turned:
+             X 22 (153 + 22 = 175 <= 205.45), Y 62 <= bank row 75, Z 17 -> in the base.
     Depth  = 2.4 + 1 + 89.855 + 1 + (73 + 2) + 1 + 2.4 = 172.655   (>= 118 + 2 + 4.8 = 124.8)
     Rim    = 2.4 + max(bank 32, board stack 20.0) + 1 = 35.4        (bank wins)
     Lid    = 2.4 + tape 1.0 + monitor 20.0 + clearance 2.0 = 25.4
     """
     lay = L.layout(L.ROUTES["printed"])
-    assert lay.vga_adapter is True and lay.boost_in_lid is True
+    assert lay.vga_adapter is True and lay.boost_in_lid is False
+    assert lay.boost_pocket.size == pytest.approx((22.0, 62.0, 17.0), abs=0.01)
     assert lay.outer.size == pytest.approx((210.25, 172.655, 35.4), abs=0.01)
     assert lay.lid_outer.size == pytest.approx((210.25, 172.655, 25.4), abs=0.01)
     assert lay.port_room.size[0] == pytest.approx(23.0, abs=0.01)
@@ -324,14 +332,27 @@ def test_every_bank_as_design_bank(bank):
 
 
 def test_boost_pocket(lay):
-    boost = CABLES["usb-12v-boost"].plug
-    want = tuple(d + 2 * L.SLACK for d in boost)
-    assert lay.boost_pocket.size == pytest.approx(want)
-    if lay.boost_in_lid:
-        assert _inside(lay.boost_pocket, lay.lid_strip)
-    else:
-        assert lay.boost_pocket.x0 == pytest.approx(lay.bank_bay.x1)
-        assert _inside(lay.boost_pocket, lay.outer, lay.wall)
+    """R10: the design kit's boost module is in the base, turned, at the bank
+    row's +X end, inside the walls and below the rim."""
+    bl, bw, bh = (d + 2 * L.SLACK for d in CABLES["usb-12v-boost"].plug)
+    p = lay.boost_pocket
+    assert lay.boost_in_lid is False
+    assert p.size == pytest.approx((bw, bl, bh))                 # turned 90 degrees
+    assert p.x0 == pytest.approx(lay.bank_bay.x1)
+    assert p.y0 == pytest.approx(lay.bank_bay.y0) and p.y1 <= lay.bank_bay.y1 + EPS
+    assert p.z0 == pytest.approx(lay.wall) and p.z1 <= lay.rim_z + EPS
+    assert _inside(p, lay.outer, lay.wall)
+
+
+def test_huge_boost_goes_to_the_lid(monkeypatch):
+    """A boost module too big for the bank row either way goes in the lid strip."""
+    from dataclasses import replace
+    monkeypatch.setattr(L, "_BOOST", replace(L._BOOST, plug=(100.0, 40.0, 10.0)))
+    lay = L.layout(L.ROUTES["printed"])
+    assert lay.boost_in_lid is True
+    assert lay.boost_pocket.size == pytest.approx((102.0, 42.0, 12.0))
+    assert _inside(lay.boost_pocket, lay.lid_strip)
+    assert lay.outer.size[0] == pytest.approx(210.25)           # the box does not grow
 
 
 def test_boost_in_the_bank_row_when_it_fits():
