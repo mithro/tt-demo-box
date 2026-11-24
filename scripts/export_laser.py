@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Write the laser route: one DXF per panel, its printed parts, the assembly.
+"""Write the laser route: one DXF per panel, its printed fittings, the assembly.
 
 * ``output/laser/<panel>.dxf`` -- one sheet per panel (``demobox.laser.panels``),
-  millimetres, kerf compensated: layer ``CUT`` (the outline, mortises, T-slots
-  and clearance holes) and layer ``ENGRAVE`` (the panel's name and the
-  outlines printed parts are glued on).  Laid landscape with its corner at the
-  origin, within the 300 x 200 mm laser bed (``BedOverflow`` otherwise,
-  before anything is written).  Normalised with the submodule's
-  ``tools.reproducible``, so a rebuild is byte for byte the same.
-* ``output/laser/printed/<part>.step`` / ``.stl`` -- the route's printed parts
-  (its glued fittings and the shared parts at this wall), posed for printing.
+  millimetres, kerf compensated: layer ``CUT`` (the outline, mortises and
+  holes) and layer ``ENGRAVE`` (the panel's name and where the magnet blocks
+  are glued).  Laid landscape with its corner at the origin, within the
+  300 x 200 mm laser bed (a panel over it is split on a glued finger seam;
+  ``BedOverflow`` if no seam will do, before anything is written).
+  Normalised with the submodule's ``tools.reproducible``, so a rebuild is
+  byte for byte the same.
+* ``output/laser/printed/<part>.step`` / ``.stl`` -- the route's printed
+  fittings (``demobox.laser.fittings``: the hinge's knuckle blocks and seal
+  bead, the magnet block), posed for printing.
 * ``output/laser/assembly.step`` -- the box with the lid at the stop and the
-  drawer shut, one named solid per part, no colours (see
+  bank in, one named solid per part, no colours (see
   ``export_printed.write_assembly``).
-* ``output/laser/hardware.txt`` -- the bought hardware list.
+* ``output/laser/hardware.txt`` -- the bought hardware list (no screws or
+  nuts: the box is glued, spec Decision 9).
 
 ``--thickness`` and ``--kerf`` regenerate everything for plywood that is not
 3 mm or a laser with another kerf (the layout is redrawn for the thickness);
@@ -112,7 +115,7 @@ def write_printed(lay, t, out: Path) -> None:
 def write_assembly(path: Path) -> None:
     import cadquery as cq
     assy = cq.Assembly(name="tt-demo-box-laser")
-    for name, shape, _colour in body.assembly("laser", LID_OPEN_DEG, 0.0):
+    for name, shape, _colour in body.assembly("laser", LID_OPEN_DEG, False):
         assy.add(shape, name=name)
     assy.export(str(path), "STEP")
     reproducible.normalise_step(path, name=path.stem)
@@ -156,7 +159,7 @@ def main(argv=None) -> int:
         write_printed(lay, t, out / "printed")
         if abs(t - ROUTES["laser"]) < 1e-9:
             write_assembly(out / "assembly.step")
-            print(f"assembly: lid at {LID_OPEN_DEG:g} deg, drawer shut")
+            print(f"assembly: lid at {LID_OPEN_DEG:g} deg, bank in")
     return 0
 
 

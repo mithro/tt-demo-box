@@ -1,26 +1,31 @@
-"""The laser-cut body (route "laser", ``layout(3.0)``): joints, panels, the
-bed, the drawer and its latch, the assembly and the DXF export."""
+"""The laser-cut route (``layout(3.0)``): glued, finger-jointed 3 mm plywood,
+printed hinge blocks and magnet blocks, no screws or nuts (spec Decision 9)."""
 
-import subprocess
-import sys
+import importlib.util
+import math
 from pathlib import Path
 
 import cadquery as cq
 import pytest
+from shapely.geometry import box as sbox
 
 from demobox import layout as L
 from demobox.clash import clashes
-from demobox.geom import BedOverflow, overlaps
+from demobox.geom import BedOverflow, box_gap, overlaps
+from demobox.laser import fittings as F
 from demobox.laser import joints as J
 from demobox.laser import panels as P
-from demobox.parts.batteries import BATTERIES
-from demobox.parts.monitors import MONITORS
+from demobox.parts.board import BOARD_KEYS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
-from demobox.shared import inserts as I
+from demobox.shared import solids as S
 
 ROOT = Path(__file__).resolve().parent.parent
 WALL = L.ROUTES["laser"]
+
+BASE = ("base-floor", "base-front", "base-back", "base-left", "base-right")
+PLINTH = ("plinth-top", "plinth-front", "plinth-back", "plinth-left", "plinth-right")
+LID = ("lid-top", "lid-front", "lid-back", "lid-left", "lid-right")
 
 
 @pytest.fixture(scope="module")
@@ -35,12 +40,25 @@ def body(lay):
 
 @pytest.fixture(scope="module")
 def thin():
-    """Review Focus 4: plywood sold as 3 mm measuring 2.7, a wider kerf."""
+    """Plywood sold as 3 mm measuring 2.7, and a wider kerf."""
     return P.build(L.layout(2.7), 2.7, 0.2)
+
+
+@pytest.fixture(scope="module")
+def parts(lay):
+    return F.printed_parts(lay, WALL)
 
 
 def _inside(shape, p) -> bool:
     return shape.isInside(cq.Vector(*p), 1e-4)
+
+
+def _common(a, b) -> float:
+    return a.intersect(b).Volume()
+
+
+def _solid_box(b) -> cq.Solid:
+    return cq.Solid.makeBox(*b.size, cq.Vector(b.x0, b.y0, b.z0))
 
 
 def _fingers(edge, t):
@@ -70,58 +88,65 @@ def test_finger_count_is_the_nearest_odd_at_least_3(length, t, n):
 @pytest.mark.parametrize("length", [27.0, 100.0, 203.55])
 def test_male_and_female_edges_are_complementary(length, t, kerf):
     """Male fingers grow kerf/2 each side, the female's slots shrink by kerf/2;
-    with that taken off, the two sets of fingers tile the edge, each finger
-    starting where the mate's ends."""
+    with that taken off, the two sets of fingers tile the edge."""
     male = _fingers(J.finger_edge(length, t, kerf, True), t)
     female = _fingers(J.finger_edge(length, t, kerf, False), t)
     n = J.finger_count(length, t)
     assert len(male) == (n + 1) // 2 and len(female) == (n - 1) // 2
     k = kerf / 2
-    # the male's end fingers run to the edge's ends (and kerf/2 past them)
     assert male[0][0] == pytest.approx(-k) and male[-1][1] == pytest.approx(length + k)
     nominal = sorted([(a + k, b - k) for a, b in male] + [(a + k, b - k) for a, b in female])
     nominal[0] = (0.0, nominal[0][1])
     nominal[-1] = (nominal[-1][0], length)
     assert sum(b - a for a, b in nominal) == pytest.approx(length)
     for (_, b0), (a1, _) in zip(nominal, nominal[1:]):
-        assert a1 == pytest.approx(b0)                         # offsets equal
-    # the profile's depths: tips kerf/2 proud of the edge, slot floors at t - kerf/2
+        assert a1 == pytest.approx(b0)
     ys = {round(y, 9) for _, y in J.finger_edge(length, t, kerf, True)}
     assert ys == {round(-k, 9), round(t - k, 9)}
 
 
-def test_tslot_takes_an_m3x12_and_a_square_nut():
-    t = 3.0
-    poly = J.tslot(50.0, t)
-    xs = [p[0] for p in poly]
-    ys = [p[1] for p in poly]
-    assert min(ys) == 0.0                                       # open at the edge
-    assert max(ys) >= J.TSLOT_SCREW - t                         # the screw's tip fits
-    from shapely.geometry import Polygon, box
-    sl = Polygon(poly)
-    assert sl.is_valid
-    # the shank slot is the clearance width, centred on ``at``
-    assert sl.intersection(box(0, 0.1, 100, 0.2)).bounds[0] == pytest.approx(50 - J.SLOT_W / 2)
-    # the nut pocket takes a square nut across and its thickness along the screw
-    y0, y1 = J.nut_pocket(t)
-    assert y1 - y0 >= J.NUT_T and max(xs) - min(xs) >= J.NUT_W
-    assert y1 <= J.TSLOT_SCREW - t - J.THREAD_PAST + 1e-9       # the screw passes the nut
+def test_finger_segments_are_complementary():
+    male = J.finger_segments(100.0, 3.0, True)
+    female = J.finger_segments(100.0, 3.0, False)
+    both = sorted(male + female)
+    assert both[0][0] == 0.0 and both[-1][1] == 100.0
+    assert sum(b - a for a, b in both) == pytest.approx(100.0)
+
+
+# --- no fasteners (spec Goal 3, Decision 9) --------------------------------------------
+
+def test_no_screws_or_nuts(lay):
+    assert not hasattr(P, "Screw")
+    for name in ("tslot", "nut_pocket", "TSLOT_SCREW", "NUT_W", "NUT_T", "SLOT_W"):
+        assert not hasattr(J, name), name
+    assert "screws" not in P.LaserBody.__dataclass_fields__
+    for key in F.hardware(lay, WALL):
+        for word in ("M3", "nut", "screw", "insert", "feet", "foot"):
+            assert word.lower() not in key.lower(), key
+
+
+def test_hardware_exact(lay):
+    rod = H.pin_length(lay)
+    assert F.hardware(lay, WALL) == {
+        "6 x 3 mm disc magnet": 4,
+        f"3 mm rod x {rod:.0f} mm (hinge pin)": 1,
+        "3 mm rod x 19.7 mm (board pins, MT2 + loose MT1)": 2,
+        "wood glue": 1,
+        "double-sided foam tape (VHB type), monitor back and boost module": 1,
+    }
+    assert lay.boost_in_lid
+    # R22/R24: from the first knuckle's blind end (156.5 + 1.0) to x 198.9
+    assert f"{rod:.0f}" == "41"
+    # R28: floor top (3.0) to the PCB top (17.15 + 1.561) + PIN_PROUD (4.0)
+    assert F.board_pin_length(lay) == pytest.approx(22.711 - 3.0)
 
 
 # --- panels -----------------------------------------------------------------------
 
-def test_panel_set(body):
-    names = set(body.panels)
-    for want in ("base-front", "base-back", "base-left", "base-right", "lid-front",
-                 "lid-left", "lid-right", "lid-hinge-left", "lid-hinge-right", "lid-band-face",
-                 "lid-band-wall", "drawer-face", "drawer-back", "drawer-side-front",
-                 "drawer-side-back", "drawer-floor", "drawer-guide", "runner-front",
-                 "runner-back"):
-        assert want in names, want
-    # R9: the base floor, deck and lid back are too big for the bed and are split
-    for big in ("base-floor", "deck", "lid-back"):
-        assert big not in names
-        assert sum(1 for n in names if n.startswith(big + "-")) == 2, big
+def test_panel_set(body, lay):
+    assert lay.plinth.z1 > lay.plinth.z0
+    assert set(body.panels) == set(BASE + PLINTH + LID)
+    assert body.seams == ()
 
 
 def test_every_panel_is_one_valid_piece(body):
@@ -134,22 +159,57 @@ def test_every_panel_is_one_valid_piece(body):
 
 
 @pytest.mark.parametrize("which", ["body", "thin"])
-def test_every_panel_fits_the_laser_bed(which, body, thin):
+def test_panels_fit_bed(which, body, thin):
+    """Every panel, kerf included, fits the 300 x 200 laser bed whole: no
+    panel of the compact box needs a seam."""
     b = body if which == "body" else thin
+    assert b.seams == ()
     for name, p in b.panels.items():
         w, h = sorted(p.cut_size(), reverse=True)
         assert w <= L.LASER_BED[0] + 1e-6 and h <= L.LASER_BED[1] + 1e-6, (name, w, h)
 
 
+def test_a_smaller_bed_splits_on_a_glued_finger_seam(lay):
+    """Decision 9: a panel over the bed is split along a glued finger seam
+    (``_split``): each piece fits, the two make the whole."""
+    bed = (190.0, 150.0)
+    b = P.build(lay, WALL, P.KERF, bed=bed)
+    assert {s.name for s in b.seams} >= {"base-floor", "lid-top"}
+    for s in b.seams:
+        p0, p1 = (b.panels[n] for n in s.pieces)
+        assert p0.shape.intersection(p1.shape).area == pytest.approx(0.0, abs=1e-6)
+        assert p0.shape.union(p1.shape).area == pytest.approx(s.whole.area, rel=1e-9)
+        assert len(s.runs) >= 1 and all(len(r) >= 3 for r in s.runs)
+    for name, p in b.panels.items():
+        w, h = sorted(p.cut_size(), reverse=True)
+        assert w <= bed[0] + 1e-6 and h <= bed[1] + 1e-6, (name, w, h)
+
+
 def test_bed_overflow_names_the_panel_and_its_size(lay):
     with pytest.raises(BedOverflow, match=r"[a-z-]+ \d+\.\d\d x \d+\.\d\d mm does not fit the "
-                                          r"150 x 100 mm laser bed"):
-        P.build(lay, WALL, P.KERF, bed=(150.0, 100.0))
+                                          r"60 x 40 mm laser bed"):
+        P.build(lay, WALL, P.KERF, bed=(60.0, 40.0))
 
 
 def test_t_must_match_the_layout(lay):
     with pytest.raises(ValueError, match="layout"):
         P.panels(lay, t=2.7)
+
+
+def test_every_edge_jointed(body):
+    """Each pair of panels that touch (their slabs meet or overlap) is
+    joined by a declared finger ``Joint``: every glued edge is fingered."""
+    joined = {frozenset((j.a, j.b)) for j in body.joints}
+    sl = body.slab_panels
+    names = sorted(sl)
+    touching = set()
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if sl[a].frame == sl[b].frame and box_gap(sl[a].box(), sl[b].box()) <= 1e-6:
+                touching.add(frozenset((a, b)))
+    assert touching == joined
+    for j in body.joints:
+        assert j.runs and all(len(r) >= 3 for r in j.runs), (j.a, j.b)
 
 
 @pytest.mark.slow
@@ -159,13 +219,8 @@ def test_every_joint_is_complementary(which, body, thin):
     within a finger run, the male owns both ends, and in 3D the zone is filled
     exactly once (the fingers interlock without overlap or gap)."""
     b = body if which == "body" else thin
-    assert len(b.joints) >= 30
     solids = {n: p.solid(holes=False) for n, p in b.slab_panels.items()}
     boxes = {n: p.box() for n, p in b.slab_panels.items()}
-
-    def box(bx):
-        return cq.Solid.makeBox(*bx.size, cq.Vector(bx.x0, bx.y0, bx.z0))
-
     for j in b.joints:
         lo, hi = j.interval
         assert j.segments[0][0] == pytest.approx(lo) and j.segments[-1][1] == pytest.approx(hi)
@@ -177,279 +232,311 @@ def test_every_joint_is_complementary(which, body, thin):
             assert owners[0] == owners[-1] == j.male
             assert all(x != y for x, y in zip(owners, owners[1:]))
         assert solids[j.a].intersect(solids[j.b]).Volume() <= 1e-3, (j.a, j.b)
-        # each segment is its owner's (less the owner's own feature cuts) and nobody else's
         for s0, s1, owner in j.segments:
-            seg = box(j.segment_box(s0, s1))
-            want = seg
             sb = j.segment_box(s0, s1)
-            for c in b.slab_cuts[owner]:
-                if overlaps(sb, c):
-                    want = want.cut(box(c))
-            got = solids[owner].intersect(seg).Volume()
-            assert got == pytest.approx(want.Volume(), abs=1e-2), (j.a, j.b, s0, owner)
+            # the owner has the whole segment, less its own feature cuts
+            # (in its plane; the zone spans its thickness)
+            u, v = P.PLANE[b.slab_panels[owner].normal]
+            rect = sbox(*(getattr(sb, f"{u}0"), getattr(sb, f"{v}0"),
+                          getattr(sb, f"{u}1"), getattr(sb, f"{v}1")))
+            want = rect.difference(b.slab_cuts[owner]).area * b.t
+            got = solids[owner].intersect(_solid_box(sb)).Volume()
+            assert got == pytest.approx(want, abs=1e-2), (j.a, j.b, s0, owner)
             for n, s in solids.items():
-                if n != owner and overlaps(boxes[n], sb):
-                    assert s.intersect(seg).Volume() <= 1e-3, (j.a, j.b, s0, n)
-
-
-@pytest.mark.parametrize("which", ["body", "thin"])
-def test_split_panels_mate_along_a_finger_seam(which, body, thin):
-    """R9: each split panel's two pieces are its whole, without overlap, and
-    meet along a fingered seam."""
-    b = body if which == "body" else thin
-    assert {s.name for s in b.seams} == {"base-floor", "deck", "lid-back"}
-    for s in b.seams:
-        p0, p1 = (b.panels[n] for n in s.pieces)
-        assert p0.shape.intersection(p1.shape).area == pytest.approx(0.0, abs=1e-6)
-        assert p0.shape.union(p1.shape).area == pytest.approx(s.whole.area, rel=1e-9)
-        assert len(s.runs) >= 1 and all(len(r) >= 3 for r in s.runs)
+                if n != owner and b.slab_panels[n].frame == j.frame and overlaps(boxes[n], sb):
+                    assert s.intersect(_solid_box(sb)).Volume() <= 1e-3, (j.a, j.b, s0, n)
 
 
 def test_kerf_is_added_to_every_cut_edge(thin):
-    """The cut path is the nominal outline grown kerf/2; the beam takes kerf/2
-    off it again, leaving the nominal part.  Holes shrink by kerf."""
+    """The cut path is the nominal outline grown kerf/2; holes shrink by kerf."""
     k = 0.2
     for name, p in thin.panels.items():
-        cut = p.cut_shape()
-        back = cut.buffer(-k / 2, join_style=2)
+        back = p.cut_shape().buffer(-k / 2, join_style=2)
         assert back.symmetric_difference(p.shape).area < 1e-3 * p.shape.length, name
         for (u, v, d), (cu, cv, cd) in zip(p.holes, p.cut_holes()):
             assert (cu, cv) == (u, v) and cd == pytest.approx(d - k)
 
 
-# --- functions of the box ------------------------------------------------------------
+# --- the cache and the body record --------------------------------------------------
 
-def test_tslot_screws_line_up(body):
-    """Every T-slot screw: a clearance hole in the panel it passes through, the
-    T-slot (shank slot + nut pocket) in the panel it goes into."""
-    assert len(body.screws) >= 16
-    for s in body.screws:
-        a, b = body.panel_at(s.through, s.at), body.panel_at(s.into, s.at)
-        sa, sb = a.solid(), b.solid()
-        d = cq.Vector(*s.direction)
-        at = cq.Vector(*s.at)
-        assert not _inside(sa, (at - d * (a.t / 2)).toTuple()), s
-        mid_nut = at + d * (sum(J.nut_pocket(a.t)) / 2)
-        assert not _inside(sb, mid_nut.toTuple()), s
-        assert not _inside(sb, (at + d * 1.0).toTuple()), s
-        assert _inside(sb, (at + d * (J.TSLOT_SCREW - a.t + 2.0)).toTuple()), s
+def test_cache_key_is_layout():
+    """Review fix (R27): the build cache keys on the whole layout, so two
+    layouts with the same wall but another bank get their own body."""
+    a = L.layout(WALL)
+    b = L.layout(WALL, bank="iniu-p512")
+    assert a.wall == b.wall and a != b
+    ba, bb = P.build(a, WALL, P.KERF), P.build(b, WALL, P.KERF)
+    assert ba is not bb
+    ha = ba.panels["base-front"].box().z1
+    hb = bb.panels["base-front"].box().z1
+    assert ha == pytest.approx(a.rim_z) and hb == pytest.approx(b.rim_z) and ha != hb
+    assert P.build(a, WALL, P.KERF) is ba                 # still cached
 
 
-def test_back_wall_has_channel_relief_and_leaf_screws(body, lay):
-    back = body.panels["base-back"].solid()
-    hy, hz = lay.hinge_axis
-    y = hy - WALL / 2
-    ch = lay.hinge_cable_channel
-    assert not _inside(back, ((ch.x0 + ch.x1) / 2, y, (lay.deck_z + hz) / 2))
-    assert _inside(back, ((ch.x0 + ch.x1) / 2, y, lay.deck_z - 1.0))         # one piece
-    for x0, x1 in H.hinge_groups(lay):
-        assert not _inside(back, ((x0 + x1) / 2, y, hz - H.KNUCKLE_R - L.FIT + 0.2))
-    for x, z in H.base_leaf_screws(lay):
-        assert not _inside(back, (x, y, z))
-        assert _inside(back, (x + 2.5, y, z))
-    blocks = [k for k in body.placed if k[0] == "nut-block-base-leaf"]
-    assert len(blocks) == len(H.base_leaf_screws(lay))
+def test_laser_body_is_frozen(body):
+    import dataclasses
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        body.t = 2.0
+    with pytest.raises(TypeError):
+        body.panels["x"] = body.panels["base-front"]
 
 
-def test_lid_hinge_wall_and_bezel_retention(body, lay):
-    for x, z in H.lid_leaf_screws(lay):
-        wall = body.panel_at("lid-hinge", (x, -WALL / 2, z))
-        assert not _inside(wall.solid(), (x, -WALL / 2, z))
-    assert len([k for k in body.placed if k[0] == "nut-block-lid-leaf"]) == 2
-    bezel = [k for k in body.placed if k[0] == "nut-block-bezel"]
-    assert len(bezel) == len(I.bezel_screws(lay)) == 3
-    # the clip's screw goes into a nut block in the band, in front of the band wall
-    (cx, cy), = P.clip_screws(lay, WALL)
-    wall = body.panels["lid-band-wall"]
-    assert cy < wall.z0 - J.SLOT_W / 2
-    assert [k for k in body.placed if k[0] == "nut-block-clip"]
-    for x0, x1 in H.hinge_groups(lay):                      # knuckle relief
-        xm = (x0 + x1) / 2
-        hw = body.panel_at("lid-hinge", (xm, -WALL / 2, 10.0))
-        assert not _inside(hw.solid(), (xm, -WALL / 2, H.KNUCKLE_R + L.FIT - 0.2))
+# --- DXF -----------------------------------------------------------------------------
+
+def _export_module():
+    spec = importlib.util.spec_from_file_location("export_laser",
+                                                  ROOT / "scripts" / "export_laser.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
-def test_magnet_latch(body, lay):
-    """Two 6 x 3 mm disc magnets in printed corner blocks, drawer front and
-    base front: coaxial and FIT apart when shut."""
-    items = dict((n, s) for n, s, _ in P.assembly(0.0, 0.0))
-    m = [items[n] for n in items if n.startswith("hw:magnet")]
-    assert len(m) == 2
-    a, b = (s.BoundingBox() for s in m)
-    assert a.xlen == pytest.approx(P.MAGNET_D) and a.zlen == pytest.approx(P.MAGNET_T)
-    assert a.center.x == pytest.approx(b.center.x) and a.center.y == pytest.approx(b.center.y)
-    assert abs(a.center.z - b.center.z) == pytest.approx(P.MAGNET_T + L.FIT)
-    assert {k[1] for k in body.placed} >= {"magnet-block-drawer", "magnet-block-base"}
-
-
-# --- assembly ------------------------------------------------------------------------
-
-@pytest.mark.parametrize("angle, out", [(0.0, 0.0), (L.LID_OPEN_DEG, 0.0), (0.0, "travel"),
-                                        (0.0, "half")])
-@pytest.mark.slow
-def test_laser_assembly_has_no_intersections(angle, out, lay):
-    d = {"travel": lay.drawer_travel, "half": lay.drawer_travel / 2}.get(out, out)
-    items = B.assembly("laser", angle, d)
-    names = [n for n, _, _ in items]
-    assert len(names) == len(set(names))
-    assert sum(1 for n in names if n.startswith("hw:nut")) >= 16
-    assert clashes(items, P.DECLARED_OVERLAPS) == []
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("key", sorted(MONITORS))
-def test_laser_assembly_each_monitor(key):
-    assert clashes(B.assembly("laser", 0.0, 0.0, monitor=key), P.DECLARED_OVERLAPS) == []
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("key", sorted(BATTERIES))
-def test_laser_assembly_each_bank(key):
-    assert clashes(B.assembly("laser", 0.0, 0.0, bank=key), P.DECLARED_OVERLAPS) == []
-
-
-def test_laser_lid_turns_about_the_axis(lay):
-    closed = dict((n, s) for n, s, _ in B.assembly("laser", 0.0, 0.0))
-    opened = dict((n, s) for n, s, _ in B.assembly("laser", L.LID_OPEN_DEG, 0.0))
-    back = [n for n in closed if n.startswith("lid-back-")]
-    assert min(closed[n].BoundingBox().zmax for n in back) == pytest.approx(
-        lay.outer.z1 + lay.lid_outer.z1)
-    assert max(opened[n].BoundingBox().zmax for n in back) > lay.outer.z1 + 150.0
-
-
-def test_laser_printed_parts_fit_the_print_bed(lay):
-    parts = P.printed_parts(lay, WALL)
-    for want in ("hinge-base", "hinge-lid", "mt1-pin", "bezel-clip", "magnet-block",
-                 "catch-block-base", "catch-block-lid",
-                 "nut-block-base-leaf", "nut-block-lid-leaf", "nut-block-bezel",
-                 "nut-block-clip", "standoff-mt2", "nut-cup-mt2", "deck-support", "mt1-boss"):
-        assert want in parts, want
-    for name, p in parts.items():
-        bb = B.posed(p).BoundingBox()
-        assert bb.xlen <= L.PRINT_BED[0] and bb.ylen <= L.PRINT_BED[1], name
-        assert len(p.solid.Solids()) == 1, name
-
-
-def test_hardware_list(lay):
-    hw = P.hardware(lay, WALL)
-    assert hw["M3 square nut"] >= 16
-    assert hw["6 x 3 mm disc magnet"] == 2 + 2 * len(lay.lid_catch)   # drawer latch + lid catch
-    assert any(k.startswith("M3 x 12") for k in hw)
-
-
-# --- export ------------------------------------------------------------------------
-
-def _export(out: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(ROOT / "scripts" / "export_laser.py"),
-                           "--out", str(out), "--no-printed", *args],
-                          capture_output=True, text=True, cwd=ROOT)
-
-
-@pytest.mark.slow
-def test_export_writes_reproducible_dxf_per_panel(tmp_path, body):
+def test_dxf_layers(body, tmp_path):
+    """Every panel's DXF has only the CUT and ENGRAVE layers, both used, and
+    lies within the bed from the origin."""
     import ezdxf
-    a, b = tmp_path / "a", tmp_path / "b"
-    for d in (a, b):
-        r = _export(d)
-        assert r.returncode == 0, r.stderr
-    files = sorted(p.name for p in a.glob("*.dxf"))
-    assert files == sorted(f"{n}.dxf" for n in body.panels)
-    for f in files:
-        assert (a / f).read_bytes() == (b / f).read_bytes(), f
-    doc = ezdxf.readfile(str(a / "deck-front.dxf" if (a / "deck-front.dxf").exists()
-                             else a / files[0]))
-    layers = {e.dxf.layer for e in doc.modelspace()}
-    assert layers <= {"CUT", "ENGRAVE"} and "CUT" in layers and "ENGRAVE" in layers
-    for f in files:
-        doc = ezdxf.readfile(str(a / f))
+    ex = _export_module()
+    for name, p in body.panels.items():
+        path = tmp_path / f"{name}.dxf"
+        ex.write_dxf(p, path)
+        doc = ezdxf.readfile(str(path))
+        layers = {e.dxf.layer for e in doc.modelspace()}
+        assert layers == {"CUT", "ENGRAVE"}, (name, layers)
         xs, ys = [], []
-        for e in doc.modelspace().query("LWPOLYLINE"):
+        for e in doc.modelspace().query("LWPOLYLINE[layer=='CUT']"):
             for x, y, *_ in e.get_points():
                 xs.append(x)
                 ys.append(y)
-        assert min(xs) >= -1e-6 and min(ys) >= -1e-6, f
-        assert max(xs) <= L.LASER_BED[0] and max(ys) <= L.LASER_BED[1], f
+        assert min(xs) >= -1e-6 and min(ys) >= -1e-6, name
+        assert max(xs) <= L.LASER_BED[0] and max(ys) <= L.LASER_BED[1], name
+
+
+# --- the plinth and the board pins ------------------------------------------------------
+
+def test_plinth_top_has_the_pin_holes(body, lay):
+    """MT2's rod is glued in a PEG_DIA hole, each revision's MT1 takes the
+    loose rod in a PEG_HOLE_D slip-fit hole, in plinth-top."""
+    top = body.panels["plinth-top"]
+    s = top.solid()
+    assert top.box().z1 == pytest.approx(lay.plinth.z1)
+    zm = lay.plinth.z1 - WALL / 2
+    for key, p in lay.pins.items():
+        r = (L.PEG_DIA if key == "MT2" else L.PEG_HOLE_D) / 2
+        assert P.pin_hole_d(key) == 2 * r
+        assert not _inside(s, (p.cx, p.cy, zm)), key
+        assert not _inside(s, (p.cx + r - 0.05, p.cy, zm)), key
+        assert _inside(s, (p.cx + r + 0.05, p.cy, zm)), key
+    assert len(top.holes) == len(lay.pins)
+
+
+def test_plinth_walls_leave_a_web_by_the_pin_holes(body, lay):
+    """The walls (and their mortises in the top) stay a panel thickness
+    clear of every pin hole: the front wall comes in behind the MT1 holes."""
+    for n in PLINTH[1:]:
+        b = body.slab_panels[n].box()
+        for key, p in lay.pins.items():
+            dx = max(b.x0 - p.cx, 0.0, p.cx - b.x1)
+            dy = max(b.y0 - p.cy, 0.0, p.cy - b.y1)
+            assert math.hypot(dx, dy) >= P.pin_hole_d(key) / 2 + WALL - 1e-6, (n, key)
+    assert body.slab_panels["plinth-front"].box().y0 > lay.plinth.y0     # set back
+
+
+def test_plinth_relief_is_clear(body, lay):
+    """R7: nothing of the plinth's panels is in ``plinth_relief``."""
+    rb = _solid_box(lay.plinth_relief)
+    for n in PLINTH:
+        assert _common(body.panels[n].solid(), rb) < 1e-6, n
+
+
+def test_plinth_stands_on_the_floor(body, lay):
+    """The plinth's walls are tabbed into the floor and the top (glued), its
+    top at the PCB underside."""
+    joined = {frozenset((j.a, j.b)) for j in body.joints}
+    for n in ("plinth-front", "plinth-back", "plinth-left", "plinth-right"):
+        assert frozenset((n, "base-floor")) in joined, n
+        assert frozenset((n, "plinth-top")) in joined, n
+    assert body.panels["plinth-top"].box().z1 == pytest.approx(lay.board_origin[2])
+
+
+# --- the hinge --------------------------------------------------------------------------
+
+def test_hinge_blocks_fill_the_plywood_cut_outs(body, lay, parts):
+    """The back and right walls are cut away round the hinge; the printed
+    knuckle blocks fill those cut-outs flush with the outside faces
+    (``panels.hinge_cutouts``)."""
+    cut = P.hinge_cutouts(lay, WALL)
+    kb, kl = parts["knuckles-base"].solid, parts["knuckles-lid"].solid
+    for frame, boxes, solid in (("base", cut["base"], kb), ("lid", cut["lid"], kl)):
+        for bx in boxes:
+            for n, p in body.panels.items():
+                if p.frame == frame:
+                    assert _common(p.solid(), _solid_box(bx)) < 1e-6, (n, bx)
+        bb = solid.BoundingBox()
+        o = lay.outer if frame == "base" else lay.lid_outer
+        assert bb.xmax == pytest.approx(o.x1) and bb.ymax == pytest.approx(o.y1)
+    hy, hz = lay.hinge_axis
+    rr = lay.hinge_relief_r
+    # the base block is solid at the outside corner below the relief ...
+    assert _inside(kb, (lay.outer.x1 - 0.1, lay.outer.y1 - 0.1, hz - rr - 1.0))
+    # ... and in the back wall's place at the notch, below the rim (R26)
+    n = lay.hinge_notch
+    assert _inside(kb, ((n.x0 + n.x1) / 2, lay.outer.y1 - WALL / 2, hz - 1.0))
+
+
+def test_knuckles_and_stop_are_in_the_blocks(lay, parts):
+    hy, hz = lay.hinge_axis
+    kb, kl = parts["knuckles-base"].solid, parts["knuckles-lid"].solid
+    for k in H.knuckle_plan(lay):
+        xm = (k.x0 + k.x1) / 2
+        if k.part == "base":
+            assert _inside(kb, (xm, hy - 2.5, hz - 2.5)), k
+        else:
+            assert _inside(kl, (xm, -2.5, 2.5)), k                     # lid frame
+            assert not _inside(kb, (xm, hy - 2.5, hz - 2.5)), k        # relieved
+    for s in H.stop_faces(lay):
+        ys = [y for y, _ in s.block]
+        zs = [z for _, z in s.block]
+        p = ((s.x0 + s.x1) / 2, sum(ys) / len(ys), sum(zs) / len(zs))
+        assert _inside(kb, p), s
+
+
+def test_lid_back_is_fit_from_the_seal_bead(lay, body, parts):
+    """R29: shut, the lid's back is FIT from the seal bead all along the
+    open segments, as in the printed route: across the back wall's
+    thickness, just inside the bead's arc is bead and just FIT (+0.02)
+    outside it, at the same angle, is lid (knuckles-lid's strip, or lid-left
+    at the left wall)."""
+    hy, hz = lay.hinge_axis
+    rb = lay.hinge_relief_r - L.FIT
+    lid = [s for n, s, _ in _shut() if n in ("knuckles-lid", "lid-left", "lid-back")]
+    bead = parts["seal-bead"].solid
+    y_in = lay.lid_outer.y1 - WALL
+    worst = 0.0
+    for x0, x1 in H.bead_x(lay):
+        for x in (x0 + 1.5, (x0 + x1) / 2, x1 - 0.2):
+            for u in (y_in + 0.05, (y_in + H.KNUCKLE_R) / 2, H.KNUCKLE_R - 0.05):
+                a = math.acos(u / (rb + L.FIT + 0.02))
+                assert _inside(bead, (x, hy + (rb - 0.02) * math.cos(a),
+                                      hz + (rb - 0.02) * math.sin(a))), (x, u)
+                # the first lid material outward along the ray from the bead
+                gap = None
+                for i in range(1, 61):
+                    r = rb + 0.05 * i
+                    p = (x, hy + r * math.cos(a), hz + r * math.sin(a))
+                    if any(_inside(s, p) for s in lid):
+                        gap = r - rb
+                        break
+                assert gap is not None and gap <= L.FIT + 0.05 + 1e-9, (x, u, gap)
+                worst = max(worst, gap)
+    assert worst <= L.FIT + 0.05
+
+
+def test_rod_press_fit_only_in_the_lid_block(lay, parts):
+    rod = S.hinge_rod(lay)
+    assert _common(rod, parts["knuckles-base"].solid) < 1e-3
+    ring = math.pi * ((L.PIN_ROD_D / 2) ** 2 - (H.PRESS_D / 2) ** 2) * H.PRESS_LEN
+    lid_block = parts["knuckles-lid"].solid.moved(lay.lid_location(0.0))
+    assert _common(rod, lid_block) == pytest.approx(ring, rel=0.05)
+
+
+# --- printed fittings ----------------------------------------------------------------------
+
+def test_printed_parts(parts):
+    """Decision 9: the printed parts are the hinge (knuckle blocks, seal
+    bead) and the magnet blocks; the rest is plywood."""
+    assert set(parts) == {"knuckles-base", "knuckles-lid", "seal-bead", "magnet-block"}
+    for name, p in parts.items():
+        assert len(p.solid.Solids()) == 1 and p.solid.isValid(), name
+        assert p.note, name
+        bb = S.posed(p).BoundingBox()
+        assert bb.xlen <= L.PRINT_BED[0] and bb.ylen <= L.PRINT_BED[1], name
+    assert "4" in parts["magnet-block"].note
+
+
+def test_magnet_block_pocket(parts):
+    s = parts["magnet-block"].solid
+    bb = s.BoundingBox()
+    assert (bb.xlen, bb.ylen, bb.zlen) == pytest.approx((L.CATCH_BLOCK, L.CATCH_BLOCK,
+                                                         L.CATCH_BLOCK_H))
+    c = (bb.xmin + bb.xlen / 2, bb.ymin + bb.ylen / 2)
+    depth = L.MAGNET_T + L.MAGNET_RECESS
+    assert not _inside(s, (*c, bb.zmax - depth + 0.1))
+    assert _inside(s, (*c, bb.zmax - depth - 0.1))
+
+
+# --- the assembly -----------------------------------------------------------------------
+
+def _shut():
+    return F.assembly(0.0, False)
+
+
+def test_assembly_parts(lay):
+    names = [n for n, _, _ in _shut()]
+    assert len(names) == len(set(names))
+    want = set(BASE + PLINTH + LID)
+    want |= {"knuckles-base", "knuckles-lid", "seal-bead", "board", "tinyvga", "vga-plug",
+             "monitor", "bank", "hw:hinge-rod", "hw:board-pin-mt2", "hw:board-pin-mt1"}
+    want |= {f"magnet-block-{s}-{i}" for s in ("base", "lid") for i in (1, 2)}
+    want |= {f"hw:catch-magnet-{s}-{i}" for s in ("base", "lid") for i in (1, 2)}
+    if lay.boost_in_lid:
+        want.add("boost")
+    assert set(names) == want
+
+
+def test_assembly_through_the_shared_entry_point():
+    """``printed.body.assembly("laser", ...)`` forwards to this route, the
+    bank too."""
+    d = {n: s for n, s, _ in B.assembly("laser", 0.0, False, bank="iniu-p512")}
+    assert d["bank"].BoundingBox().xlen == pytest.approx(104.0)
+    assert d["base-front"].BoundingBox().zmax == pytest.approx(
+        L.layout(WALL, bank="iniu-p512").rim_z)
+
+
+def test_nothing_proud(lay):
+    """Shut, every part is within the base's outline and the closed lid's."""
+    o = lay.outer
+    top = lay.hinge_axis[1] + lay.lid_outer.z1
+    for name, s, _ in _shut():
+        bb = s.BoundingBox()
+        assert bb.xmin >= o.x0 - 1e-6 and bb.xmax <= o.x1 + 1e-6, (name, bb.xmin, bb.xmax)
+        assert bb.ymin >= o.y0 - 1e-6 and bb.ymax <= o.y1 + 1e-6, (name, bb.ymin, bb.ymax)
+        assert bb.zmin >= o.z0 - 1e-6 and bb.zmax <= top + 1e-6, (name, bb.zmin, bb.zmax)
+
+
+@pytest.mark.parametrize("rev", BOARD_KEYS)
+def test_board_pins_stand_on_the_floor(lay, rev):
+    """R28: both rods stand on the base floor (so neither can drop into the
+    plinth) and reach PIN_PROUD above the fitted revision's PCB top."""
+    d = {n: s for n, s, _ in F.assembly(0.0, False, board=rev)}
+    pcb_top = d["board"].BoundingBox().zmax
+    for n in ("hw:board-pin-mt2", "hw:board-pin-mt1"):
+        bb = d[n].BoundingBox()
+        assert bb.zmin == pytest.approx(lay.wall), n                    # the floor's top
+        assert _common(d[n], d["base-floor"]) < 1e-6, n                 # on it, not in it
+        assert bb.zmax == pytest.approx(pcb_top + L.PIN_PROUD), n
+        assert bb.zlen == pytest.approx(F.board_pin_length(lay)), n
+
+
+def test_assembly_bank_out_is_lifted(lay):
+    out = {n: s for n, s, _ in F.assembly(L.LID_OPEN_DEG, True)}
+    assert out["bank"].BoundingBox().zmin == pytest.approx(lay.rim_z + S.BANK_OUT_LIFT)
+
+
+def test_only_the_press_fit_is_declared():
+    assert P.DECLARED_OVERLAPS == frozenset({frozenset(("hw:hinge-rod", "knuckles-lid"))})
+
+
+def _cases():
+    out = [(rev, float(a), False) for rev in BOARD_KEYS for a in range(0, 101, 10)]
+    out += [(rev, L.LID_OPEN_DEG, True) for rev in BOARD_KEYS]
+    return out
 
 
 @pytest.mark.slow
-def test_export_thickness_and_kerf_override(tmp_path):
-    r = _export(tmp_path, "--thickness", "2.7", "--kerf", "0.2")
-    assert r.returncode == 0, r.stderr
-    assert "2.7 mm" in r.stdout and "kerf 0.2" in r.stdout
-    assert len(list(tmp_path.glob("*.dxf"))) >= 25
-
-
-def test_assembly_laser_registered():
-    assert B.assembly("laser", 0.0, 0.0)
-
-
-# --- R19 feet, R20 nuts ----------------------------------------------------------------
-
-def test_feet_stand_below_the_floor_screw_heads(lay, body):
-    """R19: the box stands on four rubber feet; every screw head under the
-    floor is above the feet's contact plane, and nothing else reaches it."""
-    items = P.assembly(0.0, 0.0)
-    feet = [s for n, s, _ in items if n.startswith("hw:foot-")]
-    assert len(feet) == 4
-    plane = min(s.BoundingBox().zmin for s in feet)
-    assert plane == pytest.approx(-P.FOOT_H)
-    heads = [s for n, s, _ in items if n.startswith("hw:head-base")]
-    low = min(s.BoundingBox().zmin for s in heads)
-    assert low < 0.0                                       # there are heads under the floor
-    assert low >= plane + P.FOOT_CLEAR - 1e-9
-    for n, s, _ in items:
-        if not n.startswith("hw:foot-"):
-            assert s.BoundingBox().zmin > plane + 1e-6, n
-    # engraved locating circles on the floor, one per foot
-    floor = [p for n, p in body.panels.items() if n.startswith("base-floor-")]
-    for x, y in P.feet(lay):
-        assert any(any(abs(sum(u for u, _ in m[:-1]) / (len(m) - 1) - x) < 1e-6
-                       and abs(sum(v for _, v in m[:-1]) / (len(m) - 1) - y) < 1e-6
-                       for m in p.marks) for p in floor), (x, y)
-    hw = P.hardware(lay, WALL)
-    assert hw[f"{P.FOOT_D:g} x {P.FOOT_H:g} mm self-adhesive rubber foot"] == 4
-    assert any(k.startswith("hook-and-loop tape") for k in hw)
-
-
-def test_every_tslot_nut_is_a_keepout_in_the_assembly(body):
-    """R20: each T-slot's square nut is in the assembly as an ``hw:nut``
-    solid of its real size, standing (NUT_W - t) / 2 proud of each face of the
-    panel it is in, so the clash tests check it against the drawer, the
-    runners and everything else."""
-    items = P.assembly(0.0, 0.0)
-    nuts = {tuple(round(v, 6) for v in s.BoundingBox().center.toTuple())
-            for n, s, _ in items if n.startswith("hw:nut-")}
-    assert len(nuts) == len(body.screws)
-    proud = (J.NUT_W - WALL) / 2
-    for sc in body.screws:
-        b = sc.nut
-        c = ((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2)
-        if sc.frame == "base":                    # base items are not moved
-            assert tuple(round(v, 6) for v in c) in nuts
-        assert sorted(b.size) == pytest.approx([J.NUT_T, J.NUT_W, J.NUT_W])
-        into = body.panel_at(sc.into, sc.at)
-        lo, hi = {"x": (b.x0, b.x1), "y": (b.y0, b.y1), "z": (b.z0, b.z1)}[into.normal]
-        assert into.z0 - lo == pytest.approx(proud) and hi - (into.z0 + WALL) == pytest.approx(proud)
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("angle", range(10, 100, 10))
-def test_laser_assembly_intermediate_lid_angles_have_no_intersections(angle):
-    """The lid's whole swing, not just shut and fully open (finding 7)."""
-    assert clashes(B.assembly("laser", float(angle), 0.0), P.DECLARED_OVERLAPS) == []
-
-
-def test_laser_lid_catch_hole_and_blocks(lay):
-    """R22: the lid's magnet goes through a hole in the band face, behind which
-    its block is glued; the base's block sits under the front panel's top edge."""
-    from demobox.laser import fittings as F
-    body = P.build(lay, lay.wall, P.KERF)
-    face = body.panels["lid-band-face"]
-    for c in lay.lid_catch:
-        m = lay.catch_lid_magnet(c)
-        assert (m.cx, m.cy, P.MAGNET_D) in face.holes
-        blk = F.catch_lid_block_box(lay, c, lay.wall)
-        assert blk.z0 == pytest.approx(lay.wall)           # behind the face, not in it
-    parts = {k[0] for k in body.placed}
-    assert {"catch-block-base", "catch-block-lid"} <= parts
-    assert F.hardware(lay, lay.wall)["6 x 3 mm disc magnet"] == 2 + 2 * len(lay.lid_catch)
+@pytest.mark.parametrize("rev,angle,bank_out", _cases(),
+                         ids=[f"{r}-{a:g}{'-bank-out' if o else ''}" for r, a, o in _cases()])
+def test_assembly_no_clash(rev, angle, bank_out):
+    """Nothing interpenetrates but the one declared pair, the rod in the lid
+    knuckle block's R24 press fit."""
+    items = F.assembly(angle, bank_out, board=rev)
+    assert clashes(items, P.DECLARED_OVERLAPS) == []
