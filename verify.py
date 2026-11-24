@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""Prove the demo box fits, for both build routes.
+"""Prove the demo box fits its kit, for both build routes.
 
-Seven claims, each a function in ``demobox.checks``, run against
+The claims, each a function in ``demobox.checks``, run against
 ``layout(wall)`` for the printed and the laser route:
 
-* every monitor fits the lid: its bezel window shows the whole picture and
-  hides the panel's edges, its insert has material all round, the stack fits
-  the pocket depth, and its cable leaves through a lid-wall opening the plug
-  passes;
-* every power bank fits the drawer with its packing, ports at the cable bay;
-* every button can be reached: the banks' with the drawer out, the monitors'
-  through the bezel with the lid open;
-* both board revisions seat on the deck;
-* the closed lid clears the tallest thing on the deck;
-* the lid swings from closed to the stop, every degree, without meeting the
-  base or anything on the deck;
-* the cables route: drawer travel, slack loop, bend radii, VGA length.
+* ``kit_fits``: the design monitor fits the lid's monitor space and the
+  design bank the bank bay, each with SLACK;
+* ``boards_seat``: both board revisions sit on the plinth inside the walls,
+  each pin in its PCB hole and its plinth hole, nothing overlapping;
+* ``bank_lifts_out``: with the lid at its stop nothing is over the bank bay
+  above the rim, so the bank lifts straight out;
+* ``button_reachable``: the bank's button faces the port room, which takes
+  a fingertip;
+* ``lid_closed_clears``: closed, the monitor face clears everything in the
+  base, and the board can't lift off its pins;
+* ``hinge_sweep``: the lid's profile, every degree from closed to its open
+  angle, stays out of the base's;
+* ``cables_route``: the monitor's pigtail reaches the TinyVGA through the
+  hinge notch within its length and bend radius at every angle, and the
+  bank's USB cable reaches J1;
+* ``lid_catch``: the catch magnets face each other when shut, their blocks
+  clear of the board and the monitor;
+* ``size_budget``: the box is no bigger than its contents + SLACK + walls.
+
+Then, for information only (never a failure): which listed monitors would fit
+the lid, and which listed banks the bank bay.
 
 Figures that are placeholders are listed as UNCONFIRMED at the end: printed,
 not trusted, and not failures on their own.
@@ -38,6 +47,13 @@ def _print(report: checks.Report) -> None:
     print()
 
 
+def _print_fits(title: str, rows) -> None:
+    print(f"   {title} (information, not a check):")
+    for key, ok, detail in rows:
+        print(f"   {'fits        ' if ok else 'does not fit'}  {key}: {detail}")
+    print()
+
+
 def main() -> int:
     bad = tested = 0
     unconfirmed = checks.Unconfirmed()
@@ -45,11 +61,14 @@ def main() -> int:
         lay = L.layout(wall)
         o = lay.outer
         print(f"Demo box, {route} route: wall {wall} mm, base {o.size[0]:.2f} x "
-              f"{o.size[1]:.2f} x {o.size[2]:.2f} mm\n")
+              f"{o.size[1]:.2f} x {o.size[2]:.2f} mm, kit {L.DESIGN_MONITOR} + "
+              f"{L.DESIGN_BANK}\n")
         report = checks.Report()
         for proof in checks.PROOFS:
             proof(report, lay)
         _print(report)
+        _print_fits("Listed monitors in this lid", checks.monitor_fit_report(lay))
+        _print_fits("Listed banks in this bank bay", checks.bank_fit_report(lay))
         bad += report.failures
         tested += len(report.results)
         for item in report.unconfirmed:
