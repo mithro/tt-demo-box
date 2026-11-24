@@ -24,13 +24,17 @@ class Battery:
     size: tuple[float, float, float]
     port_face: Literal["end", "top", "side"]
     button: tuple[str, float, float] | None
+    #: "socket": a USB-C port the box's own cable plugs into; "built-in": the
+    #: bank's own captive cable (the survey's "built-in C").
+    cable: Literal["socket", "built-in"]
     sources: tuple[Source, ...]
     confirmed: bool
 
 
-def _bank(key, title, size, port_face, button, line, note=""):
+def _bank(key, title, size, port_face, button, cable, line, note=""):
     return Battery(
         key=key, title=title, size=size, port_face=port_face, button=button,
+        cable=cable,
         sources=(
             Source(f"Survey candidate: {title}", _SURVEY, line),
             Source("Placeholder: button position, port face", _SURVEY,
@@ -41,19 +45,23 @@ def _bank(key, title, size, port_face, button, line, note=""):
 
 BATTERIES: dict[str, Battery] = {b.key: b for b in (
     _bank("iniu-p512", "INIU P512 20000 mAh", (104, 70, 29), "end", ("end", 35.0, 14.5),
+          "socket",
           "#2: 20000 / 74 Wh, 104 x 70 x 29 mm, 314 g, 2C + A, 12 V PDO, "
           "5V 3A 15W multi-port; AU$49.73; iniushop.com"),
     _bank("ugreen-pb505", "UGREEN PB505 (built-in cable)", (116.22, 70.55, 30.03), "end",
           ("end", 35.275, 15.015),
+          "built-in",
           "#3: 20000 / 74 Wh, 116.22 x 70.55 x 30.03 mm, 338 g, built-in C + C + A all "
           "on the top face; chargerlab.com teardown",
           " The survey says 'all on top face'; read as the short top end -- ports on a "
           "broad face could not be used in any slim bay; confirm on the real unit."),
     _bank("xiaomi-pb2020", "Xiaomi 20000 integrated cable PB2020", (128, 73, 32), "end",
           ("end", 36.5, 16.0),
+          "built-in",
           "#4: 20000 / 74 Wh, 128 x 73 x 32 mm, 342 g, built-in C + C + A; mi.com"),
     _bank("anker-zolo-20k", "Anker Zolo 20K A1689", (119.9, 73.4, 31.5), "end",
           ("end", 36.7, 15.75),
+          "built-in",
           "#5: 20000 mAh, 119.9 x 73.4 x 31.5 mm, 318 g, built-in C + C + A; "
           "anker.com (some batches on the 2025 recall list)"),
 )}

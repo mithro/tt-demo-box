@@ -33,9 +33,6 @@ ACTIVE_7IN = (154.2, 85.9)
 @dataclass(frozen=True)
 class Monitor:
     key: str
-    #: Short code for drawing names (``TDB-INS-<code>``): upper-case letters
-    #: and digits, unique among MONITORS.
-    code: str
     title: str
     kind: Literal["kit", "cased"]
     panel: tuple[float, float, float]
@@ -57,6 +54,12 @@ class Monitor:
     #: Bare kits: the driver board's M3 mounting holes (x, y), in the panel's
     #: back frame like ``driver``.
     driver_holes: tuple[tuple[float, float], ...] = ()
+    #: Cable length from the panel edge to the VGA plug's face; None means
+    #: "not taped in the design kit; reported only".
+    pigtail_len: float | None = None
+    #: Where the cable leaves ``cable_edge``, measured from the panel's left in
+    #: the front view with the cable edge at the bottom.
+    pigtail_exit_u: float | None = None
 
 
 def _centred_x(panel_w: float, active_w: float) -> float:
@@ -65,7 +68,6 @@ def _centred_x(panel_w: float, active_w: float) -> float:
 
 _TAOBAO_TIM = Monitor(
     key="taobao-tim",
-    code="T7",
     title="Tim's 7-inch car-style 'TFT color monitor' (Taobao)",
     kind="cased",
     # T is unmeasured: 20.0 is survey item H's rim depth, a placeholder.
@@ -93,15 +95,23 @@ _TAOBAO_TIM = Monitor(
         Source("Placeholder: depth, active offset, button position", _PHOTOS,
                "Measure depth with calipers (20.0 is item H's rim depth); measure the "
                "active-area offset in the bezel and each button's position on the front."),
+        Source("Placeholder: pigtail length and exit point", _PHOTOS,
+               "Not measured. 300 mm length and 167 mm exit position are design "
+               "assumptions (cable seen leaving the bottom edge near the button side "
+               "in photos 1, 2, 11, but its length and offset are not read from "
+               "them); measure both."),
+        Source("Stand clip taken off", "docs/superpowers/specs/2026-11-24-compact-box-design.md",
+               "Decision 3: the monitor is taped to the lid with its stand clip taken off."),
     ),
     confirmed=False,
     cable_edge="bottom",
     window=(159, 86),
+    pigtail_len=300.0,
+    pigtail_exit_u=167.0,
 )
 
 _CAR_7 = Monitor(
     key="car-7-aliexpress",
-    code="C7",
     title="7-inch plastic car-style TFT monitor (AliExpress 1005004614276566)",
     kind="cased",
     panel=(173, 113, 20),
@@ -131,7 +141,6 @@ _KIT_DRIVER = Box(37.0, 17.0, 0.0, 37.0 + 90.6, 17.0 + 65.7, 12.0, "PCB800099 dr
 
 _KIT = Monitor(
     key="kit-at070tn92",
-    code="K7",
     title="AT070TN92 7-inch 800x480 panel + PCB800099 driver board (bare kit)",
     kind="kit",
     panel=(165, 100, 5.7),

@@ -10,6 +10,17 @@ compared with ``box_gap`` / ``overlaps``.  All lengths are millimetres.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from decimal import ROUND_HALF_UP, Decimal
+
+
+def mm(v: float) -> str:
+    """A length to two places, the one rounding every sheet, the README and
+    ``verify`` print: snapped to a micrometre first (so 174.75499999 from a
+    solid's bounding box and 174.75500002 from the layout read alike), then
+    rounded half up; never "-0.00"."""
+    d = Decimal(repr(round(v, 6))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    s = f"{d:.2f}"
+    return "0.00" if s == "-0.00" else s
 
 
 class BedOverflow(Exception):

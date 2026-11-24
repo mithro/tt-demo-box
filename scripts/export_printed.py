@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Write the printed route's parts as STEP and STL, and the assembly as STEP.
 
-Every part from ``demobox.printed.body.printed_parts(layout(2.4))`` is written
-lying as it prints (``posed``: turned onto the bed, its bounding box's corner
-at the origin), so a slicer takes it as it comes:
+Every part from ``demobox.printed.body.printed_parts(layout(2.4))`` -- the
+base, the lid and the loose MT1 pin -- is written lying as it prints
+(``posed``: turned onto the bed, its bounding box's corner at the origin), so
+a slicer takes it as it comes:
 
 * ``output/printed/<part>.step`` -- written by CadQuery, then its header
   pinned by the submodule's ``tools.reproducible.normalise_step``;
 * ``output/printed/<part>.stl`` -- meshed to STL_TOLERANCE.
 
 ``output/printed/assembly.step`` is the box with the lid at the stop and the
-drawer shut (``body.assembly``), one named solid per part (no colours: see
+bank in its bay (``body.assembly``), one named solid per part (no colours: see
 ``write_assembly``).
 
 A part bigger than the bed fails the export with ``BedOverflow`` naming it and
-its size (a base or lid is first split, see ``body``); nothing is written.
+its size; nothing is written.
 Files in ``output/printed`` that are no longer produced are removed.
 
 Run: make outputs
@@ -58,13 +59,14 @@ def write_assembly(path: Path) -> None:
     file would never rebuild byte for byte; the colours are in
     ``body.assembly`` for the renders."""
     assy = cq.Assembly(name="tt-demo-box")
-    for name, shape, _colour in body.assembly("printed", LID_OPEN_DEG, 0.0):
+    for name, shape, _colour in body.assembly("printed", LID_OPEN_DEG, False):
         assy.add(shape, name=name)
     assy.export(str(path), "STEP")
     reproducible.normalise_step(path, name=path.stem)
 
 
 def main(out: Path = OUT) -> int:
+    out = out.resolve()
     lay = layout(ROUTES["printed"])
     parts = body.printed_parts(lay)          # raises BedOverflow before writing
     out.mkdir(parents=True, exist_ok=True)
@@ -80,7 +82,7 @@ def main(out: Path = OUT) -> int:
         write_stl(shape, out / f"{name}.stl")
         print(f"{name:28s} {bb.xlen:7.2f} x {bb.ylen:7.2f} x {bb.zlen:6.2f} mm  {p.note}")
     write_assembly(out / "assembly.step")
-    print(f"assembly: lid at {LID_OPEN_DEG:g} deg, drawer shut")
+    print(f"assembly: lid at {LID_OPEN_DEG:g} deg, bank in")
     for f in sorted(out.iterdir()):
         print(f"  {f.stat().st_size:>10,d}  {f.relative_to(ROOT)}")
     return 0

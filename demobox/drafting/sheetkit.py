@@ -32,6 +32,7 @@ from tools.drafting.sheet import Rect, Sheet, TitleBlock
 from tools.drafting.view import STANDARD_SCALES, scale_text
 
 from demobox._paths import ROOT
+from demobox.geom import mm
 from demobox.drafting import names
 from demobox.drafting.hlr import Projection
 
@@ -165,11 +166,13 @@ def unconfirmed_note(keys: tuple[str, ...] | None = None, lead: str = "") -> str
     return f"UNCONFIRMED inputs{lead} (placeholders; make verify lists each): {body}."
 
 
-#: The UNCONFIRMED names that feed the box's own size: every monitor (the
-#: lid pocket), the board and TinyVGA heights (the deck and the lid's
-#: clearance) and the cables (bend radii size the deck cavity and gutters).
-BODY_KEYS = ("monitor", "USB_C", "TINYVGA", "TinyVGA", "TALLEST", "cable", "length",
-             "connector", "pigtail")
+#: The UNCONFIRMED names that feed the box's own size: the monitor (the
+#: lid's depth and the box's footprint), the bank (the base's height), the
+#: board and TinyVGA heights (the plinth and the closed clearance), the tape
+#: (the monitor's height in the lid) and the cables (bend radii and plugs size
+#: the rows and the lid strip).
+BODY_KEYS = ("monitor", "battery", "USB_C", "TINYVGA", "TinyVGA", "TALLEST", "TAPE", "cable",
+             "length", "connector", "pigtail")
 
 
 # --- placed views ----------------------------------------------------------------------
@@ -351,7 +354,7 @@ class Dim:
             line = (r.x1 if self.base is None else self.base) + d
             off = line - max(p1[0], p2[0])
         value = abs(self.b[0] - self.a[0]) if horizontal else abs(self.b[1] - self.a[1])
-        text = self.text if self.text is not None else f"{value:.2f}"
+        text = self.text if self.text is not None else fmt(value)
         g = dims.linear_geometry(p1, p2, off, horizontal=horizontal, text=text,
                                  text_side=self.text_side)
         return p1, p2, off, horizontal, text, g
@@ -766,9 +769,9 @@ def write(defn: names.SheetDef, sheet: Sheet) -> Path:
 
 
 def fmt(v: float) -> str:
-    """Two places, as every dimension on these sheets; never "-0.00"."""
-    s = f"{v:.2f}"
-    return "0.00" if s == "-0.00" else s
+    """Two places, as every dimension on these sheets: ``geom.mm``, the one
+    rounding the sheets, the README and ``verify`` share."""
+    return mm(v)
 
 
 def angle_arc(c, centre, r, a0, a1, text, colour=style.C_DIM) -> None:
