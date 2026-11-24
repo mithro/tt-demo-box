@@ -60,7 +60,7 @@ PIN_ENGAGE = 1.0
 #: The size budget's tolerance on each dimension against its formula.
 SIZE_TOL = 0.01
 
-PIGTAIL = CABLES["vga-slim"]          # the monitor's own VGA cable (layout's figures)
+PIGTAIL = CABLES["monitor-pigtail"]   # the monitor's own VGA cable (ruling R13)
 BOOST = CABLES["usb-12v-boost"]
 
 
@@ -149,7 +149,10 @@ def max_bend_r(pts) -> float:
     to.  An arc of radius r round a corner turning by phi starts and ends
     r * tan(phi / 2) from the corner, along each leg; the two arcs at a leg's
     ends must not overlap, so each leg bounds r by its length over the sum of
-    its ends' tan(phi / 2).  inf for a straight line."""
+    its ends' tan(phi / 2).  inf for a straight line.  A point the polyline
+    passes straight through is no corner and is dropped first."""
+    pts = [pts[0]] + [b for a, b, c in zip(pts, pts[1:], pts[2:]) if _turn(a, b, c) > 1e-9] \
+        + [pts[-1]]
     k = [0.0] + [math.tan(_turn(a, b, c) / 2) for a, b, c in zip(pts, pts[1:], pts[2:])] + [0.0]
     r = math.inf
     for i, (a, b) in enumerate(zip(pts, pts[1:])):
@@ -177,26 +180,89 @@ def pigtail_exit(lay: Layout) -> tuple[float, float, float]:
     return (ms.x0 + SLACK + m.pigtail_exit_u, ms.y1 - SLACK, (ms.z0 + ms.z1) / 2)
 
 
+def _lid_from_base(lay: Layout, p, angle_deg: float) -> tuple[float, float, float]:
+    """Base-frame point to the lid frame at ``angle_deg`` (``lid_point_open``
+    inverted)."""
+    hy, hz = lay.hinge_axis
+    t = math.radians(angle_deg)
+    y, z = p[1] - hy, p[2] - hz
+    return (p[0], y * math.cos(t) - z * math.sin(t), y * math.sin(t) + z * math.cos(t))
+
+
+#: Heights (fractions of the lid strip's depth, cable centre) the pigtail's
+#: run along the lid strip is tried at, at each angle.
+PIGTAIL_RUN_HEIGHTS = tuple(i / 8 for i in range(9))
+
+
+def _pigtail_routes(lay: Layout, rev: str, angle_deg: float):
+    """Candidate pigtail routes at ``angle_deg``: ``(lid points, lid frame;
+    base points, base frame)``.  The base part is fixed; the cable is free in
+    the lid strip, so the lid part is one of several runs (see
+    ``pigtail_path``)."""
+    r = PIGTAIL.dia / 2
+    ex = pigtail_exit(lay)
+    x = ex[0]
+    hy, hz = lay.hinge_axis
+    yw = min(hy, lay.outer.y1 - lay.wall - r)       # inside the back wall
+    zf = lay.wall + r                                # on the floor
+    end, face = _plug_ends(lay, rev)
+    base = [(x, yw, hz), (x, yw, zf), (x, end[1] + (yw - end[1]) / 3, zf), end, face]
+    ya = yw - hy                                     # over the drop, closed
+    yield [ex], base
+    lo, hi = r, lay.lid_strip.z1 - r
+    t = math.radians(angle_deg)
+    for f in PIGTAIL_RUN_HEIGHTS:
+        h = lo + f * (hi - lo)
+        ends = [ya]                       # over the drop when closed
+        if math.cos(t) > EPS:             # and straight over the drop at this angle
+            z_up = (h - ya * math.sin(t)) / math.cos(t)
+            ends.append(ya * math.cos(t) - z_up * math.sin(t))
+        for y_end in ends:
+            if ex[1] < y_end <= lay.lid_strip.y1 - r:
+                yield [ex, (x, ex[1] + (y_end - ex[1]) / 4, h), (x, y_end, h)], base
+
+
+def _pigtail_best(lay: Layout, angle_deg: float, rev: str):
+    """The candidate route with the widest bends at ``angle_deg``:
+    ``(lid points, base points, base-frame path)``."""
+    best = None
+    for lid, base in _pigtail_routes(lay, rev, angle_deg):
+        path = [_lid_to_base(lay, p, angle_deg) for p in lid] + base
+        bend = max_bend_r(path[:-1])
+        if best is None or bend > best[0] + EPS:
+            best = (bend, lid, base, path)
+    return best[1:]
+
+
 def pigtail_path(lay: Layout, angle_deg: float,
                  rev: str = BOARD_KEYS[0]) -> list[tuple[float, float, float]]:
     """The monitor's VGA pigtail with the lid ``angle_deg`` open, base frame:
 
-    0. the exit on the panel's cable edge (in the lid);
-    1. straight across ``lid_strip`` to the hinge axis, at the exit's X, in
-       ``hinge_notch`` (the cable crosses on the axis, so the lid's turn moves
-       the lid leg rigidly and the length never changes);
-    2. down inside the back wall to the floor (the bank row's free +X end);
-    3. to the VGA plug's cable end (past the adapter's run, when fitted);
-    4. along the plug to its face in the TinyVGA's DE-15.
+    * the exit on the panel's cable edge (in the lid);
+    * along ``lid_strip`` towards the hinge: either straight to the notch, or
+      rising to a run at some height and along it to over the drop (lid
+      points, which turn with the lid);
+    * through ``hinge_notch`` at the seam, just inside the back wall;
+    * down inside the back wall to the floor (the bank row's free +X end),
+      forward along the floor, and up to the VGA plug's cable end (past the
+      adapter's run, when fitted);
+    * along the plug to its face in the TinyVGA's DE-15.
 
-    The legs 0..3 are cable; 3..4 is the plug (and adapter), counted once."""
-    r = PIGTAIL.dia / 2
-    ex = _lid_to_base(lay, pigtail_exit(lay), angle_deg)
-    x = ex[0]
-    hy, hz = lay.hinge_axis
-    floor = (x, min(hy, lay.outer.y1 - lay.wall - r), lay.wall + r)
-    end, face = _plug_ends(lay, rev)
-    return [ex, (x, hy, hz), floor, end, face]
+    The cable is free in the lid strip, so at each angle the run taken is the
+    one whose bends round widest (``max_bend_r``).  Closed, the highest run
+    makes the loop through the notch a U-turn from the lid's inside face to
+    the floor: the widest the closed box allows.  The last leg is the plug
+    (and adapter), counted once."""
+    return _pigtail_best(lay, angle_deg, rev)[2]
+
+
+def pigtail_length_bound(lay: Layout, angle_deg: float, rev: str = BOARD_KEYS[0]) -> float:
+    """An upper bound on the cable ``pigtail_path`` needs at ``angle_deg``:
+    |dx| + |dy| + |dz| per leg, the lid legs measured in the lid frame (where
+    they are rigid) up to the notch, the rest in the base frame."""
+    lid, base, _ = _pigtail_best(lay, angle_deg, rev)
+    return manhattan_length(lid + [_lid_from_base(lay, base[0], angle_deg)]) \
+        + manhattan_length(base)
 
 
 def usb_path(lay: Layout, rev: str) -> list[tuple[float, float, float]]:
@@ -374,35 +440,56 @@ def boards_seat(report: Report, lay: Layout) -> None:
                  ", ".join(n for n, _ in rows) + " clear of each other")
 
 
+def packed_bank(lay: Layout) -> Box:
+    """The design bank as packed: on the bay floor, centred in the bay in X
+    and Y (SLACK each side), base frame."""
+    b, bay = BATTERIES[L.DESIGN_BANK], lay.bank_bay
+    l_, w, h = b.size
+    x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
+    return Box(x0, y0, bay.z0, x0 + l_, y0 + w, bay.z0 + h, f"bank {b.key}")
+
+
 def bank_lifts_out(report: Report, lay: Layout) -> None:
-    """With the lid at LID_OPEN_DEG, nothing (the lid included) is over the
-    bank bay's XY footprint above the rim: the bank lifts straight out."""
-    bay, a = lay.bank_bay, L.LID_OPEN_DEG
-    lid = lay.lid_outer
-    column = sbox(bay.y0, lay.rim_z, bay.y1, lay.rim_z + 10 * (lid.size[1] + lid.size[2]))
-    hit = 0.0
-    if min(lid.x1, bay.x1) - max(lid.x0, bay.x0) > EPS:
-        prof = lay.lid_profile_yz(a)
-        inter = prof.intersection(column)
-        hit = inter.area
-    where = ""
-    if hit > AREA_TOL:
-        y0, z0, y1, z1 = inter.bounds
-        where = (f": the lid is over Y {_f(y0)}..{_f(y1)} (bay to {_f(bay.y1)}) up to "
-                 f"{_f(z1 - lay.rim_z)} mm above the rim")
-    report.check(hit <= AREA_TOL, f"bank bay clear of the lid at {a:g} deg",
-                 f"lid YZ profile over the bay's column above z {_f(lay.rim_z)}: "
-                 f"{hit:.3g} mm^2" + where)
+    """R12: with the lid at LID_OPEN_DEG nothing (the lid included) is over
+    the design bank's own footprint, as packed in the bay, above the rim: the
+    bank lifts straight out.  And over the whole swing the lid, outside the
+    hinge relief (where the knuckles are), never meets the bank."""
+    bank, a = packed_bank(lay), L.LID_OPEN_DEG
+    lid, rim = lay.lid_outer, lay.rim_z
+    big = 10 * (lid.size[1] + lid.size[2] + lay.outer.size[1])
+    prof = lay.lid_profile_yz(a)
+    over = prof.intersection(sbox(bank.y0, rim, bank.y1, rim + big)).area
+    above = prof.intersection(sbox(-big, rim, big, rim + big))
+    clearance = above.bounds[0] - bank.y1 if not above.is_empty else math.inf
+    report.check(over <= AREA_TOL and clearance >= -EPS,
+                 f"{bank.what} in the bank bay: clear of the lid at {a:g} deg",
+                 f"bank footprint Y {_f(bank.y0)}..{_f(bank.y1)} (centred in the bay); the lid "
+                 f"above the rim starts at Y {_f(above.bounds[0])}: clearance {_f(clearance)} mm, "
+                 f"overlap {over:.3g} mm^2")
+
+    hy, hz = lay.hinge_axis
+    relief = Point(hy, hz).buffer(lay.hinge_relief_r, quad_segs=64)
+    shape = sbox(bank.y0, bank.z0, bank.y1, bank.z1)
+    worst = max(((lay.lid_profile_yz(t).difference(relief).intersection(shape).area, t)
+                 for t in sweep_angles()))
+    corner = math.dist((hy, hz), (bank.y1, bank.z1))
+    report.check(worst[0] <= AREA_TOL,
+                 f"{bank.what} in the bank bay: clear of the swinging lid outside the hinge relief",
+                 f"largest overlap {worst[0]:.3g} mm^2 over {len(sweep_angles())} angles; the "
+                 f"bank's back-top edge is {_f(corner)} mm from the hinge axis (relief r "
+                 f"{_f(lay.hinge_relief_r)}, knuckle r {L.KNUCKLE_R}): no knuckle over X "
+                 f"{_f(bank.x0)}..{_f(bank.x1)}")
+
     things = dict(lay.board_keepouts)
     things.update({p.what: Box(p.cx - p.r, p.cy - p.r, p.z0, p.cx + p.r, p.cy + p.r, p.z1, p.what)
                    for p in lay.pins.values()})
     things.update({"plinth": lay.plinth, "port room": lay.port_room})
     if not lay.boost_in_lid:
         things["boost pocket"] = lay.boost_pocket
-    above = [n for n, b in things.items() if b.z1 > lay.rim_z + EPS and _xy_overlap(b, bay)]
-    report.check(not above, "bank bay clear above the rim of everything in the base",
-                 "over it: " + ", ".join(above) if above else
-                 f"{len(things)} parts checked; none over the bay above z {_f(lay.rim_z)}")
+    hits = [n for n, b in things.items() if b.z1 > rim + EPS and _xy_overlap(b, bank)]
+    report.check(not hits, f"{bank.what} in the bank bay: nothing in the base over it",
+                 "over it: " + ", ".join(hits) if hits else
+                 f"{len(things)} parts checked; none over the bank above z {_f(rim)}")
 
 
 def button_reachable(report: Report, lay: Layout) -> None:
@@ -495,36 +582,44 @@ def lid_closed_clears(report: Report, lay: Layout) -> None:
 
 
 def sweep_angles() -> list[float]:
-    """Every whole degree from 0 to LID_OPEN_DEG, and the stop itself."""
-    angles = [float(a) for a in range(0, int(math.floor(L.LID_OPEN_DEG)) + 1)]
-    if angles[-1] != L.LID_OPEN_DEG:
-        angles.append(float(L.LID_OPEN_DEG))
-    return angles
+    """Every whole degree from 0 to LID_OPEN_DEG, and the stop itself (the
+    angles ``layout`` sizes ``hinge_relief_r`` over)."""
+    return L.sweep_angles()
 
 
 def hinge_sweep(report: Report, lay: Layout) -> None:
-    """The lid's YZ profile, at every degree from closed to LID_OPEN_DEG,
-    never enters the base's YZ profile by more than AREA_TOL (closed, it
-    rests on it: contact).  The profile turns about the hinge axis, checked
-    against an independent rotation, and the sweep ends at LID_OPEN_DEG.  The
-    physical stop is the hinge's (Task 4's tests and the solid sweep)."""
+    """R11: the hinge alternates two kinds of segment along X, and at every
+    angle from closed to LID_OPEN_DEG their YZ profiles stay apart:
+
+    * lid-knuckle segments: the base, cut back to ``hinge_relief_r`` about
+      the axis, against the whole lid;
+    * base-knuckle segments: the whole base against the lid cut back to
+      ``hinge_relief_r``.
+
+    Closed, the lid rests on the base: contact (below AREA_TOL), not a
+    collision.  The profile turns about the hinge axis (checked against an
+    independent rotation) and the sweep ends at LID_OPEN_DEG.  The physical
+    stop is the hinge's (Task 4's tests and the solid sweep)."""
     lid, o = lay.lid_outer, lay.outer
+    hy, hz = lay.hinge_axis
     base = sbox(o.y0, o.z0, o.y1, o.z1)
+    relief = Point(hy, hz).buffer(lay.hinge_relief_r, quad_segs=64)
+    base_cut = base.difference(relief)
     corners = ((lid.y0, lid.z0), (lid.y1, lid.z0), (lid.y1, lid.z1), (lid.y0, lid.z1))
     angles = sweep_angles()
-    drift, worst, first, deep = 0.0, (0.0, 0.0), None, None
+    drift, need = 0.0, 0.0
+    worst = {"lid": (0.0, 0.0), "base": (0.0, 0.0)}
     for a in angles:
         prof = lay.lid_profile_yz(a)
         drift = max(drift, max(prof.exterior.distance(Point(lid_point_open(lay, y, z, a)))
                                for y, z in corners))
-        inter = prof.intersection(base)
-        if inter.area > AREA_TOL:
-            first = a if first is None else first
-            y0, z0, y1, _ = inter.bounds
-            if deep is None or o.z1 - z0 > deep[0]:
-                deep = (o.z1 - z0, a, y0, y1)
-        if inter.area > worst[0]:
-            worst = (inter.area, a)
+        inside = prof.intersection(base)
+        if inside.area > AREA_TOL:
+            need = max(need, max(math.hypot(y - hy, z - hz) for y, z in inside.exterior.coords))
+        for kind, area in (("lid", prof.intersection(base_cut).area),
+                           ("base", prof.difference(relief).intersection(base).area)):
+            if area > worst[kind][0]:
+                worst[kind] = (area, a)
     report.check(drift <= EPS, "lid profile turns about the hinge axis",
                  f"lid_profile_yz agrees with an independent rotation to {drift:.2g} mm "
                  f"over {len(angles)} angles")
@@ -532,15 +627,16 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
                  and angles[0] == 0.0,
                  f"lid sweep runs 0..{L.LID_OPEN_DEG:g} deg (LID_OPEN_DEG)",
                  f"{len(angles)} angles, {angles[0]:g} to {angles[-1]:g}")
-    detail = (f"{len(angles)} angles; largest YZ overlap {worst[0]:.3g} mm^2"
-              + (f" at {worst[1]:g} deg" if worst[0] > 0 else "")
-              + f" (contact below {AREA_TOL:g} mm^2 is not a collision)")
-    if deep is not None:
-        detail += (f"; enters from {first:g} deg; deepest {_f(deep[0])} mm below the rim at "
-                   f"{deep[1]:g} deg, over Y {_f(deep[2])}..{_f(deep[3])} (base back face "
-                   f"{_f(o.y1)}, hinge axis Y {_f(lay.hinge_axis[0])})")
-    report.check(worst[0] <= AREA_TOL, f"lid swing 0..{L.LID_OPEN_DEG:g} deg clears the base",
-                 detail)
+    common = (f"; the lid enters the base up to {_f(need)} mm from the axis, relief r "
+              f"{_f(lay.hinge_relief_r)} (contact below {AREA_TOL:g} mm^2 is not a collision)")
+    for kind, what in (("lid", "lid-knuckle segments: whole lid clears the base cut back to "
+                               "the hinge relief"),
+                       ("base", "base-knuckle segments: lid cut back to the hinge relief "
+                                "clears the whole base")):
+        area, a = worst[kind]
+        report.check(area <= AREA_TOL, what,
+                     f"{len(angles)} angles; largest YZ overlap {area:.3g} mm^2"
+                     + (f" at {a:g} deg" if area > 0 else "") + common)
 
 
 def cables_route(report: Report, lay: Layout) -> None:
@@ -572,27 +668,33 @@ def cables_route(report: Report, lay: Layout) -> None:
     if not lay.boost_in_lid:
         clear_of["boost pocket"] = lay.boost_pocket
     o, w = lay.outer, lay.wall
+    span = (lay.rim_z + strip.z1 - r) - (w + r)
     for k in BOARD_KEYS:
         closed = pigtail_path(lay, 0.0, k)
-        fx, fy, fz = closed[2]
-        foot = Box(fx - r, fy - r, w, fx + r, fy + r, fz + r)
-        hits = [nm for nm, b in clear_of.items() if _xy_overlap(foot, b)]
-        inside = foot.x0 >= w - EPS and foot.x1 <= o.x1 - w + EPS and foot.y1 <= o.y1 - w + EPS
-        report.check(inside and not hits, f"{m.key} pigtail ({k}): drops to the floor in free room",
-                     f"at ({_f(fx)}, {_f(fy)}) inside the walls"
+        foot = [p for p in closed if p[2] <= w + r + EPS]          # the floor points
+        hits, inside = [], True
+        for fx, fy, _ in foot:
+            fb = Box(fx - r, fy - r, w, fx + r, fy + r, w + 2 * r)
+            hits += [nm for nm, b in clear_of.items() if _xy_overlap(fb, b) and nm not in hits]
+            inside &= fb.x0 >= w - EPS and fb.x1 <= o.x1 - w + EPS and fb.y1 <= o.y1 - w + EPS
+        report.check(inside and not hits, f"{m.key} pigtail ({k}): along the floor in free room",
+                     ", ".join(f"({_f(x)}, {_f(y)})" for x, y, _ in foot) + " inside the walls"
                      + (f"; hits {', '.join(hits)}" if hits else
                         f", clear of {', '.join(clear_of)}"))
-        # the lid legs are measured closed, where lid and base axes agree
-        length = manhattan_length(closed)
-        report.check(length <= m.pigtail_len + EPS, f"{m.key} pigtail ({k}): length",
-                     f"exit to plug face, |dx|+|dy|+|dz| per leg: {_f(length)} <= pigtail_len "
-                     f"{_f(m.pigtail_len)} mm (polyline {_f(path_length(closed))})")
+        lengths = [(pigtail_length_bound(lay, a, k), a) for a in sweep_angles()]
+        longest, at = max(lengths)
+        report.check(longest <= m.pigtail_len + EPS, f"{m.key} pigtail ({k}): length",
+                     f"exit to plug face, |dx|+|dy|+|dz| per leg: at most {_f(longest)} "
+                     f"({at:g} deg) <= pigtail_len {_f(m.pigtail_len)} mm")
         bends = [(max_bend_r(pigtail_path(lay, a, k)[:-1]), a) for a in sweep_angles()]
         least, at = min(bends)
+        closed_r = bends[0][0]
         report.check(least >= PIGTAIL.min_bend_r - EPS,
                      f"{m.key} pigtail ({k}): bend at the hinge notch",
-                     f"loop through the notch rounds to r {_f(least)} at worst ({at:g} deg) over "
-                     f"{len(bends)} angles >= {PIGTAIL.key} min bend r {PIGTAIL.min_bend_r}")
+                     f"rounds to r {_f(least)} at worst ({at:g} deg) over {len(bends)} angles >= "
+                     f"{PIGTAIL.key} min bend r {PIGTAIL.min_bend_r}; closed U-turn r "
+                     f"{_f(closed_r)} (the closed box allows {_f(span / 2)}: half of {_f(span)} "
+                     f"from the lid's inside face to the floor)")
 
         c = usb_cable()
         path = usb_path(lay, k)

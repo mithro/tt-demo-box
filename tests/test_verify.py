@@ -79,7 +79,7 @@ def test_unconfirmed_listed(lay):
         proof(r, lay)
     names = " ".join(what for what, _ in r.unconfirmed)
     for name in ("TALLEST_COMPONENT", "USB_C_AXIS_ABOVE_PCB", "TINYVGA_Z_OFFSET", "TAPE_T",
-                 "vga-slim", L.DESIGN_MONITOR, L.DESIGN_BANK):
+                 "vga-slim", "monitor-pigtail", L.DESIGN_MONITOR, L.DESIGN_BANK):
         assert name in names, name
 
 
@@ -109,10 +109,9 @@ def _shallow_lid(lay, mp):
     return replace(lay, lid_outer=replace(lay.lid_outer, z1=lay.lid_outer.z1 - 3.0))
 
 
-def _lid_enters_base(lay, mp):
-    # the lid 6 mm further back along itself: a 10 mm strip behind the axis
-    # swings down through the base as it opens
-    return replace(lay, lid_outer=lay.lid_outer.moved(0.0, 6.0, 0.0))
+def _small_hinge_relief(lay, mp):
+    # R11: the reliefs 2 mm smaller than the lid's back sweeps
+    return replace(lay, hinge_relief_r=lay.hinge_relief_r - 2.0)
 
 
 def _short_pigtail(lay, mp):
@@ -138,7 +137,7 @@ MUTATIONS = [
     ("bank_lifts_out", "bank bay", _bay_under_the_open_lid),
     ("button_reachable", "port room", _short_port_room),
     ("lid_closed_clears", "monitor face", _shallow_lid),
-    ("hinge_sweep", "base", _lid_enters_base),
+    ("hinge_sweep", "relief", _small_hinge_relief),
     ("cables_route", "pigtail", _short_pigtail),
     ("lid_catch", "lid catch 1", _magnet_moved),
     ("size_budget", "width", _wider_box),
@@ -241,35 +240,62 @@ def test_closed_lid_touches_but_is_no_collision(lay):
 # --- the pigtail path ---------------------------------------------------------------
 
 def test_pigtail_path_runs_exit_notch_plug(lay):
-    hy, hz = lay.hinge_axis
     n = lay.hinge_notch
     v = lay.board_keepouts["v3.2/tinyvga"]
-    for a in (0.0, 50.0, L.LID_OPEN_DEG):
+    for a in C.sweep_angles():
         path = C.pigtail_path(lay, a)
         assert all(len(p) == 3 for p in path)
-        assert any(math.isclose(y, hy) and math.isclose(z, hz) and n.x0 < x < n.x1
-                   for x, y, z in path), "through the hinge axis, inside the notch"
+        assert any(n.x0 < x < n.x1 and n.y0 < y < n.y1 and n.z0 < z < n.z1
+                   for x, y, z in path), "through the hinge notch"
         x, y, z = path[-1]                      # the TinyVGA's DE-15 face
         assert v.x0 <= x <= v.x1 and v.y0 <= y <= v.y1 and v.z0 <= z <= v.z1
     x0, y0, _ = C.pigtail_path(lay, 0.0)[0]
     ms = lay.monitor_space
     assert ms.x0 < x0 < ms.x1
-    assert y0 == pytest.approx(ms.y1 - L.SLACK + hy)        # the panel's cable edge
+    assert y0 == pytest.approx(ms.y1 - L.SLACK + lay.hinge_axis[0])   # the cable edge
 
 
-def test_pigtail_length_same_at_every_angle(lay):
-    lengths = {round(C.path_length(C.pigtail_path(lay, a)), 6) for a in C.sweep_angles()}
-    assert len(lengths) == 1
+def test_pigtail_takes_the_widest_closed_u_turn(lay):
+    """R13: closed, the loop spans the lid's inside face to the floor (cable
+    centrelines), and the route rounds it to half that: the widest U-turn the
+    closed box allows."""
+    r = C.PIGTAIL.dia / 2
+    span = (lay.rim_z + lay.lid_strip.z1 - r) - (lay.wall + r)
+    assert C.max_bend_r(C.pigtail_path(lay, 0.0)[:-1]) == pytest.approx(span / 2, abs=1e-6)
+    assert span / 2 == pytest.approx(25.5, abs=0.01)
+    assert C.PIGTAIL.key == "monitor-pigtail"
+
+
+def test_pigtail_within_its_length_at_every_angle(lay):
+    m = MONITORS[L.DESIGN_MONITOR]
+    for a in C.sweep_angles():
+        assert C.pigtail_length_bound(lay, a) <= m.pigtail_len
 
 
 def test_bend_radius_of_a_right_angle_corner():
     # a 90 degree corner with 10 mm legs takes a 10 mm fillet, no more
     pts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0)]
     assert C.max_bend_r(pts) == pytest.approx(10.0)
+    # a corner that is straight on (a point on a line) is no corner
+    pts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 4.0, 0.0), (10.0, 10.0, 0.0)]
+    assert C.max_bend_r(pts) == pytest.approx(10.0)
     # two corners share the leg between them
     pts = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0), (20.0, 10.0, 0.0)]
     assert C.max_bend_r(pts) == pytest.approx(5.0)
     assert C.max_bend_r([(0.0, 0.0, 0.0), (5.0, 0.0, 0.0), (9.0, 0.0, 0.0)]) == math.inf
+
+
+# --- the bank lifts out ---------------------------------------------------------
+
+def test_bank_lift_uses_the_bank_not_the_bay(lay):
+    """R12: the bank's own footprint, centred in the bay, is what lifts.  A
+    bay 0.5 mm deeper at the back moves the packed bank back only 0.25 mm,
+    still clear; the bay's own back edge would now be under the lid."""
+    r = _run(C.bank_lifts_out, lay)
+    assert r.failures == 0, _failed(r)
+    assert any("clearance" in d for _, _, d in r.results)
+    deeper = replace(lay, bank_bay=replace(lay.bank_bay, y1=lay.bank_bay.y1 + 0.5))
+    assert _run(C.bank_lifts_out, deeper).failures == 0
 
 
 # --- the lid catch ------------------------------------------------------------------
