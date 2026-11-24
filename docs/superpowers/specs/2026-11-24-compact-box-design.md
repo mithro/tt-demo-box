@@ -2,6 +2,10 @@
 
 Status: approved by Tim, 2026-11-24.
 
+The rulings made while building it (R1 to R36, cited by ID in the code) are in
+[`2026-11-24-compact-box-rulings.md`](2026-11-24-compact-box-rulings.md); where a ruling and this
+document disagree, the ruling is the later decision.
+
 Supersedes `2026-11-23-tt-demo-box-design.md` (the "first design", merged in PR #1) where the two
 disagree. Everything in the first design that this document does not change still holds: the
 intent (open the lid and it is a working demo), the 5 V power scheme, the 20,000 mAh-class bank,

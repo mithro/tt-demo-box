@@ -4,7 +4,9 @@ One layout, two bodies: the printed route calls ``layout(2.4)``, the laser
 route ``layout(3.0)``.  ``verify.py`` proves the fits from the same numbers.
 Every placement below is computed from ``demobox.parts``; the only numbers
 typed here are the spec's (``LID_OPEN_DEG`` .. ``CLOSED_CLEARANCE``), the
-machine beds, ``SLACK`` and a few named design choices.  The box is sized for
+machine beds, ``SLACK`` and a few named design choices.  Ruling IDs in the
+comments (R1 .. R36) are defined in
+docs/superpowers/specs/2026-11-24-compact-box-rulings.md.  The box is sized for
 one kit (``DESIGN_MONITOR``, ``DESIGN_BANK``, both board revisions): every
 dimension is that kit plus ``SLACK`` plus the walls, and nothing else.
 

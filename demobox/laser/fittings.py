@@ -26,7 +26,8 @@ which are printed and glued in:
   the seam: two glued in the base's front corners under the rim (pocket up),
   two in the lid's over them (the same part, pocket down).
 
-The board's pins are bought rod (R28, ``board_pin_length``), standing on
+The board's pins are bought rod (ruling R28 in
+docs/superpowers/specs/2026-11-24-compact-box-rulings.md; ``board_pin_length``), standing on
 the base floor through ``plinth-top``'s holes: MT2's glued, MT1's loose.  The hinge rod is the printed route's
 (``hinge.pin_length``), pushed in from the +X side face.
 """
