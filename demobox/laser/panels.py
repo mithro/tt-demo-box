@@ -101,7 +101,7 @@ from shapely.ops import unary_union
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.geom import BedOverflow, Box
-from demobox.layout import FIT, LASER_BED, Layout
+from demobox.layout import FIT, LASER_BED, MAGNET_D, MAGNET_T, Layout
 from demobox.laser import joints as J
 from demobox.shared import hinge as H
 from demobox.shared import m3
@@ -116,9 +116,7 @@ SEAM_MARGIN = 2.0
 RUNNER_LIP = 4.0
 #: The drawer back's ear (in runner-back's slot): its width along Y.
 EAR_W = 6.0
-#: Disc magnets of the latch, and their printed blocks (cubes).
-MAGNET_D = 6.0
-MAGNET_T = 3.0
+#: The drawer latch's printed magnet blocks (cubes); the magnets are layout.MAGNET_D x _T.
 MAGNET_BLOCK = 10.0
 #: Printed nut blocks: across the screw, along it; the nut's pocket from the
 #: block's entry face; and the wall under it.
@@ -503,6 +501,9 @@ def _slabs(lay: Layout, t: float) -> dict[str, _Slab]:
         sl.holes.append((x, z, m3.CLEARANCE_D))
     for x, y in clip_screws(lay, t):
         bf.holes.append((x, y, m3.CLEARANCE_D))
+    for c in lay.lid_catch:        # the lid catch's magnets press into the band face
+        m = lay.catch_lid_magnet(c)
+        bf.holes.append((m.cx, m.cy, MAGNET_D))
     return s
 
 

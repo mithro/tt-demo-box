@@ -97,6 +97,17 @@ ROUTES: dict[str, float] = {"printed": 2.4, "laser": 3.0}
 #: The VGA plug is sized for a 90 degree adapter: with a straight plug the base
 #: would be deeper than the print bed (``_base_depth(2.4, straight=True)``).
 VGA_PLUG_STRAIGHT = False
+#: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
+#: in the base's front wall rim and the lid's front band, MAGNET_RECESS below
+#: each seam face, so the shut lid's magnets face each other 2 x MAGNET_RECESS
+#: apart.  Each sits in a CATCH_BLOCK square, CATCH_BLOCK_H tall block against
+#: the front wall, CATCH_INSET_X in from each side wall (clear of the board).
+MAGNET_D = 6.0
+MAGNET_T = 3.0
+MAGNET_RECESS = 0.2
+CATCH_BLOCK = 10.0
+CATCH_BLOCK_H = 6.0
+CATCH_INSET_X = 35.0
 #: Monitor insert material: front bezel plate and rear retainer thickness.
 INSERT_MATERIAL = 1.2
 #: Bare-kit driver board standoff height above the panel's back.
@@ -311,6 +322,24 @@ class Layout:
     lid_outer: Box                   # lid frame, closed
     lid_pocket: Box                  # lid frame, closed
     lid_cable_gutters: dict[str, Box]  # lid frame, closed: "hinge", and "left"/"right"
+    lid_catch: tuple[Cyl, ...]       # the base-side catch magnets (base frame, in the front wall)
+
+    def catch_base_block(self, c: Cyl) -> Box:
+        """The block holding catch magnet ``c`` under the base's rim (base frame)."""
+        h, w = self.outer.z1, self.wall
+        return Box(c.cx - CATCH_BLOCK / 2, w, h - CATCH_BLOCK_H, c.cx + CATCH_BLOCK / 2,
+                   w + CATCH_BLOCK, h, "lid catch block (base)")
+
+    def catch_lid_block(self, c: Cyl) -> Box:
+        """The block over it in the lid's front band (lid frame, closed)."""
+        b = self.catch_base_block(c)
+        d = self.outer.y1
+        return Box(b.x0, b.y0 - d, 0.0, b.x1, b.y1 - d, CATCH_BLOCK_H, "lid catch block (lid)")
+
+    def catch_lid_magnet(self, c: Cyl) -> Cyl:
+        """The lid-side magnet facing ``c`` across the seam (lid frame, closed)."""
+        return Cyl(c.cx, c.cy - self.outer.y1, MAGNET_RECESS, MAGNET_RECESS + MAGNET_T,
+                   MAGNET_D / 2, "lid catch magnet (lid)")
 
     def _open_yz(self, y: float, z: float, angle_deg: float) -> tuple[float, float]:
         """Lid-frame (y, z) to base-frame (Y, Z) with the lid ``angle_deg`` open:
@@ -451,6 +480,10 @@ def layout(wall: float) -> Layout:
                               cx + chan_w / 2, hinge[0], hinge[1] + pocket_depth,
                               "hinge cable channel")
 
+    catch = tuple(Cyl(x, wall + CATCH_BLOCK / 2, height - MAGNET_RECESS - MAGNET_T,
+                      height - MAGNET_RECESS, MAGNET_D / 2, f"lid catch magnet (base) {i + 1}")
+                  for i, x in enumerate((CATCH_INSET_X, width - CATCH_INSET_X)))
+
     return Layout(
         wall=wall, outer=outer, deck_z=deck_z, board_origin=origin,
         board_keepouts=keepouts, standoffs=standoffs, mt1_boss=mt1_boss, pegs=pegs,
@@ -459,4 +492,5 @@ def layout(wall: float) -> Layout:
         drawer_out=(-1.0, 0.0, 0.0), drawer_travel=drawer_travel,
         boost_pocket=boost_pocket, hinge_axis=hinge,
         hinge_cable_channel=hinge_cable_channel,
-        lid_outer=lid_outer, lid_pocket=lid_pocket, lid_cable_gutters=gutters)
+        lid_outer=lid_outer, lid_pocket=lid_pocket, lid_cable_gutters=gutters,
+        lid_catch=catch)

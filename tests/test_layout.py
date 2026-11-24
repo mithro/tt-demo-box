@@ -352,3 +352,25 @@ def test_tinyvga_offset_places_the_keepout():
         u = L.TINYVGA.pcb.union(L.TINYVGA.de15).union(L.TINYVGA.plug_keepout(L.VGA_PLUG_STRAIGHT))
         k = L._tinyvga(key, L.VGA_PLUG_STRAIGHT)
         assert (k.x0, k.y0, k.z0) == pytest.approx((u.x0 + dx, u.y0 + dy, u.z0 + dz))
+
+
+# --- the lid catch (R22) ------------------------------------------------------------
+
+@pytest.mark.parametrize("wall", sorted(L.ROUTES.values()))
+def test_lid_catch_pairs_face_each_other(wall):
+    """Each base magnet has its lid partner straight over it, the pair
+    2 x MAGNET_RECESS apart (<= 1 mm) with the lid shut, clear of the board."""
+    lay = L.layout(wall)
+    assert len(lay.lid_catch) == 2
+    keep = [b for b in lay.board_keepouts.values()]
+    for c in lay.lid_catch:
+        m = lay.catch_lid_magnet(c)
+        hy, hz = lay.hinge_axis
+        assert (m.cx, m.cy + hy) == pytest.approx((c.cx, c.cy))
+        gap = (hz + m.z0) - c.z1
+        assert gap == pytest.approx(2 * L.MAGNET_RECESS) and 0 <= gap <= 1.0
+        assert c.z1 - c.z0 == pytest.approx(L.MAGNET_T) == pytest.approx(m.z1 - m.z0)
+        blk = lay.catch_base_block(c)
+        assert blk.x1 - blk.x0 == pytest.approx(L.CATCH_BLOCK)
+        assert 0 < blk.x0 and blk.x1 < lay.outer.x1
+        assert all(blk.x1 < k.x0 or blk.x0 > k.x1 for k in keep)   # clear of the board

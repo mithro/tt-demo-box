@@ -108,8 +108,9 @@ import cadquery as cq
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.checks import MIN_BOSS_WALL, panel_in_lid
 from demobox.geom import BedOverflow, Box, Stadium
-from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, INSERT_MATERIAL, PEG_HOLE_D,
-                            PRINT_BED, ROUTES, Layout, layout)
+from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, INSERT_MATERIAL, MAGNET_D,
+                            MAGNET_RECESS, MAGNET_T, PEG_HOLE_D, PRINT_BED, ROUTES, Layout,
+                            layout)
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.board import board_spec
 from demobox.parts.monitors import MONITORS
@@ -210,7 +211,7 @@ COLOURS: dict[str, tuple[float, float, float]] = {
     "hinge-lid": (0.62, 0.62, 0.62), "bezel": (0.08, 0.08, 0.08),
     "bezel-clip": (0.08, 0.08, 0.08), "hw": (0.75, 0.75, 0.78),
     "retainer": (0.35, 0.35, 0.35), "packing": (0.20, 0.50, 0.85),
-    "mt1-pin": (0.95, 0.85, 0.20), "bank": (0.85, 0.85, 0.85), "panel": (0.02, 0.02, 0.05),
+    "magnet": (0.55, 0.55, 0.60), "mt1-pin": (0.95, 0.85, 0.20), "bank": (0.85, 0.85, 0.85), "panel": (0.02, 0.02, 0.05),
     "monitor-driver": (0.10, 0.45, 0.20), "board": (0.05, 0.40, 0.15),
 }
 
@@ -414,6 +415,8 @@ def _tub(lay: Layout) -> tuple[cq.Solid, tuple[HeatSet, ...]]:
     bp = lay.boost_pocket
     adds.append(_box(w, bp.y1, w, bp.x1 + FENCE_T, bp.y1 + FENCE_T, w + FENCE_H))
     adds.append(_box(bp.x1, bp.y0, w, bp.x1 + FENCE_T, bp.y1 + FENCE_T, w + FENCE_H))
+    # lid catch: a block under the rim at each magnet, its pocket open on the rim
+    adds += [_bx(lay.catch_base_block(c)) for c in lay.lid_catch]
     # pad outside the detent groove: the wall keeps ``wall`` behind it
     zb, zt = det["bz0"] - FIT - PAD_MARGIN, det["bz1"] + FIT + PAD_MARGIN
     adds.append(_prism_x([(0.0, zb - PAD_T), (-PAD_T, zb), (-PAD_T, zt), (0.0, zt + PAD_T),
@@ -430,6 +433,9 @@ def _tub(lay: Layout) -> tuple[cq.Solid, tuple[HeatSet, ...]]:
         _box(us.x0, us.y0 - 1.0, deck_bot - LEDGE - 1.0, us.x1, us.y1, deck_bot + 1.0),
         # hinge cable channel, base part, through the back wall
         _box(base_ch.x0, base_ch.y0, base_ch.z0, base_ch.x1, base_ch.y1 + 1.0, base_ch.z1 + 1.0),
+        # lid catch magnet pockets, open on the rim face
+        *(_cyl((c.cx, c.cy, c.z0), (0, 0, 1), MAGNET_D / 2, MAGNET_T + MAGNET_RECESS + 1.0)
+          for c in lay.lid_catch),
         # detent groove in the front wall's inner face
         _box(det["g0"], w - GROOVE_D, det["bz0"] - FIT, det["g1"], w + 0.1, det["bz1"] + FIT),
         *H.knuckle_relief(lay, (hy, hz)),
@@ -584,9 +590,14 @@ def _lid(lay: Layout) -> tuple[cq.Solid, tuple[HeatSet, ...]]:
     for x, y in clip_screws(lay):
         adds.append(_bx(clip_boss(lay, x, y)))
         heatsets.append(HeatSet((x, y, 0.0), (0.0, 0.0, 1.0), "clip screw (bezel corner)"))
+    # lid catch: a solid block in the band's front cell at each magnet
+    adds += [_bx(lay.catch_lid_block(c)) for c in lay.lid_catch]
     body = _fuse(body, *adds)
     _, ch = channel_parts(lay)
-    body = _cut(body, _box(ch.x0, ch.y0, -1.0, ch.x1, ch.y1 + 1.0, ch.z1),
+    body = _cut(body, *(_cyl((m.cx, m.cy, -1.0), (0, 0, 1), MAGNET_D / 2,
+                             MAGNET_T + MAGNET_RECESS + 1.0)
+                        for m in map(lay.catch_lid_magnet, lay.lid_catch)),
+                _box(ch.x0, ch.y0, -1.0, ch.x1, ch.y1 + 1.0, ch.z1),
                 *H.knuckle_relief(lay, (0.0, 0.0)), *(_heatset_hole(h) for h in heatsets))
     return _one(body, "lid"), tuple(heatsets)
 
@@ -902,6 +913,7 @@ def _base_keepouts(lay: Layout) -> list[Box]:
                 d.z1 + FIT, "drawer sweep"),
             lay.boost_pocket, base_ch,
             Box(us.x0, us.y0, d.z1 + FIT, us.x1, us.y1, lay.deck_z, "USB-C cable drop")]
+    keep += [lay.catch_base_block(c) for c in lay.lid_catch]
     B = DECK_BLOCK
     for cx, cy in _deck_corners(lay):
         keep.append(Box(cx - B / 2, cy - B / 2, lay.deck_z - w - DECK_BLOCK_H, cx + B / 2,
@@ -916,7 +928,8 @@ def split_base(lay: Layout, bed=PRINT_BED) -> tuple[dict[str, Printed], Split | 
     tub, tub_hs = _cached("tub", lay, lambda: _tub(lay))
     dk, dk_hs = _cached("deck", lay, lambda: _deck(lay))
     note_t = ("Base tub: print floor down, no supports (the drawer opening's top is "
-              "45 degree peaks). Heat-set M3 inserts: ")
+              "45 degree peaks). Press a 6 x 3 mm disc magnet into each of the two rim "
+              "pockets (the lid's pair attract: check polarity). Heat-set M3 inserts: ")
     note_d = "Deck: print flat, standoffs up. Heat-set M3 insert in the MT2 standoff."
     x, y = _footprint(tub)
     if x <= bed[0] + 1e-6 and y <= bed[1] + 1e-6:
@@ -997,8 +1010,9 @@ def split_lid(lay: Layout, bed=PRINT_BED) -> tuple[dict[str, Printed], Split | N
     solid, hs = _cached("lid", lay, lambda: _lid(lay))
     note = ("Lid: print on its back (screen side up), no supports; the front band is "
             "hollow and ribbed, its screen-side skin bridges "
-            f"{max(c.size[1] for c in front_cavities(lay)):.1f} mm cells. Heat-set M3 "
-            "inserts: ")
+            f"{max(c.size[1] for c in front_cavities(lay)):.1f} mm cells. Press a 6 x 3 mm "
+            "disc magnet into each of the two front pockets (facing the base's: check "
+            "polarity). Heat-set M3 inserts: ")
     x, y = _footprint(solid)
     if x <= bed[0] + 1e-6 and y <= bed[1] + 1e-6:
         return {"lid": _printed("lid", solid, note + _count(hs), hs)}, None
@@ -1006,7 +1020,7 @@ def split_lid(lay: Layout, bed=PRINT_BED) -> tuple[dict[str, Printed], Split | N
     o = lay.lid_outer
     lo, hi = (o.x0, o.x1) if axis == "x" else (o.y0, o.y1)
     _, ch = channel_parts(lay)
-    keep = [lay.lid_pocket, ch]
+    keep = [lay.lid_pocket, ch, *(lay.catch_lid_block(c) for c in lay.lid_catch)]
     keep += [Box(h.at[0] - BOSS_R, h.at[1] - BOSS_R - _leaf_boss_len(lay) - lay.wall,
                  h.at[2] - BOSS_R, h.at[0] + BOSS_R, h.at[1] + BOSS_R, o.z1, h.what)
              for h in hs]
@@ -1140,6 +1154,7 @@ def hardware(lay: Layout) -> dict[str, int]:
     for s in insert_screws(lay):
         add(f"M3 x {s.length} pan-head ({s.what})", s.count)
     add(f"M3 x {H.hinge_bolt_length(lay)} bolt + nyloc (hinge pin)", len(H.hinge_groups(lay)))
+    add(f"{MAGNET_D:g} x {MAGNET_T:g} mm disc magnet", 2 * len(lay.lid_catch))
     return dict(sorted(hw.items()))
 
 
@@ -1198,7 +1213,17 @@ def assembly(route: str, angle_deg: float, drawer_out: float,
     lid_items += [(f"hw:clip-screw-head-{i + 1}", _screw_head(x, y, -CLIP_T))
                   for i, (x, y) in enumerate(clip_screws(lay))]
 
+    # the lid catch's magnets, in their pockets
+    base_items += [(f"hw:catch-magnet-base-{i + 1}", _cyl((c.cx, c.cy, c.z0), (0, 0, 1),
+                                                           MAGNET_D / 2, MAGNET_T))
+                   for i, c in enumerate(lay.lid_catch)]
+    lid_items += [(f"hw:catch-magnet-lid-{i + 1}",
+                   _cyl((m.cx, m.cy, m.z0), (0, 0, 1), MAGNET_D / 2, MAGNET_T))
+                  for i, m in enumerate(map(lay.catch_lid_magnet, lay.lid_catch))]
+
     def colour(n):
+        if n.startswith("hw:catch-magnet"):
+            return COLOURS["magnet"]
         if n.startswith("hw:"):
             return COLOURS["hw"]
         return COLOURS["bezel-clip" if n.startswith("bezel-clip") else n]

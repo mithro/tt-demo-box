@@ -31,8 +31,9 @@ from tools.drafting import dims, style
 from demobox.drafting import names
 from demobox.drafting import sheetkit as K
 from demobox.drafting.hlr import project, to_view, view_bbox
-from demobox.layout import (FIT, HEATSET_DEPTH, HEATSET_HOLE_D, PEG_DIA, PEG_HEIGHT, PEG_HOLE_D,
-                            ROUTES, layout)
+from demobox.layout import (CATCH_BLOCK, CATCH_BLOCK_H, FIT, HEATSET_DEPTH, HEATSET_HOLE_D, MAGNET_D,
+                            MAGNET_RECESS, MAGNET_T, PEG_DIA, PEG_HEIGHT, PEG_HOLE_D, ROUTES,
+                            layout)
 from demobox.parts.batteries import BATTERIES
 from demobox.printed import body as B
 from demobox.shared import hinge as H
@@ -273,6 +274,11 @@ def base_part(defn) -> Part:
         + ", ".join(f"{F(g0 - FIT)}..{F(g1 + FIT)}" for g0, g1 in groups) + ".",
         f"Drawer opening from the floor's top (Z {F(oz0)}), topped by 45 deg peaks at "
         f"{F(pitch)} pitch.",
+        f"Lid catch: {len(lay.lid_catch)} magnet pockets D{F(MAGNET_D)} x "
+        f"{F(MAGNET_T + MAGNET_RECESS)} deep, open on the front wall's rim, at Y "
+        f"{F(lay.lid_catch[0].cy)}, X " + ", ".join(F(c.cx) for c in lay.lid_catch)
+        + f"; each in a {F(CATCH_BLOCK)} square block {F(CATCH_BLOCK_H)} deep under the rim. "
+        f"The {F(MAGNET_D)} x {F(MAGNET_T)} mm disc magnet sits {F(MAGNET_RECESS)} below the rim.",
         _unconf(),
     ]
     return part
@@ -384,6 +390,11 @@ def lid_part(defn) -> Part:
         f"{F(pk.z1)} deep. Front band hollow, {len(cells)} cells, ribs along X (R18).",
         f"Table: hole mouths, X and Y from the datum, DEPTH below the screen face. {HEATSET}",
         f"Knuckle reliefs R{F(H.KNUCKLE_R + FIT)} about the hinge axis.",
+        f"Lid catch: {len(lay.lid_catch)} magnet pockets D{F(MAGNET_D)} x "
+        f"{F(MAGNET_T + MAGNET_RECESS)} deep, open on the screen face, at X "
+        + ", ".join(F(c.cx) for c in lay.lid_catch)
+        + f", Y {F(lay.catch_lid_magnet(lay.lid_catch[0]).cy)}; each in a solid "
+        f"{F(CATCH_BLOCK)} square block in the band's front cell. They face the base's.",
         _unconf(),
     ]
     return part

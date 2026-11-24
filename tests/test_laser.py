@@ -363,6 +363,7 @@ def test_laser_lid_turns_about_the_axis(lay):
 def test_laser_printed_parts_fit_the_print_bed(lay):
     parts = P.printed_parts(lay, WALL)
     for want in ("hinge-base", "hinge-lid", "mt1-pin", "bezel-clip", "magnet-block",
+                 "catch-block-base", "catch-block-lid",
                  "nut-block-base-leaf", "nut-block-lid-leaf", "nut-block-bezel",
                  "nut-block-clip", "standoff-mt2", "nut-cup-mt2", "deck-support", "mt1-boss"):
         assert want in parts, want
@@ -479,3 +480,19 @@ def test_every_tslot_nut_is_a_keepout_in_the_assembly(body):
 def test_laser_assembly_intermediate_lid_angles_have_no_intersections(angle):
     """The lid's whole swing, not just shut and fully open (finding 7)."""
     assert clashes(B.assembly("laser", float(angle), 0.0), P.DECLARED_OVERLAPS) == []
+
+
+def test_laser_lid_catch_hole_and_blocks(lay):
+    """R22: the lid's magnet goes through a hole in the band face, behind which
+    its block is glued; the base's block sits under the front panel's top edge."""
+    from demobox.laser import fittings as F
+    body = P.build(lay, lay.wall, P.KERF)
+    face = body.panels["lid-band-face"]
+    for c in lay.lid_catch:
+        m = lay.catch_lid_magnet(c)
+        assert (m.cx, m.cy, P.MAGNET_D) in face.holes
+        blk = F.catch_lid_block_box(lay, c, lay.wall)
+        assert blk.z0 == pytest.approx(lay.wall)           # behind the face, not in it
+    parts = {k[0] for k in body.placed}
+    assert {"catch-block-base", "catch-block-lid"} <= parts
+    assert F.hardware(lay, lay.wall)["6 x 3 mm disc magnet"] == 2 + 2 * len(lay.lid_catch)

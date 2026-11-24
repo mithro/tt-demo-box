@@ -56,8 +56,10 @@ def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
 def printed_hardware(lay) -> dict[str, int]:
     """The printed route's bought hardware (``body.hardware``), plus the
     board's screw check: the assembly's screw-head ``hw:`` solids are the
-    bezel's and the clip's, and must agree with them."""
-    heads = [n for n, _, _ in B.assembly("printed", 0.0, 0.0) if n.startswith("hw:")]
+    bezel's and the clip's, and must agree with them (the catch magnets are
+    counted by ``body.hardware``)."""
+    heads = [n for n, _, _ in B.assembly("printed", 0.0, 0.0)
+             if n.startswith("hw:") and "magnet" not in n]
     if len(heads) != len(I.bezel_screws(lay)) + len(B.clip_screws(lay)):
         raise ValueError(f"hw: solids {heads} disagree with the bezel and clip screws")
     return B.hardware(lay)

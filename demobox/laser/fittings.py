@@ -20,6 +20,11 @@ route puts into heat-set inserts go into M3 square nuts in pockets in them:
   ``mt1-pin``;
 * ``magnet-block`` (2): the latch, one in the drawer's front corner (magnet
   up), one over it in the base's front corner (the same part upside down).
+* ``catch-block-base`` (2), ``catch-block-lid`` (2): the lid catch (R22), two
+  places along the front (``Layout.lid_catch``): a block glued inside the
+  base's front panel under its top edge, magnet up; a block glued behind the
+  lid's band face over it, its magnet pressed into a hole in the face
+  (``panels``), the two magnets facing across the seam.
 
 Each nut pocket is NUT_DEPTH from the block's entry face (where the screw
 comes in) and runs right through the block across the screw, so the nut goes
@@ -34,7 +39,8 @@ import cadquery as cq
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from demobox.geom import Box
-from demobox.layout import FIT, INSERT_MATERIAL, PEG_HOLE_D, PRINT_BED, ROUTES, Layout, layout
+from demobox.layout import (FIT, INSERT_MATERIAL, MAGNET_D, MAGNET_RECESS, MAGNET_T,
+                            PEG_HOLE_D, PRINT_BED, ROUTES, Layout, layout)
 from demobox.laser import joints as J
 from demobox.laser import panels as P
 from demobox.parts.batteries import BATTERIES
@@ -143,6 +149,41 @@ def _magnet_block(b: Box, m, facing) -> cq.Shape:
     return _box(b).cut(hole).clean()
 
 
+def catch_lid_block_box(lay: Layout, c, t: float) -> Box:
+    """The laser lid's catch block (lid frame): glued behind the band face
+    (the magnet sits in a hole through the face), so from ``t`` up."""
+    b = lay.catch_lid_block(c)
+    return Box(b.x0, b.y0, t, b.x1, b.y1, t + (b.z1 - b.z0), b.what)
+
+
+def _catch_block(lay: Layout, frame: str, c, t: float) -> cq.Shape:
+    """A lid catch block with its magnet pocket open on the seam side.  The
+    base's is under its top edge, a full-depth pocket; the lid's stands behind
+    the band face, whose hole holds most of the magnet, so its pocket is only
+    the magnet's last bit (none if the face is thick enough)."""
+    depth = MAGNET_T + MAGNET_RECESS
+    if frame == "base":
+        b = lay.catch_base_block(c)
+        return _box(b).cut(_cyl((c.cx, c.cy, b.z1 - depth), (0, 0, 1), MAGNET_D / 2,
+                                depth + 1.0)).clean()
+    b, mg = catch_lid_block_box(lay, c, t), lay.catch_lid_magnet(c)
+    into = mg.z1 - t
+    if into <= 0:
+        return _box(b)
+    return _box(b).cut(_cyl((mg.cx, mg.cy, t - 1.0), (0, 0, 1), MAGNET_D / 2, into + 1.0)).clean()
+
+
+def _catch(lay: Layout, t: float) -> dict:
+    """instance -> (part, frame, block solid, magnet Cyl in that frame) for the lid catch."""
+    out = {}
+    for i, c in enumerate(lay.lid_catch, 1):
+        out[f"catch-block-base-{i}"] = ("catch-block-base", "base",
+                                        _catch_block(lay, "base", c, t), c)
+        out[f"catch-block-lid-{i}"] = ("catch-block-lid", "lid", _catch_block(lay, "lid", c, t),
+                                       lay.catch_lid_magnet(c))
+    return out
+
+
 def _mounts(lay: Layout) -> dict:
     """The board's printed mounts on the deck: instance -> (part, solid)."""
     out = {}
@@ -173,6 +214,8 @@ def placed(lay: Layout, t: float) -> list[tuple[str, str, str, cq.Shape]]:
         out.append((part, inst, "base", s))
     for inst, (frame, b, m, facing) in _magnets(lay, t).items():
         out.append(("magnet-block", inst, frame, _magnet_block(b, m, facing)))
+    for inst, (part, frame, s, _m) in _catch(lay, t).items():
+        out.append((part, inst, frame, s))
     return out
 
 
@@ -196,6 +239,8 @@ def keepouts(lay: Layout, t: float) -> list[tuple[str, Box]]:
     out.append(("base", Box(*P._bb(H.hinge_base_knuckles(lay).val()), "hinge-base")))
     out.append(("lid", Box(*P._bb(H.hinge_lid_knuckles(lay).val()), "hinge-lid")))
     out.append(("lid", lay.lid_pocket))
+    for c in lay.lid_catch:
+        out += [("base", lay.catch_base_block(c)), ("lid", catch_lid_block_box(lay, c, t))]
     x0, y0, x1, y1 = I.lid_opening(lay)
     out.append(("lid", Box(x0, y0, 0.0, x1, y1, INSERT_MATERIAL, "bezel")))
     return out
@@ -224,6 +269,12 @@ _NOTES = {
     "deck-support": "Glue on the deck's engraved support outlines.",
     "mt1-boss": "Glue on the deck's engraved MT1 outline; the loose pin goes in the fitted "
                 "revision's hole.",
+    "catch-block-base": "Lid catch: glue inside the base's front panel under its top edge, "
+                        "hole up; press a 6 x 3 mm disc magnet into it (the lid's attracts: "
+                        "check polarity).",
+    "catch-block-lid": "Lid catch: glue behind the lid's band face, over the base's block, "
+                       "centred on the face's magnet hole; press a 6 x 3 mm disc magnet into the "
+                       "hole from the screen side (facing the base's: check polarity).",
     "magnet-block": "Press a 6 x 3 mm disc magnet into the hole (check polarity: the two attract); "
                     "glue one in the drawer's front corner, hole up, and one upside down over "
                     "it in the base's front corner.",
@@ -289,7 +340,7 @@ def hardware(lay: Layout, t: float) -> dict[str, int]:
     add(f"M3 x {_screw_len(pcb + (c.z1 - c.z0) + t)} pan-head screw (board, MT2)", 1)
     add(f"M3 x {H.hinge_bolt_length(lay)} bolt (hinge)", len(H.hinge_groups(lay)))
     add("M3 nyloc nut (hinge)", len(H.hinge_groups(lay)))
-    add("6 x 3 mm disc magnet", len(_magnets(lay, t)))
+    add(f"{MAGNET_D:g} x {MAGNET_T:g} mm disc magnet", len(_magnets(lay, t)) + len(_catch(lay, t)))
     add(f"{P.FOOT_D:g} x {P.FOOT_H:g} mm self-adhesive rubber foot", len(P.feet(lay)))
     bp = lay.boost_pocket
     add(f"hook-and-loop tape, {math.floor(bp.size[0] - 10):g} x "
@@ -321,6 +372,10 @@ def assembly(angle_deg: float, drawer_out: float, monitor: str = PB.ASSEMBLY_MON
     for inst, (frame, _b, mg, _f) in _magnets(lay, t).items():
         items[frame].append((f"hw:magnet-{frame}", _cyl(mg, (0, 0, 1), P.MAGNET_D / 2,
                                                          P.MAGNET_T), COLOURS["magnet"]))
+    for inst, (_part, frame, _s, mg) in _catch(lay, t).items():
+        items[frame].append((f"hw:catch-magnet-{inst.removeprefix('catch-block-')}",
+                             _cyl((mg.cx, mg.cy, mg.z0), (0, 0, 1), MAGNET_D / 2, MAGNET_T),
+                             COLOURS["magnet"]))
     for i, (x, y) in enumerate(P.feet(lay)):
         items["base"].append((f"hw:foot-{i + 1}", _cyl((x, y, -P.FOOT_H), (0, 0, 1),
                                                        P.FOOT_D / 2, P.FOOT_H), (0.1, 0.1, 0.1)))
