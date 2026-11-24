@@ -96,7 +96,7 @@ def test_battery_keys_and_sources():
 
 def test_cable_data():
     assert set(CABLES) == {"vga-slim", "vga-90-adapter", "usb-c-right-angle",
-                           "usb-a-c", "usb-12v-boost"}
+                           "usb-a-c", "usb-12v-boost", "bank-built-in"}
     for c in CABLES.values():
         assert c.sources and all(isinstance(s, Source) for s in c.sources)
         assert c.dia > 0 and c.min_bend_r > 0 and all(p > 0 for p in c.plug)
@@ -109,3 +109,20 @@ def test_ugreen_ports_on_the_end():
     assert b.port_face == "end" and b.button[0] == "end"
     assert any("read as the short top end" in s.note for s in b.sources)
     assert b.confirmed is False
+
+
+def test_design_monitor_has_pigtail_placeholders():
+    m = MONITORS["taobao-tim"]
+    assert m.pigtail_len == 300.0 and 0 < m.pigtail_exit_u < m.panel[0]
+    assert any("pigtail" in s.label.lower() for s in m.sources) and not m.confirmed
+
+
+def test_bank_cable_kinds():
+    assert BATTERIES["iniu-p512"].cable == "socket"
+    assert {k for k, b in BATTERIES.items() if b.cable == "built-in"} == {
+        "ugreen-pb505", "xiaomi-pb2020", "anker-zolo-20k"}
+
+
+def test_bank_built_in_cable_data():
+    c = CABLES["bank-built-in"]
+    assert (c.dia, c.min_bend_r) == (4.0, 20.0)
