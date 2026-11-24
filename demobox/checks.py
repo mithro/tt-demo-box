@@ -28,12 +28,14 @@ round every counted corner of the polyline without two arcs overlapping.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
-from shapely.geometry import Point, box as sbox
+from shapely.geometry import Point, Polygon, box as sbox
 
 from demobox import layout as L
 from demobox.geom import Box, overlaps
+from demobox.shared import hinge as H
 from demobox.layout import FINGERTIP_D, SLACK, Layout, exit_edge, tinyvga_offset
 from demobox.parts import board as board_mod
 from demobox.parts.batteries import BATTERIES
@@ -49,6 +51,9 @@ EPS = 1e-6
 #: zero area (a line), which is contact, not a collision.  1e-6 mm^2 is far
 #: below any real interference and far above floating-point noise.
 AREA_TOL = 1e-6
+#: The hinge stop's faces "touch" closer than this; a degree short of the stop
+#: they must be further apart.
+STOP_TOUCH = 0.05
 #: The lid catch's magnets may be this far apart with the lid shut (R22).
 CATCH_MAX_GAP = 1.0
 #: The bank-to-board USB cable: the longest this box asks for (a short
@@ -525,9 +530,9 @@ def packed_bank(lay: Layout) -> Box:
 
 
 def bank_lifts_out(report: Report, lay: Layout) -> None:
-    """R12: with the lid at LID_OPEN_DEG nothing (the lid included) is over
-    the design bank's own footprint, as packed in the bay, above the rim: the
-    bank lifts straight out.  (The swinging lid against the bank, and every
+    """R12: with the lid at LID_OPEN_DEG nothing (the lid and the hinge's
+    seal bead included) is over the design bank's own footprint, as packed in
+    the bay, above the rim: the bank lifts straight out.  (The swinging lid against the bank, and every
     other base content, is ``hinge_sweep``'s.)"""
     bank, a = packed_bank(lay), L.LID_OPEN_DEG
     lid, rim = lay.lid_outer, lay.rim_z
@@ -548,6 +553,10 @@ def bank_lifts_out(report: Report, lay: Layout) -> None:
     things.update({"plinth": lay.plinth, "port room": lay.port_room})
     if not lay.boost_in_lid:
         things["boost pocket"] = lay.boost_pocket
+    bys, bzs = zip(*H.bead_yz(lay))                      # R21: the base's seal bead
+    for i, (x0, x1) in enumerate(H.bead_x(lay), 1):
+        things[f"seal bead {i}"] = Box(x0, min(bys), min(bzs), x1, max(bys), max(bzs),
+                                       f"seal bead {i}")
     hits = [n for n, b in things.items() if b.z1 > rim + EPS and _xy_overlap(b, bank)]
     report.check(not hits, f"{bank.what} in the bank bay: nothing in the base over it",
                  "over it: " + ", ".join(hits) if hits else
@@ -672,29 +681,37 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
 
     * ``knuckle_x`` holds no base content within ``hinge_relief_r`` of the
       axis in YZ (a lid knuckle's whole lid, or a base knuckle, sweeps
-      there), and at least two ranges of ``KNUCKLE_LEN``.
+      there) -- the whole bank bay counting, not the bank as packed, since
+      the bank slides in it (R19) -- nor within FIT of one along X (R23);
+      and at least two ranges of ``KNUCKLE_LEN``.
     * At every angle from closed to LID_OPEN_DEG, inside ``knuckle_x`` the
       whole lid misses every base content there.
-    * In open segments, the lid cut back to ``hinge_relief_r`` misses every
-      base content there, and the base's walls cut back the same.
+    * In open segments (R21), the lid cut back to ``hinge_relief_r`` misses
+      every base content there, the base's intact walls (its whole YZ
+      profile: nothing cut back) and the seal bead (``hinge.bead_yz``).
 
     Closed, the lid rests on the base: contact (below AREA_TOL), not a
     collision.  The profile turns about the hinge axis (checked against an
-    independent rotation) and the sweep ends at LID_OPEN_DEG.  The physical
-    stop is the hinge's (Task 4's tests and the solid sweep)."""
+    independent rotation) and the sweep ends at LID_OPEN_DEG, where the
+    hinge's own stop (``hinge.stop_faces``) holds it: clear before, landing
+    at LID_OPEN_DEG, blocking past it (``_hinge_stop``)."""
     lid, o = lay.lid_outer, lay.outer
     hy, hz = lay.hinge_axis
     rr = lay.hinge_relief_r
     relief = Point(hy, hz).buffer(rr, quad_segs=64)
-    walls = sbox(o.y0, o.z0, o.y1, o.z1).difference(relief)
+    walls = sbox(o.y0, o.z0, o.y1, o.z1)                 # R21: intact in open segments
+    bead = Polygon(H.bead_yz(lay))
     knuckles, opens = list(lay.knuckle_x), _open_x(lay)
     contents = L.base_contents(lay)
 
-    near = {n: b for n, b in contents.items()
+    near = {n: b for n, b in {**contents, "bank bay": lay.bank_bay}.items()
             if math.hypot(max(b.y0 - hy, 0.0, hy - b.y1), max(b.z0 - hz, 0.0, hz - b.z1)) <= rr}
-    under = sorted(n for n, b in near.items() if _x_overlaps(b, knuckles))
-    report.check(not under, "knuckle_x: no base content within the hinge relief of the axis",
-                 (f"within r {_f(rr)} of the axis and under a knuckle: {', '.join(under)}"
+    under = sorted(n for n, b in near.items()
+                   if _x_overlaps(replace(b, x0=b.x0 - L.FIT, x1=b.x1 + L.FIT), knuckles))
+    report.check(not under, "knuckle_x: no base content (the whole bank bay) within the "
+                 "hinge relief of the axis, nor within FIT of one along X",
+                 (f"within r {_f(rr)} of the axis and within FIT of a knuckle range: "
+                  f"{', '.join(under)}"
                   if under else f"within r {_f(rr)} of the axis: "
                   + (", ".join(f"{n} (X {_f(b.x0)}..{_f(b.x1)})" for n, b in sorted(near.items()))
                      or "nothing") + "; all in open segments"))
@@ -714,7 +731,8 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
                                for y, z in corners))
         cut = prof.difference(relief)
         for kind, shape, things in (("knuckle", prof, in_k),
-                                    ("open", cut, {**in_o, "base walls": walls})):
+                                    ("open", cut, {**in_o, "base walls": walls,
+                                                   "seal bead": bead})):
             for n, t in things.items():
                 area = shape.intersection(t).area
                 if area > worst[kind][0]:
@@ -730,13 +748,58 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
             ("knuckle", "knuckle segments: whole lid misses every base content in knuckle_x",
              len(in_k)),
             ("open", "open segments: lid cut back to the hinge relief misses every base "
-                     "content and the cut base walls", len(in_o) + 1)):
+                     "content, the intact base walls and the seal bead", len(in_o) + 2)):
         area, a, n = worst[kind]
         report.check(area <= AREA_TOL, what,
                      f"{n_things} parts, {len(angles)} angles; largest YZ overlap {area:.3g} mm^2"
                      + (f" ({n} at {a:g} deg)" if area > 0 else "")
                      + f"; hinge relief r {_f(rr)} (contact below {AREA_TOL:g} mm^2 is not a "
                      "collision)")
+    _hinge_stop(report, lay, angles)
+
+
+def _hinge_stop(report: Report, lay: Layout, angles: list[float]) -> None:
+    """R2: the hinge's own stop (``hinge.stop_faces``).  At each lid knuckle
+    the lid -- its profile and the knuckle's tab, turned here by
+    ``lid_point_open`` -- misses the base's stop block at every sweep angle
+    short of LID_OPEN_DEG and is more than STOP_TOUCH off it a degree short;
+    at LID_OPEN_DEG it is within STOP_TOUCH of it without overlapping; a
+    degree past, it overlaps it."""
+    names = ("hinge stop clear: the lid misses each stop block short of LID_OPEN_DEG",
+             "hinge stop lands: each lid knuckle's tab on its stop block at LID_OPEN_DEG",
+             "hinge stop blocks: the lid can't open a degree past LID_OPEN_DEG")
+    try:
+        stops = H.stop_faces(lay)
+    except ValueError as e:
+        for what in names:
+            report.check(False, what, f"no stop: {e}")
+        return
+    lid = lay.lid_outer
+    corners = ((lid.y0, lid.z0), (lid.y1, lid.z0), (lid.y1, lid.z1), (lid.y0, lid.z1))
+    a = L.LID_OPEN_DEG
+
+    def lid_at(s: H.Stop, deg: float):
+        return Polygon([lid_point_open(lay, y, z, deg) for y, z in corners]).union(
+            Polygon([lid_point_open(lay, y, z, deg) for y, z in s.tab]))
+
+    clear, short, land, over, past = [], [], [], [], []
+    for s in stops:
+        block = Polygon(s.block)
+        clear.append(max(lid_at(s, d).intersection(block).area for d in angles if d < a))
+        short.append(lid_at(s, a - 1.0).distance(block))
+        at = lid_at(s, a)
+        land.append(at.distance(block))
+        over.append(at.intersection(block).area)
+        past.append(lid_at(s, a + 1.0).intersection(block).area)
+    n = f"{len(stops)} stops (X " + ", ".join(f"{_f(s.x0)}..{_f(s.x1)}" for s in stops) + ")"
+    report.check(max(clear) <= AREA_TOL and min(short) > STOP_TOUCH, names[0],
+                 f"{n}: largest YZ overlap {max(clear):.3g} mm^2 over 0..{a - 1:g} deg; "
+                 f"{min(short):.3f} mm apart at {a - 1:g} deg (> {STOP_TOUCH:g})")
+    report.check(max(land) <= STOP_TOUCH and max(over) <= AREA_TOL, names[1],
+                 f"{n}: {max(land):.3f} mm apart (<= {STOP_TOUCH:g}), overlap "
+                 f"{max(over):.3g} mm^2 at {a:g} deg")
+    report.check(min(past) > AREA_TOL, names[2],
+                 f"{n}: overlap {min(past):.3g} mm^2 at {a + 1:g} deg")
 
 
 def cables_route(report: Report, lay: Layout) -> None:

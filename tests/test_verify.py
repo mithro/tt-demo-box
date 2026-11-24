@@ -249,10 +249,104 @@ def test_hinge_sweep_fails_with_a_knuckle_over_the_bank(lay):
     assert any(L.DESIGN_BANK in f for f in failed), failed
 
 
+def test_hinge_sweep_keeps_knuckles_fit_off_the_bank_bay(lay):
+    """R19, R23 in verify: knuckle_x built with no FIT margin along X (a
+    knuckle range touching the bank bay's end) fails hinge_sweep, naming the
+    bank bay; the real knuckle_x passes."""
+    bare = replace(lay, knuckle_x=L._knuckle_x(lay, margin=0.0))
+    assert bare.knuckle_x != lay.knuckle_x
+    failed = _failed(_run(C.hinge_sweep, bare))
+    assert failed and all("knuckle" in f for f in failed), failed
+    assert any("bank bay" in f for f in failed), failed
+
+
 def test_hinge_sweep_needs_two_knuckle_ranges(lay):
     few = replace(lay, knuckle_x=lay.knuckle_x[:1])
     failed = _failed(_run(C.hinge_sweep, few))
     assert any("KNUCKLE_LEN" in f for f in failed), failed
+
+
+def test_hinge_sweep_proves_the_stop(lay):
+    """R2: hinge_sweep checks the hinge's stop (``hinge.stop_faces``): each lid
+    knuckle's tab clear of its block short of LID_OPEN_DEG, on it at
+    LID_OPEN_DEG, blocked past it."""
+    from demobox.shared import hinge as H
+    r = _run(C.hinge_sweep, lay)
+    stop = [(ok, what, detail) for ok, what, detail in r.results if "stop" in what]
+    assert len(stop) == 3, stop
+    assert all(ok for ok, _, _ in stop), stop
+    assert all(f"{len(H.stop_faces(lay))} stops" in detail for _, _, detail in stop), stop
+
+
+def _stops_moved(dy, dz):
+    from demobox.shared import hinge as H
+    real = H.stop_faces
+
+    def moved(lay):
+        return tuple(replace(s, block=tuple((y + dy, z + dz) for y, z in s.block))
+                     for s in real(lay))
+    return moved
+
+
+@pytest.mark.parametrize("dy,dz,why", [
+    (0.0, -0.5, "lands"),        # the block 0.5 mm low: the lid opens past the stop
+    (0.0, -5.0, "blocks"),       # far too low: nothing stops the lid a degree past
+    (0.0, 0.3, "clear"),         # 0.3 mm high: the lid hits it before the stop
+])
+def test_hinge_sweep_fails_with_the_stop_moved(lay, monkeypatch, dy, dz, why):
+    from demobox.shared import hinge as H
+    monkeypatch.setattr(H, "stop_faces", _stops_moved(dy, dz))
+    failed = _failed(_run(C.hinge_sweep, lay))
+    assert failed and all("stop" in f for f in failed), failed
+    assert any(why in f for f in failed), failed
+
+
+def test_hinge_sweep_fails_with_no_lid_knuckle(lay):
+    """A knuckle_x holding a single knuckle has no base knuckle to pair with:
+    a stop failure, not a crash."""
+    x0 = max(lay.knuckle_x, key=lambda r: r[1] - r[0])[0]
+    one = replace(lay, knuckle_x=((x0, x0 + L.KNUCKLE_LEN),))
+    failed = _failed(_run(C.hinge_sweep, one))
+    assert any("stop" in f for f in failed), failed
+
+
+def _bead_scaled(k, du=0.0):
+    """``hinge.bead_yz`` scaled by k about the axis, its front moved du."""
+    from demobox.shared import hinge as H
+    real = H.bead_yz
+
+    def scaled(lay):
+        hy, hz = lay.hinge_axis
+        return tuple((hy + k * (y - hy) + (du if y - hy < EPS_U else 0.0), hz + k * (z - hz))
+                     for y, z in real(lay))
+    return scaled
+
+
+EPS_U = -0.4     # bead points in front of this u (only its front edge) move by du
+
+
+def test_hinge_sweep_open_segments_take_the_intact_base_and_bead(lay):
+    """R21: the open-segment check names the intact base walls and the bead."""
+    r = _run(C.hinge_sweep, lay)
+    opens = [what for ok, what, _ in r.results if what.startswith("open segments")]
+    assert opens and all("intact" in w and "seal bead" in w for w in opens), opens
+
+
+def test_hinge_sweep_fails_with_the_bead_too_big(lay, monkeypatch):
+    """The bead grown past the lid's relief: the lid meets it, hinge_sweep fails."""
+    from demobox.shared import hinge as H
+    monkeypatch.setattr(H, "bead_yz", _bead_scaled(1.15))
+    failed = _failed(_run(C.hinge_sweep, lay))
+    assert failed and all("open segments" in f for f in failed), failed
+    assert any("(seal bead at" in f for f in failed), failed
+
+
+def test_bank_lifts_out_fails_with_the_bead_over_the_bank(lay, monkeypatch):
+    """The bead reaching 3 mm over the bank row: the bank can't lift straight out."""
+    from demobox.shared import hinge as H
+    monkeypatch.setattr(H, "bead_yz", _bead_scaled(1.0, du=-3.0))
+    failed = _failed(_run(C.bank_lifts_out, lay))
+    assert failed and any("seal bead" in f for f in failed), failed
 
 
 # --- the pigtail path ---------------------------------------------------------------

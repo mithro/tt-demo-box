@@ -16,7 +16,10 @@ The claims, each a function in ``demobox.checks``, run against
   base, and the board can't lift off its pins;
 * ``hinge_sweep``: every degree from closed to its open angle, the lid
   misses everything in the base: whole where the knuckles go (``knuckle_x``),
-  cut back to the hinge relief elsewhere;
+  cut back to the hinge relief elsewhere, against the intact base and its
+  seal bead; and the hinge's own stop holds it there: each lid knuckle's tab
+  lands on its stop block at LID_OPEN_DEG, not before, and blocks it a
+  degree past;
 * ``cables_route``: the monitor's pigtail reaches the VGA plug's stiff run
   (in the bank row's back corner) through the hinge notch, within its length
   and bend radius at every angle, and the bank's USB cable reaches J1;
