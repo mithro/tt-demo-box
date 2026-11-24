@@ -419,3 +419,18 @@ def test_stamp_is_order_independent_and_short():
     a = K.stamp({"demobox": "1" * 40, "Makefile": "2" * 40})
     assert a == K.stamp({"Makefile": "2" * 40, "demobox": "1" * 40})
     assert len(a) == K.STAMP_LEN and a != K.stamp({"demobox": "1" * 40, "Makefile": "3" * 40})
+
+
+def test_base_depth_reads_the_same_on_every_sheet():
+    """The printed base's depth (174.755) once read 174.75 on BASE-P and
+    LID-P (a solid's bounding box) and 174.76 on the GA (the layout): one
+    rounding source now, so every sheet carries one figure."""
+    from demobox.geom import mm
+    from demobox.layout import ROUTES, layout
+    d = layout(ROUTES["printed"]).outer.size[1]
+    want, lo = mm(d), f"{d - 0.005:.2f}"
+    assert want == "174.76"
+    for n in ("TDB-GA-P", "TDB-BASE-P", "TDB-LID-P"):
+        words = _sheet_words(n)
+        assert want in words, n
+        assert lo not in words, n

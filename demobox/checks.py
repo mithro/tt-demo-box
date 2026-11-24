@@ -35,7 +35,7 @@ import demobox  # noqa: F401  (puts the submodule on sys.path)
 from shapely.geometry import Point, Polygon, box as sbox
 
 from demobox import layout as L
-from demobox.geom import Box, overlaps
+from demobox.geom import Box, mm, overlaps
 from demobox.shared import hinge as H
 from demobox.layout import FINGERTIP_D, SLACK, Layout, exit_edge, tinyvga_offset
 from demobox.parts import board as board_mod
@@ -100,7 +100,7 @@ def _placeholders(sources) -> str:
 
 
 def _f(x: float) -> str:
-    return f"{x:.2f}"
+    return mm(x)
 
 
 def _xy_overlap(a: Box, b: Box) -> bool:
