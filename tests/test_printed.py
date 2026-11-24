@@ -1,4 +1,4 @@
-"""The 3D-printed body (route "printed", ``layout(2.4)``) and its assembly."""
+"""The 3D-printed route (``layout(2.4)``): base, lid, loose pin, assembly."""
 
 import math
 
@@ -9,11 +9,11 @@ from demobox import checks as C
 from demobox import layout as L
 from demobox.clash import clashes
 from demobox.geom import BedOverflow
-from demobox.parts.batteries import BATTERIES
-from demobox.parts.monitors import MONITORS
+from demobox.parts.board import BOARD_KEYS
 from demobox.printed import body as B
 from demobox.shared import hinge as H
-from demobox.shared import inserts as I
+from demobox.shared import pin as P
+
 
 @pytest.fixture(scope="module")
 def lay():
@@ -25,325 +25,372 @@ def parts(lay):
     return B.printed_parts(lay)
 
 
+@pytest.fixture(scope="module")
+def base(lay):
+    return B.base(lay)
+
+
+@pytest.fixture(scope="module")
+def lid(lay):
+    return B.lid(lay)
+
+
 def _inside(shape, p) -> bool:
     return shape.isInside(cq.Vector(*p), 1e-4)
 
 
-# --- the parts list ------------------------------------------------------------
-
-def test_parts_list(parts):
-    want = {"base", "deck", "lid", "drawer", "hinge-base", "hinge-lid", "mt1-pin", "bezel-clip"}
-    want |= {f"bezel-{k}" for k in MONITORS} | {f"retainer-{k}" for k in MONITORS}
-    want |= {f"packing-{k}" for k in BATTERIES}
-    assert set(parts) == want
+def _common(a, b) -> float:
+    return a.intersect(b).Volume()
 
 
-def test_every_part_is_one_valid_solid(parts):
+def _box(x0, y0, z0, x1, y1, z1) -> cq.Solid:
+    return cq.Solid.makeBox(x1 - x0, y1 - y0, z1 - z0, cq.Vector(x0, y0, z0))
+
+
+def _rod(lay) -> cq.Solid:
+    hy, hz = lay.hinge_axis
+    length = H.pin_length(lay)
+    return cq.Solid.makeCylinder(L.PIN_ROD_D / 2, length,
+                                 cq.Vector(lay.outer.x1 - length, hy, hz), cq.Vector(1, 0, 0))
+
+
+def _in_lid_frame(lay, p):
+    """A base-frame point of the closed box, in the lid frame."""
+    hy, hz = lay.hinge_axis
+    return (p[0], p[1] - hy, p[2] - hz)
+
+
+# --- the parts list and the bed -------------------------------------------------
+
+def test_parts_are_single_valid_solids(parts):
+    assert set(parts) == {"base", "lid", "mt1-pin"}
     for name, p in parts.items():
-        solids = p.solid.Solids()
-        assert len(solids) == 1, (name, len(solids))
+        assert len(p.solid.Solids()) == 1, name
         assert p.solid.isValid(), name
         assert p.note, name
 
 
-def test_every_part_fits_the_bed_in_its_print_orientation(parts):
+def test_parts_fit_the_bed(parts):
+    """Each footprint is within 220 x 220 in its print orientation, lying on
+    a flat face at Z = 0."""
     for name, p in parts.items():
         bb = B.posed(p).BoundingBox()
-        assert bb.xmin == pytest.approx(0.0, abs=1e-6) and bb.ymin == pytest.approx(0.0, abs=1e-6)
-        assert bb.zmin == pytest.approx(0.0, abs=1e-6), name
+        assert (bb.xmin, bb.ymin, bb.zmin) == pytest.approx((0, 0, 0), abs=1e-6), name
         assert bb.xlen <= L.PRINT_BED[0] + 1e-6 and bb.ylen <= L.PRINT_BED[1] + 1e-6, \
             (name, bb.xlen, bb.ylen)
-
-
-def test_print_orientation_puts_a_face_on_the_bed(parts):
-    """The pose puts a flat face of every part at Z = 0, and for the bodies
-    it is the face they are designed to print on."""
-    for name, p in parts.items():
         assert B.bed_contact_area(B.posed(p)) > 0, name
-    o = L.layout(2.4).outer
-    assert B.posed(parts["base"]).BoundingBox().zlen == pytest.approx(o.size[2])   # floor down
-    assert B.posed(parts["lid"]).BoundingBox().zlen == pytest.approx(
-        L.layout(2.4).lid_outer.size[2])                        # back down, nothing proud
+
+
+def test_print_orientations(parts, lay):
+    """The base prints floor down, the lid top plate down, the pin standing."""
+    o, lo, w = lay.outer, lay.lid_outer, lay.wall
+    base = B.posed(parts["base"])
+    assert B.bed_contact_area(base) == pytest.approx(o.size[0] * o.size[1], rel=1e-3)
     lid = B.posed(parts["lid"])
-    # back plate down: the pocket opens upwards, so its centre is empty high up
+    assert B.bed_contact_area(lid) == pytest.approx(lo.size[0] * lo.size[1], rel=1e-3)
     bb = lid.BoundingBox()
-    assert not _inside(lid, (bb.xlen / 2, bb.ylen / 2, bb.zlen - 1.0))
-    assert _inside(lid, (bb.xlen / 2, bb.ylen / 2, 1.0))
+    assert _inside(lid, (bb.xlen / 2, bb.ylen / 2, w / 2))              # the top plate
+    assert not _inside(lid, (bb.xlen / 2, bb.ylen / 2, w + 1.0))         # the tray, open up
+    pin = B.posed(parts["mt1-pin"]).BoundingBox()
+    assert pin.zlen > pin.xlen                                            # standing
 
 
-def test_oversized_part_raises_bed_overflow_naming_part_and_size(lay):
-    """Review Focus 5: a part that does not fit fails the export, naming it."""
-    drawer = B.drawer(lay)
-    with pytest.raises(BedOverflow, match=r"drawer 197\.80 x 88\.10 mm"):
-        B.check_bed("drawer", drawer, (150.0, 220.0))
-    with pytest.raises(BedOverflow, match=r"drawer 197\.80 x 88\.10 mm"):
-        B.printed_parts(lay, bed=(190.0, 220.0))
+def test_oversized_part_raises_bed_overflow(parts):
+    with pytest.raises(BedOverflow, match=r"base 197\.70 x 174\.76 mm"):
+        B.check_bed("base", B.posed(parts["base"]), (150.0, 220.0))
 
 
-def test_unsplittable_body_raises_bed_overflow(lay):
-    """Halves that still do not fit are a BedOverflow, not an unprintable STL."""
-    with pytest.raises(BedOverflow, match=r"base 214\.50 x 210\.25 mm"):
-        B.split_base(lay, bed=(100.0, 220.0))
+# --- hardware ---------------------------------------------------------------------
+
+def test_hardware_exact(lay):
+    rod = H.pin_length(lay)
+    assert B.hardware(lay) == {
+        "6 x 3 mm disc magnet": 4,
+        f"3 mm rod x {rod:.0f} mm (hinge pin; steel, or 2.85 mm filament)": 1,
+        "double-sided foam tape (VHB type), monitor back and boost module": 1,
+    }
+    assert f"{rod:.0f}" == "41"     # R24: 156.9 .. 197.7
 
 
-# --- the split -----------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def split(lay):
-    return B.split_base(lay, bed=(200.0, 220.0))
-
-
-def test_over_bed_base_splits_left_and_right(split):
-    pieces, info = split
-    assert set(pieces) == {"base-left", "base-right", "deck-left", "deck-right"}
-    for name, p in pieces.items():
-        bb = B.posed(p).BoundingBox()
-        assert bb.xlen <= 200.0 + 1e-6 and bb.ylen <= 220.0 + 1e-6, name
-        assert len(p.solid.Solids()) == 1, name
-    assert info.axis == "x"
-    assert pieces["base-left"].solid.BoundingBox().xmax == pytest.approx(info.at, abs=1e-6)
-    assert pieces["base-right"].solid.BoundingBox().xmin == pytest.approx(info.at, abs=1e-6)
+def test_no_fasteners_anywhere(lay):
+    for key in B.hardware(lay):
+        for word in ("M3", "screw", "nut", "insert"):
+            assert word.lower() not in key.lower(), key
 
 
-def test_split_is_at_the_shortest_section(lay, split):
-    _, info = split
-    tub = B.base_tub(lay)
-    best = B.section_area(tub, "x", info.at)
-    for s in info.candidates:
-        assert best <= B.section_area(tub, "x", s) + 1e-6, s
+# --- nothing proud ----------------------------------------------------------------
+
+def test_nothing_proud(lay):
+    """Review Focus 5: shut, every part's bounding box is within the base's
+    outline united with the closed lid's."""
+    o = lay.outer
+    top = lay.hinge_axis[1] + lay.lid_outer.z1
+    for name, s, _ in B.assembly("printed", 0.0, False):
+        bb = s.BoundingBox()
+        assert bb.xmin >= o.x0 - 1e-6 and bb.xmax <= o.x1 + 1e-6, (name, bb.xmin, bb.xmax)
+        assert bb.ymin >= o.y0 - 1e-6 and bb.ymax <= o.y1 + 1e-6, (name, bb.ymin, bb.ymax)
+        assert bb.zmin >= o.z0 - 1e-6 and bb.zmax <= top + 1e-6, (name, bb.zmin, bb.zmax)
 
 
-# --- heat-set inserts ----------------------------------------------------------
+# --- the catch ---------------------------------------------------------------------
 
-# --- features ----------------------------------------------------------------------
+def _pocket_checks(solid, c, open_z, into):
+    """A pocket ``MAGNET_D + 0.2`` across and ``MAGNET_T + MAGNET_RECESS``
+    deep from the face at ``open_z``, going ``into`` (+1 up, -1 down)."""
+    r = (L.MAGNET_D + 0.2) / 2
+    depth = L.MAGNET_T + L.MAGNET_RECESS
+    for dz in (0.1, depth / 2, depth - 0.1):
+        z = open_z + into * dz
+        assert not _inside(solid, (c.cx, c.cy, z))
+        assert not _inside(solid, (c.cx + r - 0.05, c.cy, z))
+        assert _inside(solid, (c.cx + r + 0.05, c.cy, z))
+    assert _inside(solid, (c.cx, c.cy, open_z + into * (depth + 0.1)))   # its floor
 
-def test_knuckle_relief_round_the_axis(parts, lay):
-    """Carry-forward 1: base and lid are cut back to KNUCKLE_R + FIT round the
-    hinge axis along each knuckle group, and kept elsewhere."""
+
+def test_magnet_pockets_flush(lay, base, lid):
+    """Two pockets each side, open at the seam; the magnet in each sits
+    MAGNET_RECESS under the face, nothing proud."""
+    for c in lay.lid_catch:
+        assert c.z1 == pytest.approx(lay.rim_z - L.MAGNET_RECESS)
+        _pocket_checks(base, c, lay.rim_z, -1)
+        m = lay.catch_lid_magnet(c)
+        assert m.z0 == pytest.approx(L.MAGNET_RECESS)
+        _pocket_checks(lid, m, 0.0, +1)
+
+
+# --- the plinth and pins -------------------------------------------------------------
+
+def _plinth_samples(lay, step=5.0):
+    pl, rl = lay.plinth, lay.plinth_relief
+    pins = list(lay.pins.values())
+    x = pl.x0 + 0.5
+    while x < pl.x1:
+        y = pl.y0 + 0.5
+        while y < pl.y1:
+            near_pin = any(math.hypot(x - p.cx, y - p.cy) < L.PEG_HOLE_D / 2 + 0.3 for p in pins)
+            in_relief = rl.x0 - 0.3 < x < rl.x1 + 0.3 and rl.y0 - 0.3 < y < rl.y1 + 0.3
+            if not near_pin and not in_relief:
+                yield x, y
+            y += step
+        x += step
+
+
+def test_plinth_top_level(lay, base):
+    """The plinth's top is one flat face at the PCB underside: solid a full
+    wall thick under it, and nothing above it but the MT2 pin."""
+    pl = lay.plinth
+    assert pl.z1 == pytest.approx(lay.board_origin[2])
+    for x, y in _plinth_samples(lay):
+        assert _inside(base, (x, y, pl.z1 - 0.1)), (x, y)
+        assert _inside(base, (x, y, pl.z1 - lay.wall + 0.1)), (x, y)
+        assert not _inside(base, (x, y, pl.z1 + 0.1)), (x, y)
+    faces = [f for f in base.Faces() if f.geomType() == "PLANE"
+             and abs(f.BoundingBox().zmin - pl.z1) < 1e-6
+             and abs(f.BoundingBox().zmax - pl.z1) < 1e-6]
+    assert len(faces) == 1
+    bb = faces[0].BoundingBox()
+    assert (bb.xmin, bb.ymin, bb.xmax, bb.ymax) == pytest.approx((pl.x0, pl.y0, pl.x1, pl.y1))
+
+
+def test_plinth_relief_keeps_a_wall_under_it(lay, base):
+    r = lay.plinth_relief
+    cx, cy = (max(r.x0, lay.plinth.x0) + r.x1) / 2, (r.y0 + r.y1) / 2
+    assert not _inside(base, (cx, cy, r.z0 + 0.1))
+    assert _inside(base, (cx, cy, r.z0 - 0.1))
+    assert _inside(base, (cx, cy, r.z0 - lay.wall + 0.1))
+
+
+def test_plinth_is_hollow_but_never_thin(lay, base):
+    """Hollow underneath (it saves material), its top and sides ``wall``
+    thick, ribs no further apart than RIB_SPAN_MAX so the top bridges."""
+    pl, w = lay.plinth, lay.wall
+    solid = _box(pl.x0, pl.y0, pl.z0, pl.x1, pl.y1, pl.z1)
+    assert _common(base, solid) < 0.6 * solid.Volume()
+    cells = B.plinth_cells(lay)
+    assert cells
+    for c in cells:
+        assert c.size[0] <= B.RIB_SPAN_MAX + 1e-6 and c.size[1] <= B.RIB_SPAN_MAX + 1e-6
+        assert c.x0 >= pl.x0 + w - 1e-6 and c.x1 <= pl.x1 - w + 1e-6
+        assert c.y0 >= pl.y0 + w - 1e-6 and c.y1 <= pl.y1 - w + 1e-6
+        assert c.z1 <= pl.z1 - w + 1e-6
+    for a in cells:
+        for b in cells:
+            if a is not b:
+                gap = max(b.x0 - a.x1, a.x0 - b.x1, b.y0 - a.y1, a.y0 - b.y1)
+                assert gap >= w - 1e-6
+    zm, ym = (pl.z0 + pl.z1) / 2, (pl.y0 + pl.y1) / 2
+    assert _inside(base, (pl.x0 + w - 0.1, ym, zm)) and _inside(base, (pl.x1 - w + 0.1, ym, zm))
+
+
+def test_mt1_holes_go_to_the_floor(lay, base):
+    depth = P.socket_depth(lay)
+    r = L.PEG_HOLE_D / 2
+    for rev in BOARD_KEYS:
+        p = lay.pins[f"{rev}/MT1"]
+        bottom = p.z0 - depth
+        assert bottom == pytest.approx(lay.wall)                  # the floor's top
+        for z in (bottom + 0.1, (bottom + p.z0) / 2, p.z0 - 0.1):
+            assert not _inside(base, (p.cx, p.cy, z)), (rev, z)
+            assert not _inside(base, (p.cx + r - 0.05, p.cy, z)), (rev, z)
+            assert _inside(base, (p.cx + r + 0.05, p.cy, z)), (rev, z)
+        assert _inside(base, (p.cx, p.cy, bottom - 0.1))
+        assert not _inside(base, (p.cx, p.cy, p.z0 + 0.5))       # no fixed pin there
+
+
+def test_mt2_pin_is_integral(lay, base):
+    p = lay.pins["MT2"]
+    zm = (p.z0 + p.z1) / 2
+    assert _inside(base, (p.cx, p.cy, p.z0 + 0.5))
+    assert _inside(base, (p.cx, p.cy, p.z1 - 0.1))
+    assert _inside(base, (p.cx + p.r - 0.05, p.cy, zm))
+    assert not _inside(base, (p.cx + p.r + 0.05, p.cy, zm))
+    assert not _inside(base, (p.cx, p.cy, p.z1 + 0.1))
+
+
+# --- the hinge -------------------------------------------------------------------
+
+def test_knuckles_are_built_in(lay, base, lid):
+    """Each knuckle is part of its own part's solid, and the other part is
+    cut back there (closed)."""
     hy, hz = lay.hinge_axis
-    r = H.KNUCKLE_R + L.FIT
-    u = lay.wall / 2                                   # mid-wall
-    v_in = math.sqrt((r - 0.1) ** 2 - u ** 2)          # just inside the relief
-    v_out = math.sqrt((r + 0.3) ** 2 - u ** 2)         # just outside it
-    for x0, x1 in H.hinge_groups(lay):
-        for x in (x0 + 0.5, (x0 + x1) / 2, x1 - 0.5):
-            assert not _inside(parts["base"].solid, (x, hy - u, hz - v_in))
-            assert _inside(parts["base"].solid, (x, hy - u, hz - v_out))
-            assert not _inside(parts["lid"].solid, (x, -u, v_in))
-            assert _inside(parts["lid"].solid, (x, -u, v_out))
-    # beside the groups the corner is kept
-    x = H.hinge_groups(lay)[0][1] + 5.0
-    assert _inside(parts["base"].solid, (x, hy - u, hz - v_in))
+    for k in H.knuckle_plan(lay):
+        xm = (k.x0 + k.x1) / 2
+        low, high = (xm, hy - 2.5, hz - 2.5), (xm, hy - 2.5, hz + 2.5)
+        if k.part == "base":
+            assert _inside(base, low) and _inside(base, high), k
+            assert not _inside(lid, _in_lid_frame(lay, high)), k
+        else:
+            assert _inside(lid, _in_lid_frame(lay, low)), k
+            assert _inside(lid, _in_lid_frame(lay, high)), k
+            assert not _inside(base, low) and not _inside(base, high), k
 
 
-def test_hinge_cable_channel_split_between_base_and_lid(parts, lay):
-    """Carry-forward 5: the channel's base part is cut from the base (deck to
-    the axis), its lid part from the lid, in the lid frame."""
-    base_part, lid_part = B.channel_parts(lay)
-    c = lay.hinge_cable_channel
+def test_rod_runs_in_the_bores(lay, base, lid):
+    """The rod is a slip fit in the base knuckle, and in the lid knuckles but
+    for the last PRESS_LEN, the press fit (R24)."""
+    rod = _rod(lay)
+    assert _common(rod, base) < 1e-3
+    ring = math.pi * ((L.PIN_ROD_D / 2) ** 2 - (H.PRESS_D / 2) ** 2) * H.PRESS_LEN
+    assert _common(rod, lid.moved(lay.lid_location(0.0))) == pytest.approx(ring, rel=0.05)
+
+
+def test_seal_bead_on_the_base(lay, base):
     hy, hz = lay.hinge_axis
-    assert base_part.z1 == pytest.approx(hz) and lid_part.z0 == pytest.approx(0.0)
-    assert lid_part.y1 == pytest.approx(0.0) and lid_part.z1 == pytest.approx(c.z1 - hz)
-    cx = (c.x0 + c.x1) / 2
-    # the back wall is open across the channel, closed beside it
-    assert not _inside(parts["base"].solid, (cx, hy - lay.wall / 2, (lay.deck_z + hz) / 2))
-    assert _inside(parts["base"].solid, (c.x1 + 5.0, hy - lay.wall / 2, (lay.deck_z + hz) / 2))
-    # ... and so is the lid's hinge-end wall
-    assert not _inside(parts["lid"].solid, (cx, -lay.wall / 2, lid_part.z1 / 2))
-    assert _inside(parts["lid"].solid, (c.x1 + 5.0, -lay.wall / 2, lid_part.z1 / 2))
+    for x0, x1 in H.bead_x(lay):
+        assert _inside(base, ((x0 + x1) / 2, hy + 1.0, hz + 2.0))
 
 
-def test_mt1_boss_has_a_peg_hole_per_revision(parts, lay):
-    deck = parts["deck"].solid
-    for peg in lay.pegs.values():
-        assert not _inside(deck, (peg.cx, peg.cy, lay.deck_z + 1.0))
-        assert _inside(deck, (peg.cx + peg.r + 0.3, peg.cy, lay.deck_z + 1.0))
+def test_notch_is_clear(lay, base, lid):
+    n = lay.hinge_notch
+    hy, hz = lay.hinge_axis
+    xm = (n.x0 + n.x1) / 2
+    for dy in (-3.5, 0.0, 2.0, 3.5):
+        for dz in (-3.5, -0.5, 0.5, 3.5):
+            p = (xm, hy + dy, hz + dz)
+            assert not _inside(base, p), p
+            assert not _inside(lid, _in_lid_frame(lay, p)), p
 
 
-def test_boost_pocket_is_clear(parts, lay):
-    b = lay.boost_pocket
-    box = cq.Solid.makeBox(*b.size, cq.Vector(b.x0, b.y0, b.z0))
-    assert parts["base"].solid.intersect(box).Volume() <= 1e-6
+# --- the lid --------------------------------------------------------------------------
+
+def test_lid_inside_face_is_flat(lay, lid):
+    """No pocket for the monitor, nor for the boost (R25): a flat inside face
+    over the whole tray, ``wall`` thick, for the tape."""
+    z = lay.lid_outer.z1 - lay.wall
+    for b in (lay.monitor_space, lay.lid_strip, lay.boost_pocket):
+        for fx in (0.1, 0.5, 0.9):
+            for fy in (0.1, 0.5, 0.9):
+                x, y = b.x0 + fx * b.size[0], b.y0 + fy * b.size[1]
+                assert _inside(lid, (x, y, z + 0.1)), (b.what, x, y)
+                assert not _inside(lid, (x, y, z - 0.1)), (b.what, x, y)
 
 
-# --- assembly ----------------------------------------------------------------------
+# --- what the base must not block -------------------------------------------------------
 
-def _clashes(items):
-    return clashes(items, B.DECLARED_OVERLAPS)
+def _tube(pts, r):
+    shapes = [cq.Solid.makeSphere(r, cq.Vector(*p), angleDegrees1=-90, angleDegrees2=90)
+              for p in pts]
+    for a, b in zip(pts, pts[1:]):
+        d = cq.Vector(*b) - cq.Vector(*a)
+        if d.Length > 1e-9:
+            shapes.append(cq.Solid.makeCylinder(r, d.Length, cq.Vector(*a), d.normalized()))
+    return shapes[0].fuse(*shapes[1:]).clean()
 
 
 @pytest.mark.parametrize("angle", [0.0, L.LID_OPEN_DEG])
-def test_assembly_has_no_intersections(angle):
-    items = B.assembly("printed", angle, 0.0)
-    names = [n for n, _, _ in items]
+@pytest.mark.parametrize("rev", BOARD_KEYS)
+def test_pigtail_misses_the_solids(lay, base, lid, angle, rev):
+    """``checks.pigtail_path``, swept as a cable-thick (5 mm) tube, misses
+    the base and the lid."""
+    assert C.PIGTAIL.dia == 5.0
+    tube = _tube(C.pigtail_path(lay, angle, rev), C.PIGTAIL.dia / 2)
+    assert _common(tube, base) < 1e-3
+    assert _common(tube, lid.moved(lay.lid_location(angle))) < 1e-3
+
+
+def test_bank_lifts_out_of_the_solids(lay, base, lid):
+    """At the stop nothing of the base or lid is over the packed bank: its
+    footprint, swept up from the bay floor, meets neither."""
+    b = C.packed_bank(lay)
+    sweep = _box(b.x0, b.y0, b.z0, b.x1, b.y1, lay.rim_z + 200.0)
+    assert _common(sweep, base) < 1e-3
+    assert _common(sweep, lid.moved(lay.lid_location(L.LID_OPEN_DEG))) < 1e-3
+
+
+@pytest.mark.parametrize("rev", BOARD_KEYS)
+def test_board_seats_on_the_plinth(lay, base, rev):
+    """The PCB rests on the plinth (touching, not in it) and the MT2 pin
+    passes through its hole."""
+    pcb = B.board_pcb(lay, rev)
+    assert _common(pcb, base) < 1e-3
+    assert _common(pcb.translate(cq.Vector(0, 0, -0.1)), base) > 1.0
+
+
+# --- the assembly -----------------------------------------------------------------------
+
+def test_assembly_parts(lay):
+    names = [n for n, _, _ in B.assembly("printed", 0.0, False)]
     assert len(names) == len(set(names))
-    for n in ("base", "deck", "lid", "drawer", "hinge-base", "hinge-lid"):
-        assert n in names
-    assert _clashes(items) == []
+    want = {"base", "lid", "mt1-pin", "board", "tinyvga", "vga-plug", "monitor", "bank",
+            "hw:hinge-rod"}
+    want |= {f"hw:catch-magnet-{s}-{i}" for s in ("base", "lid") for i in (1, 2)}
+    if lay.boost_in_lid:
+        want.add("boost")
+    assert set(names) == want
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize("key", sorted(MONITORS))
-def test_assembly_each_monitor(key):
-    items = B.assembly("printed", 0.0, 0.0, monitor=key)
-    assert _clashes(items) == []
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("key", sorted(BATTERIES))
-def test_assembly_each_bank(key):
-    items = B.assembly("printed", 0.0, 0.0, bank=key)
-    assert _clashes(items) == []
+def test_assembly_bank_out_is_lifted(lay):
+    shut = {n: s for n, s, _ in B.assembly("printed", L.LID_OPEN_DEG, False)}
+    out = {n: s for n, s, _ in B.assembly("printed", L.LID_OPEN_DEG, True)}
+    assert B.BANK_OUT_LIFT == 60.0
+    assert out["bank"].BoundingBox().zmin == pytest.approx(lay.rim_z + B.BANK_OUT_LIFT)
+    assert shut["bank"].BoundingBox().zmin == pytest.approx(lay.bank_bay.z0)
 
 
 def test_assembly_lid_turns_about_the_axis(lay):
-    closed = dict((n, s) for n, s, _ in B.assembly("printed", 0.0, 0.0))
-    opened = dict((n, s) for n, s, _ in B.assembly("printed", L.LID_OPEN_DEG, 0.0))
-    assert closed["lid"].BoundingBox().zmin == pytest.approx(lay.outer.z1)
-    assert opened["lid"].BoundingBox().zmax > lay.outer.z1 + 150.0
-    assert closed["base"].BoundingBox().xlen == opened["base"].BoundingBox().xlen
+    shut = {n: s for n, s, _ in B.assembly("printed", 0.0, False)}
+    open_ = {n: s for n, s, _ in B.assembly("printed", L.LID_OPEN_DEG, False)}
+    for n in ("lid", "monitor"):
+        assert shut[n].Volume() == pytest.approx(open_[n].Volume())
+    assert open_["lid"].BoundingBox().zmax > shut["lid"].BoundingBox().zmax + 100
 
 
 def test_assembly_unknown_route():
     with pytest.raises(ValueError, match="unknown route"):
-        B.assembly("cnc", 0.0, 0.0)
+        B.assembly("cardboard", 0.0, False)
 
 
-def test_over_bed_lid_splits_with_joints(lay):
-    """The lid splits like the base on a bed narrower than it (but wide
-    enough for the bezel), joined at its front band and hinge-end gutter."""
-    pieces, info = B.split_lid(lay, bed=(210.0, 220.0))
-    assert set(pieces) == {"lid-left", "lid-right"}
-    assert {j.wall for j in info.joints} == {"front", "hinge"}
-    for name, p in pieces.items():
-        bb = B.posed(p).BoundingBox()
-        assert bb.xlen <= 210.0 + 1e-6 and bb.ylen <= 220.0 + 1e-6, name
-    best = B.section_area(B.lid(lay), "x", info.at)
-    assert all(best <= B.section_area(B.lid(lay), "x", s) + 1e-6 for s in info.candidates)
-
-
-# --- R17: bezel clip; R18: no solid lumps; bridges; detent pad; hardware -------------
-
-def test_bezel_front_left_corner_is_clipped(lay, parts):
-    """R17: the opening corner without a bezel screw (the pocket's front-left)
-    is held by a flat printed clip screwed into a lid insert, clamping the
-    bezel's corner face to face; the clip prints flat and covers no window."""
-    x0, y0, x1, _ = I.lid_opening(lay)
-    screws = B.clip_screws(lay)
-    assert len(screws) == 1 and screws[0][0] < (x0 + x1) / 2      # front-left only
-    (sx, sy), = screws
-    clip = B.bezel_clip(lay, sx, sy)
-    bb = clip.BoundingBox()
-    assert bb.zmax == pytest.approx(0.0) and bb.zlen == pytest.approx(B.CLIP_T)
-    # it lies over the bezel's corner (in front of it, screen side) ...
-    assert _inside(clip, (x0 + L.FIT + 1.0, y0 + L.FIT + 1.0, -B.CLIP_T / 2))
-    assert bb.ymax == pytest.approx(y0 + L.FIT + B.CLIP_OVER)
-    for m in MONITORS.values():
-        bezel = I.monitor_bezel(m, lay).val()
-        assert clip.intersect(bezel).Volume() <= 1e-6
-        assert bezel.BoundingBox().zmin == pytest.approx(bb.zmax)   # clamps it
-        wx0, wy0, wx1, wy1 = I._panel_rect(m, lay, C.monitor_window(m))
-        assert bb.xmax <= wx0 or bb.xmin >= wx1 or bb.ymax <= wy0 or bb.ymin >= wy1
-    # ... its screw goes into the lid's insert, through the clip's hole
-    hs = [h for h in parts["lid"].heatsets if h.what == "clip screw (bezel corner)"]
-    assert [(round(h.at[0], 6), round(h.at[1], 6)) for h in hs] == [(round(sx, 6), round(sy, 6))]
-    assert not _inside(clip, (sx, sy, -B.CLIP_T / 2))
-    # printed flat: the whole plate is on the bed
-    p = parts["bezel-clip"]
-    assert B.bed_contact_area(B.posed(p)) == pytest.approx(clip.Volume() / B.CLIP_T)
-
-
-def test_lid_has_nothing_below_its_face(lay):
-    """Printed screen side up, nothing of the lid overhangs its face."""
-    assert B.lid(lay).BoundingBox().zmin == pytest.approx(0.0)
-
-
-def test_lid_front_band_is_hollow_and_ribbed(lay):
-    """R18, direct: the band's cells are empty but for the clip's boss and the
-    lid catch's blocks (R22), the
-    ribs between them are ``wall`` thick, and no cell (the screen-side skin's
-    bridge when printed) is wider than RIB_SPAN_MAX."""
-    lid, cells = B.lid(lay), B.front_cavities(lay)
-    assert len(cells) >= 2
-    assert max(c.size[1] for c in cells) <= B.RIB_SPAN_MAX
-    for a, b in zip(cells, cells[1:]):
-        assert b.y0 - a.y1 == pytest.approx(lay.wall)
-    bosses = [B.clip_boss(lay, x, y) for x, y in B.clip_screws(lay)]
-    bosses += [lay.catch_lid_block(c) for c in lay.lid_catch]
-    allowed = 0.0
-    for c in cells:
-        for b in bosses:
-            dx = min(b.x1, c.x1) - max(b.x0, c.x0)
-            dy = min(b.y1, c.y1) - max(b.y0, c.y0)
-            dz = min(b.z1, c.z1) - max(b.z0, c.z0)
-            allowed += max(dx, 0) * max(dy, 0) * max(dz, 0)
-    held = sum(lid.intersect(cq.Solid.makeBox(*c.size, cq.Vector(c.x0, c.y0, c.z0))).Volume()
-               for c in cells)
-    assert held <= allowed + 1e-3
-    assert sum(c.size[0] * c.size[1] * c.size[2] for c in cells) > 150_000   # really hollow
-
-
-def test_screw_heads_clear_when_shut_and_open():
-    """Bought hardware proud of the screen face (the bezel and clip screws'
-    pan heads) is in the assembly as keep-outs and clears everything."""
-    for angle in (0.0, L.LID_OPEN_DEG):
-        items = B.assembly("printed", angle, 0.0)
-        heads = [n for n, _, _ in items if n.startswith("hw:") and "magnet" not in n]
-        assert len(heads) == len(I.bezel_screws(L.layout(2.4))) + 1
-        assert _clashes(items) == []
-
-
-def test_bodies_have_no_solid_lumps(lay):
-    """R18, every body: mean thickness 2V/A at most MAX_MEAN_THICKNESS x wall
-    (justified in body's docstring)."""
-    for name, f in (("base", B.base_tub), ("deck", B.deck), ("drawer", B.drawer),
-                    ("lid", B.lid)):
-        t = B.mean_thickness(f(lay)) / lay.wall
-        assert t <= B.MAX_MEAN_THICKNESS, (name, t)
-
-
-def test_detent_groove_leaves_a_full_wall(lay):
-    """The front wall behind the detent groove is at least ``wall`` thick."""
-    tub = B.base_tub(lay)
-    det = B._detent(lay)
-    x, z = (det["g0"] + det["g1"]) / 2, (det["bz0"] + det["bz1"]) / 2
-    groove_bottom = lay.wall - B.GROOVE_D
-    assert not _inside(tub, (x, groove_bottom + 0.05, z))
-    assert _inside(tub, (x, groove_bottom - lay.wall + 0.05, z))
-
-
-def test_nothing_stands_below_the_printed_floor():
-    """R19, printed route: no screw goes through the tub's floor (its screws go
-    into heat-set inserts from inside or from the sides), so nothing stands
-    below Z = 0 and the box needs no feet."""
-    items = B.assembly("printed", 0.0, 0.0)
-    assert min(s.BoundingBox().zmin for _, s, _ in items) == pytest.approx(0.0, abs=1e-6)
-    assert not [n for n, _, _ in items if n.startswith("hw:") and "foot" in n]
-
-
-# --- screws into heat-set inserts (review fix round 1) ---------------------------
-
-@pytest.mark.slow
-@pytest.mark.parametrize("angle", range(10, 100, 10))
-def test_assembly_intermediate_lid_angles_have_no_intersections(angle):
-    """The lid's whole swing, not just shut and fully open (finding 7)."""
-    assert _clashes(B.assembly("printed", float(angle), 0.0)) == []
+def _cases():
+    out = [(rev, float(a), False) for rev in BOARD_KEYS for a in range(0, 101, 10)]
+    out += [(rev, L.LID_OPEN_DEG, True) for rev in BOARD_KEYS]
+    return out
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("route", ["printed", "laser"])
-def test_lid_catch_magnets_face_each_other_when_shut(route):
-    """R22, in real solids: with the lid shut every catch magnet in the lid
-    sits straight over one in the base, <= 1 mm apart; the whole assembly,
-    magnets included, is clash-free (the 0 degree assembly test, both routes)."""
-    items = dict((n, s) for n, s, _ in B.assembly(route, 0.0, 0.0))
-    base = sorted(n for n in items if n.startswith("hw:catch-magnet-base-"))
-    lid = sorted(n for n in items if n.startswith("hw:catch-magnet-lid-"))
-    assert len(base) == len(lid) == 2
-    for nb, nl in zip(base, lid):
-        a, b = items[nb].BoundingBox(), items[nl].BoundingBox()
-        assert (a.center.x, a.center.y) == pytest.approx((b.center.x, b.center.y))
-        gap = b.zmin - a.zmax
-        assert 0 <= gap <= 1.0
-    if route == "printed":
-        assert _clashes(list(B.assembly("printed", 0.0, 0.0))) == []
+@pytest.mark.parametrize("rev,angle,bank_out", _cases(),
+                         ids=[f"{r}-{a:g}{'-bank-out' if o else ''}" for r, a, o in _cases()])
+def test_assembly_no_clash(rev, angle, bank_out):
+    """Review Focus 3/4: only the declared contacts touch (the rod in its
+    bores, the magnets in their pockets, the board on its pins and plinth)."""
+    items = B.assembly("printed", angle, bank_out, board=rev)
+    assert clashes(items, B.DECLARED_OVERLAPS) == []
