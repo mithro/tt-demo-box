@@ -104,12 +104,20 @@ def test_cable_data():
 
 
 def test_monitor_pigtail_cable():
-    """Ruling R13: the monitor's own cable, a placeholder until measured."""
+    """Rulings R13, R17: the monitor's own cable, a placeholder until measured."""
     c = CABLES["monitor-pigtail"]
-    assert (c.dia, c.min_bend_r) == (5.0, 20.0)
+    assert (c.dia, c.min_bend_r) == (5.0, 15.0)
     assert c.confirmed is False
     assert any(s.label.startswith("Placeholder: Tim's monitor's own hard-wired cable")
-               and "25.5 mm" in s.note and "stiffness" in s.note for s in c.sources)
+               and "3 x dia" in s.note and "208 x 209" in s.note for s in c.sources)
+
+
+def test_vga_adapter_orientation_is_a_placeholder():
+    """R16a: the left/right-angle adapter is assumed, and says so."""
+    c = CABLES["vga-90-adapter"]
+    assert c.plug == (35.0, 17.0, 20.0) and c.confirmed is False
+    assert any(s.label == "Placeholder: adapter orientation" and "left/right-angle" in s.note
+               and "up/down" in s.note for s in c.sources)
 
 
 def test_ugreen_ports_on_the_end():
