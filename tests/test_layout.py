@@ -38,21 +38,38 @@ def _to_base(lay, x, y, z=0.0):
     return (ox - y, oy + x, oz + z)
 
 
-def _board_row_board_frame(adapter: bool) -> tuple[float, float, float, float, float, float]:
-    """(x0, x1, y0, y1, z0, z1) of both revisions' keep-outs, board frame, from
-    the part data (not from the layout)."""
+def _adapter() -> Box:
+    """R16a: the left/right-angle adapter on the DE-15, TinyVGA frame, from
+    the cable data: 35 along the D-sub's long axis, 17 out of the face, 20
+    tall on the plug's axis."""
+    span, out, tall = CABLES["vga-90-adapter"].plug
+    d = TINYVGA.de15
+    cx, zc = (d.x0 + d.x1) / 2, (TINYVGA.plug_z0 + TINYVGA.plug_z1) / 2
+    return Box(cx - span / 2, d.y0 - out, zc - tall / 2, cx + span / 2, d.y0, zc + tall / 2)
+
+
+def _board_row_board_frame() -> tuple[float, float, float, float, float, float]:
+    """(x0, x1, y0, y1, z0, z1) of both revisions' board-row keep-outs, board
+    frame, from the part data (not from the layout)."""
     usb = CABLES["usb-c-right-angle"].plug
     xs, ys, zs = [], [], []
     for k in BOARD_KEYS:
         env = board_envelope(k)
         j1 = next(f for f in board_spec(k).features if f.kind == "usb_power")
         dx, dy, dz = L.tinyvga_offset(k)
-        vga = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(not adapter))
+        vga = TINYVGA.pcb.union(TINYVGA.de15).union(_adapter())
         xs += [env.x0, env.x1, vga.x0 + dx, vga.x1 + dx]
         ys += [env.y0, env.y1, j1.y1 + usb[0], vga.y0 + dy, vga.y1 + dy]
         axis = board_spec(k).outline.thickness + L.USB_C_AXIS_ABOVE_PCB
         zs += [env.z0, env.z1, axis - usb[2] / 2, axis + usb[2] / 2, vga.z0 + dz, vga.z1 + dz]
     return min(xs), max(xs), min(ys), max(ys), min(zs), max(zs)
+
+
+def _plug_board_y(k: str) -> tuple[float, float]:
+    """The VGA plug + stiff run's board-y extent (base X), from the data."""
+    a = _adapter().moved(*L.tinyvga_offset(k))
+    yc = (a.y0 + a.y1) / 2
+    return yc - TINYVGA.plug_width / 2, yc + TINYVGA.plug_width / 2
 
 
 # --- constants ---------------------------------------------------------------------
@@ -88,32 +105,34 @@ def test_size_budget(lay):
     w, s = lay.wall, L.SLACK
     bank = BATTERIES[L.DESIGN_BANK]
     panel = MONITORS[L.DESIGN_MONITOR].panel
+    assert lay.vga_adapter is True                       # R16a: always
 
-    rows = {a: _board_row_board_frame(a) for a in (False, True)}
-    row_len = {a: r[3] - r[2] for a, r in rows.items()}     # board y runs along base X
-    adapter = row_len[True] < row_len[False]
-    assert lay.vga_adapter is adapter
-    x0, x1, _, _, z0, z1 = rows[adapter]
-    board_row_x = row_len[adapter] + 2 * s
+    x0, x1, y0, y1, z0, z1 = _board_row_board_frame()
+    board_row_x = (y1 - y0) + 2 * s                     # board y runs along base X
     board_row_y = x1 - x0
     stack_h = z1 - z0
+    # the VGA plug in the bank row's +X back corner, from the row's start
+    plug_x0 = s + y1 - max(_plug_board_y(k)[1] for k in BOARD_KEYS)
+    plug_x1 = s + y1 - min(_plug_board_y(k)[0] for k in BOARD_KEYS)
 
     port = max(max(CABLES[k].plug[0] for k in L.BANK_SIDE_PLUGS) + s, L.FINGERTIP_D)
-    bank_row_x = port + bank.size[0] + 2 * s
+    bay_x = bank.size[0] + 2 * s
     bank_row_y = bank.size[1] + 2 * s
-    # R10: the boost goes at the bank row's +X end, along X or turned, if
-    # either fits the width the other rows set; else in the lid
+    assert plug_x0 >= port + bay_x
+    inner_x = max(board_row_x, port + bay_x, plug_x1 + s, panel[0] + 2 * s)
+    # R10 as amended by R16a: the boost in the room the bay and the plug
+    # leave, along X or turned; else in the lid
     bl, bw, bh = (d + 2 * s for d in CABLES["usb-12v-boost"].plug)
-    room = max(board_row_x, panel[0] + 2 * s) - bank_row_x
-    fits = [(fx, fy) for fx, fy in ((bl, bw), (bw, bl))
+    rooms = (plug_x0 - (port + bay_x), inner_x - plug_x1)
+    fits = [(fx, fy) for room in rooms for fx, fy in ((bl, bw), (bw, bl))
             if fx <= room and fy <= bank_row_y and bh <= lay.rim_z - w]
     assert lay.boost_in_lid is (not fits)
     if fits:
         assert lay.boost_pocket.size[:2] == pytest.approx(fits[0])
-        bank_row_x += fits[0][0]
 
-    width = max(board_row_x, bank_row_x, panel[0] + 2 * s) + 2 * w
-    depth = max(w + s + board_row_y + s + bank_row_y + s + w, panel[1] + 2 * s + 2 * w)
+    width = inner_x + 2 * w
+    depth = max(w + s + board_row_y + s + bank_row_y + s + w,
+                panel[1] + 2 * s + 2 * w + L.CATCH_BLOCK)
     rim = w + max(bank.size[2], stack_h) + s
     assert lay.outer == Box(0.0, 0.0, 0.0, width, depth, rim, lay.outer.what)
     assert lay.outer.size == pytest.approx((width, depth, rim))
@@ -122,36 +141,45 @@ def test_size_budget(lay):
 
 
 def test_size_budget_printed_literals():
-    """R5: the printed design kit, derived by hand from the part data.
+    """R5: the printed design kit, derived by hand from the part data (R16a).
 
-    Board row, board frame (both revisions' keep-outs):
+    Board row, board frame (both revisions' board-row keep-outs):
       board y (base X): v3.3 J1 shell y1 86.65 + USB-C plug 20.0 = 106.65;
-        TinyVGA plug end: pmod3 body_y0 -8.55 + DE-15 face -51.25
-        - (plug body 17.0 + 90 degree run 20.0) = -96.8  (straight: -116.8)
-        -> 203.45 with the adapter, 223.45 straight: vga_adapter = True.
-      board x (base Y): PCB 0 .. TinyVGA x1 (56.855 + 33.0) = 89.855.
-      z: TinyVGA plug hood 1.6 + 12.5/2 - 20/2 = -2.15 .. 1.6 + 6.25 + 10 = 17.85 -> 20.0.
-    Width  = max(203.45 + 2*1 = 205.45, bank row 23 + 128 + 2 + 22 = 175, panel 182 + 2 = 184)
-             + 2*2.4 = 210.25   (board row wins).
-             port room = max(max(20, 22, 20) + 1, 16) = 23.
-             boost (60 x 20 x 15 + 2*1): along X 153 + 62 = 215 > 205.45, so it is turned:
-             X 22 (153 + 22 = 175 <= 205.45), Y 62 <= bank row 75, Z 17 -> in the base.
-    Depth  = 2.4 + 1 + 89.855 + 1 + (73 + 2) + 1 + 2.4 = 172.655   (>= 118 + 2 + 4.8 = 124.8)
+        the 90 degree adapter's far face: pmod3 body_y0 -8.55 + DE-15 face
+        -51.25 - adapter 17.0 out = -76.8  -> 183.45.
+      board x (base Y): PCB 0 .. adapter x1 = 56.855 + DE-15 centre 16.5
+        + 35/2 = 90.855.
+      z: TinyVGA plug hood / adapter 1.6 + 12.5/2 - 20/2 = -2.15 .. 17.85 -> 20.0.
+    VGA plug + STRAIGHT_RUN, in the bank row's +X back corner: hood 31.9 wide
+      on the adapter's mid-depth, board y -8.55 - 51.25 - 8.5 = -68.3, so
+      -84.25 .. -52.35, base X 3.4 + (106.65 - by) = 162.4 .. 194.3; base Y from
+      the adapter's end 3.4 + 90.855 = 94.255, + 17 + 40 = 151.255 (row ends 170.255).
+    Width  = max(board row 183.45 + 2*1 = 185.45, port + bay 23 + 130 = 153,
+                 plug 194.3 - 2.4 + 1 = 192.9, panel 182 + 2 = 184) + 2*2.4 = 197.7
+             (the plug's keep-out wins).  port room = max(max(20, 22, 20) + 1, 16) = 23.
+    Boost (60 x 20 x 15 + 2*1 = 62 x 22 x 17): room between the bay (to 155.4) and
+             the plug (from 162.4) is 7.0, past the plug (194.3 + 1 .. 195.3) 0:
+             neither way fits -> in the lid strip.
+    Depth  = 2.4 + 1 + 90.855 + 1 + (73 + 2) + 1 + 2.4 = 173.655
+             (>= 118 + 2 + 4.8 + catch block 10 = 134.8)
     Rim    = 2.4 + max(bank 32, board stack 20.0) + 1 = 35.4        (bank wins)
     Lid    = 2.4 + tape 1.0 + monitor 20.0 + clearance 2.0 = 25.4
+    Closed 197.7 x 173.655 x 60.8 = 2.087 L.
     """
     lay = L.layout(L.ROUTES["printed"])
-    assert lay.vga_adapter is True and lay.boost_in_lid is False
-    assert lay.boost_pocket.size == pytest.approx((22.0, 62.0, 17.0), abs=0.01)
-    assert lay.outer.size == pytest.approx((210.25, 172.655, 35.4), abs=0.01)
-    assert lay.lid_outer.size == pytest.approx((210.25, 172.655, 25.4), abs=0.01)
+    assert lay.vga_adapter is True and lay.boost_in_lid is True
+    assert lay.boost_pocket.size == pytest.approx((62.0, 22.0, 17.0), abs=0.01)
+    assert lay.outer.size == pytest.approx((197.7, 173.655, 35.4), abs=0.01)
+    assert lay.lid_outer.size == pytest.approx((197.7, 173.655, 25.4), abs=0.01)
     assert lay.port_room.size[0] == pytest.approx(23.0, abs=0.01)
+    v = lay.board_keepouts["v3.2/vga_plug"]
+    assert (v.x0, v.x1, v.y0, v.y1) == pytest.approx((162.4, 194.3, 94.255, 151.255), abs=0.01)
 
 
 # --- arrangement -------------------------------------------------------------------
 
 def _board_row(lay) -> Box:
-    ks = list(lay.board_keepouts.values())
+    ks = [b for k, b in lay.board_keepouts.items() if k.split("/")[1] in L.ROW_PARTS]
     u = ks[0]
     for k in ks[1:]:
         u = u.union(k)
@@ -332,27 +360,28 @@ def test_every_bank_as_design_bank(bank):
 
 
 def test_boost_pocket(lay):
-    """R10: the design kit's boost module is in the base, turned, at the bank
-    row's +X end, inside the walls and below the rim."""
+    """R10 as amended by R16a: the design kit's bank row has no room left for
+    the boost module beside the bay and the VGA plug, so it is in the lid
+    strip, against the inside face."""
     bl, bw, bh = (d + 2 * L.SLACK for d in CABLES["usb-12v-boost"].plug)
     p = lay.boost_pocket
-    assert lay.boost_in_lid is False
-    assert p.size == pytest.approx((bw, bl, bh))                 # turned 90 degrees
-    assert p.x0 == pytest.approx(lay.bank_bay.x1)
-    assert p.y0 == pytest.approx(lay.bank_bay.y0) and p.y1 <= lay.bank_bay.y1 + EPS
-    assert p.z0 == pytest.approx(lay.wall) and p.z1 <= lay.rim_z + EPS
-    assert _inside(p, lay.outer, lay.wall)
+    assert lay.boost_in_lid is True
+    assert p.size == pytest.approx((bl, bw, bh))
+    assert _inside(p, lay.lid_strip)
+    assert p.z1 == pytest.approx(lay.lid_strip.z1)
 
 
 def test_huge_boost_goes_to_the_lid(monkeypatch):
-    """A boost module too big for the bank row either way goes in the lid strip."""
+    """A boost module too big for the room a short bank leaves goes in the
+    lid strip, and the box does not grow."""
     from dataclasses import replace
-    monkeypatch.setattr(L, "_BOOST", replace(L._BOOST, plug=(100.0, 40.0, 10.0)))
-    lay = L.layout(L.ROUTES["printed"])
+    ref = L.layout(L.ROUTES["printed"], bank="iniu-p512")
+    monkeypatch.setattr(L, "_BOOST", replace(L._BOOST, plug=(100.0, 30.0, 10.0)))
+    lay = L.layout(L.ROUTES["printed"], bank="iniu-p512")
     assert lay.boost_in_lid is True
-    assert lay.boost_pocket.size == pytest.approx((102.0, 42.0, 12.0))
+    assert lay.boost_pocket.size == pytest.approx((102.0, 32.0, 12.0))
     assert _inside(lay.boost_pocket, lay.lid_strip)
-    assert lay.outer.size[0] == pytest.approx(210.25)           # the box does not grow
+    assert lay.outer.size == pytest.approx(ref.outer.size)
 
 
 def test_boost_in_the_bank_row_when_it_fits():
@@ -382,7 +411,11 @@ def test_lid(lay):
     assert _inside(ms, inner)
     assert ms.size[0] == pytest.approx(m.panel[0] + 2 * s)
     assert ms.size[1] == pytest.approx(m.panel[1] + 2 * s)
-    assert ms.y0 == pytest.approx(inner.y0)                       # at the free edge
+    # at the free edge, or just behind the lid's catch blocks when they reach
+    # over it in X (R16a's box is barely wider than the monitor)
+    over = any(lay.catch_lid_block(c).x0 < ms.x1 and ms.x0 < lay.catch_lid_block(c).x1
+               for c in lay.lid_catch)
+    assert ms.y0 == pytest.approx(inner.y0 + (L.CATCH_BLOCK if over else 0.0))
     assert ms.z0 == pytest.approx(L.CLOSED_CLEARANCE)              # face above the seam
     assert ms.z1 == pytest.approx(inner.z1 - L.TAPE_T)             # back on the tape
     assert ms.size[2] == pytest.approx(m.panel[2])
@@ -431,16 +464,15 @@ def test_hinge_relief_r_less_than_the_lid_depth(lay):
 
 
 def test_knuckle_x_design_kit():
-    """R15, by hand (printed).  Within hinge_relief_r = 6.72 of the axis
-    (Y 168.655, Z 35.4) in YZ lie only the port room (X 2.4..25.4: it runs to
-    the back wall and the rim) and the packed bank (X 26.4..154.4, back-top
-    edge at Y 168.255, Z 34.4: 1.08 from the axis).  The boost pocket's
-    nearest corner (Y 156.255, Z 19.4) is sqrt(12.4^2 + 16^2) = 20.2 away;
-    the board row is ~75 mm forward.  The pigtail notch (X 178.125..184.125)
-    is no knuckle either.  So, of X 0..210.25:
-      0..2.4, 25.4..26.4, 154.4..178.125, 184.125..210.25."""
+    """R15, by hand (printed, R16a box).  Within hinge_relief_r = 6.72 of the
+    axis (Y 169.655, Z 35.4) in YZ lie only the port room (X 2.4..25.4: it
+    runs to the back wall and the rim) and the packed bank (X 26.4..154.4,
+    back-top edge at Y 169.255, Z 34.4: 1.08 from the axis).  The VGA plug's
+    stiff run ends at Y 151.255, 18.4 in front of the axis; the boost is in
+    the lid.  The pigtail's notch is on the plug's run axis, X 178.35 +- 3.
+    So, of X 0..197.7:  0..2.4, 25.4..26.4, 154.4..175.35, 181.35..197.7."""
     lay = L.layout(L.ROUTES["printed"])
-    want = ((0.0, 2.4), (25.4, 26.4), (154.4, 178.125), (184.125, 210.25))
+    want = ((0.0, 2.4), (25.4, 26.4), (154.4, 175.35), (181.35, 197.7))
     assert len(lay.knuckle_x) == len(want)
     for (a, b), (c, d) in zip(lay.knuckle_x, want):
         assert (a, b) == (pytest.approx(c, abs=1e-6), pytest.approx(d, abs=1e-6))
@@ -459,10 +491,9 @@ def test_knuckle_x_clear_of_base_contents(lay):
 
 
 def test_hinge_notch(lay):
-    m = MONITORS[L.DESIGN_MONITOR]
     n = lay.hinge_notch
-    exit_x = lay.monitor_space.x0 + L.SLACK + m.pigtail_exit_u
-    assert (n.x0 + n.x1) / 2 == pytest.approx(exit_x)
+    v = lay.board_keepouts["v3.2/vga_plug"]
+    assert (n.x0 + n.x1) / 2 == pytest.approx((v.x0 + v.x1) / 2)   # on the plug's run axis
     assert n.size[0] == pytest.approx(CABLES["monitor-pigtail"].dia + 2 * L.FIT)
     hy, hz = lay.hinge_axis
     assert n.y0 < hy < n.y1 and n.z0 < hz < n.z1
@@ -501,8 +532,8 @@ def test_lid_catch_moves_past_a_keepout(monkeypatch):
     """A keep-out over the left corner pushes the block to its +X side."""
     real = L._board_keepouts
 
-    def fake(origin, adapter):
-        k = dict(real(origin, adapter))
+    def fake(origin):
+        k = dict(real(origin))
         k["test/blocker"] = Box(0.0, 0.0, 0.0, 10.0, 20.0, 1.0, "test blocker")
         return k
     monkeypatch.setattr(L, "_board_keepouts", fake)
@@ -516,8 +547,8 @@ def test_lid_catch_moves_past_a_keepout(monkeypatch):
 def test_lid_catch_raises_naming_the_keepout(monkeypatch):
     real = L._board_keepouts
 
-    def fake(origin, adapter):
-        k = dict(real(origin, adapter))
+    def fake(origin):
+        k = dict(real(origin))
         k["test/blocker"] = Box(0.0, 0.0, 0.0, 1000.0, 20.0, 1.0, "test blocker")
         return k
     monkeypatch.setattr(L, "_board_keepouts", fake)
@@ -556,7 +587,7 @@ def test_tinyvga_offset_places_the_keepout(lay):
     """The TinyVGA offset is one function the layout and the scene share."""
     for key in BOARD_KEYS:
         dx, dy, dz = L.tinyvga_offset(key)
-        u = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(not lay.vga_adapter))
+        u = TINYVGA.pcb.union(TINYVGA.de15).union(_adapter())
         k = lay.board_keepouts[f"{key}/tinyvga"]
         lo = _to_base(lay, u.x0 + dx, u.y1 + dy, u.z0 + dz)
         assert (k.x0, k.y0, k.z0) == pytest.approx(lo)
