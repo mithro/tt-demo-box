@@ -1,6 +1,6 @@
 # tt-demo-box, compact: as small as the parts, no screws
 
-Status: draft for Tim's review, 2026-11-24.
+Status: approved by Tim, 2026-11-24.
 
 Supersedes `2026-11-23-tt-demo-box-design.md` (the "first design", merged in PR #1) where the two
 disagree. Everything in the first design that this document does not change still holds: the
