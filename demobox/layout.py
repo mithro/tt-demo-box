@@ -140,8 +140,7 @@ PEG_DIA = 3.0
 #: The plinth's hole for the loose MT1 pin: PEG_DIA plus a slip clearance, so
 #: the pin pushes in by hand and comes out again for the other revision.
 PEG_HOLE_D = PEG_DIA + 0.2
-#: How far the board pins stand above the PCB top: the closed lid comes down
-#: to CLOSED_CLEARANCE above the board, so a board can't lift off them.
+#: How far the board pins stand above the PCB top.
 PIN_PROUD = CLOSED_CLEARANCE + 1.0
 #: A fingertip on a bank's end button (the port room is at least this long).
 FINGERTIP_D = 16.0
