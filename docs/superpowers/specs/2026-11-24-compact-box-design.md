@@ -90,7 +90,14 @@ one-box-fits-every-part layout took the rest.
    - Which end the USB-C and the VGA plug go is the builder's call. Choose whatever gives the
      shortest cable runs: VGA to the hinge, bank to board, bank to boost to the monitor.
 3. **The monitor is stuck to the lid with double-sided foam tape** (VHB type), face out. The lid
-   has no pocket, insert, bezel, clip or retainer.
+   has no pocket, insert, bezel, clip or retainer. The monitor's stand clip is taken off so the
+   tape grips a flat back (my call; if it can't come off, its height adds to the lid depth).
+   - **Its cable stays plugged in.** Tim's monitor has a fixed cable ending in VGA, a DC barrel
+     and composite (composite cut off). Its VGA plug goes straight into the TinyVGA, so the
+     first design's separate slim VGA cable and 90 degree adapter go (if the plug's run fits the
+     board row; otherwise the adapter stays). The cable crosses from lid to base in a loop at the
+     hinge, through a notch in the hinge line, and its bend radius is checked over the full
+     0-100 degree swing. The DC barrel plugs into the boost cable.
 4. **The lid is a shallow tray; the base is only as tall as the bank row.**
    - **Lid:** a flat panel whose rim walls cover the monitor's depth.
    - **Base:** its walls are as tall as the bank (the tallest thing on the floor) plus the floor
@@ -99,6 +106,11 @@ one-box-fits-every-part layout took the rest.
      the monitor too. That puts the board at the bottom of a roughly 30 mm pit behind a tall
      front wall, hiding it from anyone not looking straight down. The volume is the same either
      way.
+   - **The board is raised to the rim:** the board row is shorter than the bank row (board +
+     TinyVGA about 21 mm against the bank's 32), so the board stands on a printed plinth (the
+     pins of Decision 6 rise from it). Its top is then level with the base rim, in view over the
+     front wall, and no taller than the box already is. My call; the plinth fills space that
+     was empty anyway.
    - **Closed:** the monitor's face comes down over the board and bank rows.
    - **Spare space:** the strip of the lid tray beside the monitor (lid depth minus the
      monitor's height, about 50 mm) takes the cable runs and, if it fits better there than on
@@ -118,8 +130,11 @@ one-box-fits-every-part layout took the rest.
      closed gap kept under the pins' height so it can't lift off them). Open, it rests on the
      pins. Builder's choice.
 7. **Bank: lifts straight out with the lid open.**
-   - Its cables unplug at the bank's end. That replaces the drawer, its runners, the cable bay
-     and the slack layer.
+   - Its cables unplug, and that replaces the drawer, its runners, the cable bay and the slack
+     layer. A bank with sockets: the cables unplug at the bank and stay in the box. A bank with a
+     built-in cable (three of the four listed, including `DESIGN_BANK`): the cable unplugs at
+     the board or the boost cable and leaves with the bank. The bay keeps room for the bank's
+     plugs or its built-in cable's loop, whichever the bank in the data has.
    - Spec rule kept: removable in seconds, for airport security.
    - The bank's power button must be reachable with the lid open (a finger gap at that end of
      the bay, or the button facing up); `verify.py` proves it.
@@ -175,3 +190,4 @@ Also considered and dropped:
 - **Board's tallest component** (placeholder 12 mm).
 - **TinyVGA reach** (KiCad 59.8 vs photo about 53).
 - **Which power bank** (sets `DESIGN_BANK`).
+- **Monitor cable:** length to the VGA plug, and whether the stand clip comes off.
