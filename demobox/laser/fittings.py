@@ -150,7 +150,7 @@ def printed_parts(lay: Layout, t: float = 3.0, bed=PRINT_BED) -> dict[str, S.Pri
             "wall's cut-out, flush with both outside faces; along the open segments it is "
             "the lid's lip round the seal bead. The glue areas carry the stop load; use a "
             "gap-filling glue. Hinge: lid on the base, push the "
-            f"{PIN_ROD_D:g} mm x {rod:.0f} mm rod in from the right side face until flush "
+            f"{PIN_ROD_D:g} mm x {rod:.1f} mm rod in from the right side face until flush "
             "(the last 5 mm is a press fit).")),
         **{name: S.Printed(s, S.FLAT, (
             "Seal bead: print flat side down. Glue it along the base back wall's top edge, "
@@ -176,7 +176,7 @@ def hardware(lay: Layout, t: float = 3.0) -> dict[str, int]:
         tape += " and boost module"
     return {
         f"{MAGNET_D:g} x {MAGNET_T:g} mm disc magnet": 2 * len(lay.lid_catch),
-        f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.0f} mm (hinge pin)": 1,
+        f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.1f} mm (hinge pin)": 1,
         f"{PEG_DIA:g} mm rod x {board_pin_length(lay):.1f} mm (board pins, MT2 + loose MT1)": 2,
         "wood glue": 1,
         tape: 1,

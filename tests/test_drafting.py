@@ -274,8 +274,40 @@ def test_ga_sheet_says_how_the_box_goes_together(route):
     assert f"{LID_OPEN_DEG:g} deg" in words
     assert "pressed in from the right side face" in words
     assert "drawer" not in words.lower() and "screw" not in words.lower()
+    assert "4 magnets, 6 x 3 mm" in words
     if route == "laser":
         assert "3 mm rods" in words
+    else:
+        from demobox.printed import body as B
+        made = B.printed_parts(lay)
+        assert f"{len(made)} printed parts: {', '.join(made)}." in words
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_ga_rod_length_is_the_hardware_lists(route):
+    """The hinge rod reads the same, to one place, in the GA note and in the
+    parts list (they once said 40.8 and 41)."""
+    from demobox.laser import fittings as LF
+    from demobox.layout import ROUTES, layout
+    from demobox.printed import body as B
+    from demobox.shared import hinge as H
+    lay = layout(ROUTES[route])
+    hw = B.hardware(lay) if route == "printed" else LF.hardware(lay, lay.wall)
+    keys = [k for k in hw if "(hinge pin" in k]
+    assert len(keys) == 1
+    rod = re.match(r"(\S+ mm rod x \d+\.\d mm) \(hinge pin", keys[0]).group(1)
+    words = _sheet_words("TDB-GA-" + route[0].upper())
+    assert f"knuckles on one {rod}, pressed in" in words
+    assert words.count(rod) == 2, words.count(rod)     # the note and the parts list
+    # every hinge rod length on the route's sheets: the same figure
+    sheets = ["TDB-GA-" + route[0].upper()] + (["TDB-LID-P"] if route == "printed"
+                                                else ["TDB-FIT-L"])
+    board = f"{LF.board_pin_length(lay):.1f}" if route == "laser" else None
+    want = f"{H.pin_length(lay):.1f}"
+    for n in sheets:
+        found = [v for v in re.findall(r"3 mm (?:rod )?x (\d+(?:\.\d+)?) mm",
+                                       _sheet_words(n)) if v != board]
+        assert found and set(found) == {want}, (n, found)
 
 
 @pytest.mark.parametrize("route", ["printed", "laser"])

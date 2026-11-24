@@ -129,14 +129,14 @@ def test_hardware_exact(lay):
     rod = H.pin_length(lay)
     assert F.hardware(lay, WALL) == {
         "6 x 3 mm disc magnet": 4,
-        f"3 mm rod x {rod:.0f} mm (hinge pin)": 1,
+        "3 mm rod x 41.4 mm (hinge pin)": 1,
         "3 mm rod x 19.7 mm (board pins, MT2 + loose MT1)": 2,
         "wood glue": 1,
         "double-sided foam tape (VHB type), monitor back and boost module": 1,
     }
     assert lay.boost_in_lid
     # R22/R24: from the first knuckle's blind end (156.5 + 1.0) to x 198.9
-    assert f"{rod:.0f}" == "41"
+    assert f"{rod:.1f}" == "41.4"
     # R28: floor top (3.0) to the PCB top (17.15 + 1.561) + PIN_PROUD (4.0)
     assert F.board_pin_length(lay) == pytest.approx(22.711 - 3.0)
 

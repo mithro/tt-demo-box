@@ -294,7 +294,7 @@ def base_part(defn) -> Part:
     part.notes = [
         f"Walls and floor {F(w)}; rim (the seam) at Z {F(rim)}. Table: base frame; the "
         "plinth's top is the board's underside; the knuckle's axis is the hinge's.",
-        f"The MT2 pin is printed on the plinth, {F(PEG_DIA)} with a {F(PIN.PIN_CHAMFER)} "
+        f"The MT2 pin is printed on the plinth, D{F(PEG_DIA)} with a {F(PIN.PIN_CHAMFER)} "
         "lead-in chamfer. Each MT1 hole takes the loose printed pin (TDB-PIN-P) under the "
         "fitted board revision's MT1. The relief clears the v3.2 board's USB plug.",
         f"Magnet pockets: open at the rim, in the catch blocks in the front corners; a "
@@ -362,7 +362,8 @@ def lid_part(defn) -> Part:
         f"Knuckles bored D{F(H.PIN_HOLE_D)} for the {F(PIN_ROD_D)} rod (slip fit); the first "
         f"knuckle's bore is blind, {F(H.ROD_BLIND)} short of its left face; the last "
         f"{F(H.PRESS_LEN)} of the right knuckle's bore, at the side face, is D{F(H.PRESS_D)}, "
-        f"a press fit. Rod {F(H.pin_length(lay))} long, pressed in from the right side face. "
+        f"a press fit. Rod {PIN_ROD_D:g} mm x {H.pin_length(lay):.1f} mm, pressed in from the "
+        "right side face. "
         f"The back face stops the lid at {LID_OPEN_DEG:g} deg.",
         f"Magnet pockets open at the seam, in the catch blocks over the base's; a "
         f"{F(MAGNET_D)} x {F(MAGNET_T)} magnet sits {F(MAGNET_RECESS)} in. Elsewhere along "

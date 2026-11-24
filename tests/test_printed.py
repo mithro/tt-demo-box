@@ -106,10 +106,10 @@ def test_hardware_exact(lay):
     rod = H.pin_length(lay)
     assert B.hardware(lay) == {
         "6 x 3 mm disc magnet": 4,
-        f"3 mm rod x {rod:.0f} mm (hinge pin; steel, or 2.85 mm filament)": 1,
+        "3 mm rod x 40.8 mm (hinge pin; steel, or 2.85 mm filament)": 1,
         "double-sided foam tape (VHB type), monitor back and boost module": 1,
     }
-    assert f"{rod:.0f}" == "41"     # R24: 156.9 .. 197.7
+    assert f"{rod:.1f}" == "40.8"     # R24: 156.9 .. 197.7
 
 
 def test_no_fasteners_anywhere(lay):

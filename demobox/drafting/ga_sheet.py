@@ -128,6 +128,11 @@ def _projections(route: str):
     return projs, lid_open
 
 
+def rod_text(lay) -> str:
+    """The hinge rod as the hardware lists it: ``3 mm rod x 40.8 mm``."""
+    return f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.1f} mm"
+
+
 def size_note(lay) -> str:
     """The closed size and volume, as ``checks.size_budget`` proves them."""
     report = checks.Report()
@@ -163,9 +168,10 @@ def render_ga(defn: names.SheetDef):
             K.Dim(f, (0.0, 0.0), (0.0, Hc), "left", 1),
             K.Dim(p, (0.0, 0.0), (W, 0.0), "bottom", 0),
             K.Dim(p, (0.0, 0.0), (0.0, D), "left", 0),
-            # open: the height to the lid's top, and how far it reaches behind
+            # open: the height to the lid's top, and how far it reaches behind the
+            # base's back face
             K.Dim(s, (-D, 0.0), top_open, "left", 0),
-            K.Dim(s, (bb_open[0], 0.0), (-hy, 0.0), "bottom", 0, text_side="low"),
+            K.Dim(s, (bb_open[0], 0.0), (-D, 0.0), "bottom", 0, text_side="low"),
             K.Leader(s, ax, (s.x(ax[0]) + 8.0, s.y(ax[1]) - 10.0), "HINGE AXIS", dot=True),
             K.Angle(s.pt(*ax), 26.0, 0.0, LID_OPEN_DEG, f"{LID_OPEN_DEG:g}\N{DEGREE SIGN}"),
         ]
@@ -209,14 +215,14 @@ def render_ga(defn: names.SheetDef):
                            K.L_CENTRE, K.L_DIM])
         table = K.Table("PARTS LIST", ["ITEM", "QTY", "PART", "DRAWING, SOURCE"], rows,
                         ["end", "end", "start", "start"])
-        rod = H.pin_length(lay)
         n_mag = 2 * len(lay.lid_catch)
         if route == "printed":
+            made = list(B.printed_parts(lay))
             build_note = (
-                "Two printed parts, base and lid. Board: MT2 pin + loose MT1 pin: "
+                f"{len(made)} printed parts: {', '.join(made)}. Board: MT2 pin + loose MT1 pin: "
                 "the MT2 pin is printed on the plinth, the loose printed MT1 pin (TDB-PIN-P) "
                 "goes in the fitted revision's hole (v3.2 or v3.3).")
-            catch = (f"Lid catch: {n_mag} {MAGNET_D:g} x {MAGNET_T:g} mm magnets pressed flush "
+            catch = (f"Lid catch: {n_mag} magnets, {MAGNET_D:g} x {MAGNET_T:g} mm, pressed flush "
                      "into pockets in the front corners, poled to pull.")
         else:
             build_note = (
@@ -226,7 +232,7 @@ def render_ga(defn: names.SheetDef):
                 f"{PIN_ROD_D:g} mm rods {LF.board_pin_length(lay):.1f} mm long standing on "
                 "the floor through plinth-top: MT2's glued, MT1's loose in the fitted "
                 "revision's hole (v3.2 or v3.3).")
-            catch = (f"Lid catch: {n_mag} {MAGNET_D:g} x {MAGNET_T:g} mm magnets pressed flush "
+            catch = (f"Lid catch: {n_mag} magnets, {MAGNET_D:g} x {MAGNET_T:g} mm, pressed flush "
                      "into the printed magnet blocks, two glued in the base's front corners "
                      "and two in the lid's, poled to pull.")
         route_word = "3D-printed" if route == "printed" else "laser-cut plywood"
@@ -236,7 +242,7 @@ def render_ga(defn: names.SheetDef):
             size_note(lay),
             f"The lid turns {LID_OPEN_DEG:g} deg about the hinge axis (Y {F(hy)}, Z {F(hz)}) "
             "to its stop, where the view from the left shows it in phantom. Hinge: printed "
-            f"knuckles on one {PIN_ROD_D:g} mm rod {rod:.1f} mm long, pressed in from the "
+            f"knuckles on one {rod_text(lay)}, pressed in from the "
             f"right side face: the last {H.PRESS_LEN:g} mm of its bore there is a press fit "
             "and the first knuckle's bore is blind.",
             "Monitor: double-sided foam tape (VHB type) on its back, to the lid's flat "
