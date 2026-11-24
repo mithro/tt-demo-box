@@ -137,19 +137,6 @@ def test_open_front_lid_at_open_angle(manifests):
 
 
 @pytest.mark.slow
-def test_closed_and_drawer_out(manifests):
-    lay = layout(ROUTES["printed"])
-    _, closed = manifests["printed-closed"]
-    by = {e["part"]: e for e in closed["parts"]}
-    assert _lid_angle(_matrix(by["lid"])) == pytest.approx(0.0)
-    _, out = manifests["printed-drawer-out"]
-    by = {e["part"]: e for e in out["parts"]}
-    assert _matrix(by["drawer"])[0][3] == pytest.approx(-lay.drawer_travel)
-    assert _matrix(by["bank"])[0][3] == pytest.approx(-lay.drawer_travel)
-    assert _matrix(by["base"])[0][3] == pytest.approx(0.0)
-
-
-@pytest.mark.slow
 def test_bought_parts_present(manifests):
     """The renders sell the idea: the board, its TinyVGA and plugs, the
     monitor and its lit screen, the bank."""

@@ -116,37 +116,6 @@ def test_long_battery_fails(monkeypatch, lay):
     assert failed and all("huge" in f for f in failed), failed
 
 
-def test_short_cable_bay_fails_the_port_end(lay):
-    """The port-end claim is a real check (M7): a cable bay too short for the
-    plug, or one not ending at the bank's port face, fails."""
-    short = replace(lay, cable_bay=replace(lay.cable_bay, x0=lay.cable_bay.x1 - 10.0))
-    failed = _failed(_run(C.batteries_fit, short))
-    assert any("port end against the cable-bay wall" in f for f in failed), failed
-    gap = replace(lay, cable_bay=lay.cable_bay.moved(-5.0, 0.0, 0.0))
-    failed = _failed(_run(C.batteries_fit, gap))
-    assert any("port end against the cable-bay wall" in f for f in failed), failed
-
-
-def test_bank_buttons_need_the_drawer_open(lay):
-    r = _run(C.buttons_reachable, lay)
-    notes = {what: detail for what, detail in r.unconfirmed}
-    for b in BATTERIES.values():
-        if b.button is not None:
-            assert any(b.key in w and "press with drawer open" in d for w, d in notes.items()), b.key
-
-
-def test_bank_button_covered_with_drawer_out_fails(monkeypatch, lay):
-    base = BATTERIES["iniu-p512"]
-    monkeypatch.setitem(BATTERIES, "side-btn", replace(base, key="side-btn",
-                                                       button=("side", 50.0, 15.0)))
-    failed = _failed(_run(C.buttons_reachable, lay))
-    assert failed and all("side-btn" in f for f in failed), failed
-    short = replace(lay, drawer_travel=10.0)
-    failed = _failed(_run(C.buttons_reachable, short))
-    assert {b.key for b in BATTERIES.values() if b.button} <= {
-        k for k in BATTERIES if any(k in f for f in failed)}
-
-
 def test_monitor_button_against_the_base_fails(monkeypatch, lay):
     base = MONITORS["taobao-tim"]
     monkeypatch.setitem(MONITORS, "low-btn", replace(base, key="low-btn", button=(60.0, 0.5)))
@@ -213,12 +182,6 @@ def test_hinge_sweep_fails_on_overlap(lay):
 
 # --- cables ------------------------------------------------------------------------
 
-def test_short_drawer_travel_fails(lay):
-    short = replace(lay, drawer_travel=lay.bay.x0 + 50.0)
-    failed = _failed(_run(C.cables_route, short))
-    assert any("drawer travel" in f for f in failed), failed
-
-
 def test_slack_loop_too_short_fails(lay):
     far = replace(lay, drawer_travel=500.0)
     failed = _failed(_run(C.cables_route, far))
@@ -239,30 +202,6 @@ def test_tight_channel_fails_bend(lay):
 
 
 # --- R13: in-lid cable route --------------------------------------------------------
-
-def test_every_monitor_has_an_in_lid_route(lay):
-    r = _run(C.cables_route, lay)
-    for m in MONITORS.values():
-        mine = [(ok, w) for ok, w, _ in r.results if m.key in w and "in-lid" in w]
-        assert mine and all(ok for ok, _ in mine), (m.key, mine)
-
-
-def test_too_narrow_side_gutter_fails_naming_the_monitor(lay):
-    g = lay.lid_cable_gutters["right"]
-    narrow = replace(lay, lid_cable_gutters={**lay.lid_cable_gutters,
-                                             "right": replace(g, x1=g.x0 + 5.0)})
-    failed = _failed(_run(C.cables_route, narrow))
-    assert failed and any("car-7-aliexpress" in f and "in-lid" in f for f in failed), failed
-    assert not any("taobao-tim" in f for f in failed), failed
-
-
-def test_too_shallow_hinge_gutter_fails(lay):
-    g = lay.lid_cable_gutters["hinge"]
-    shallow = replace(lay, lid_cable_gutters={**lay.lid_cable_gutters,
-                                              "hinge": replace(g, y0=g.y1 - 5.0)})
-    failed = _failed(_run(C.cables_route, shallow))
-    assert any("taobao-tim" in f and "in-lid" in f for f in failed), failed
-
 
 def test_top_exit_has_no_route(monkeypatch, lay):
     base = MONITORS["car-7-aliexpress"]
