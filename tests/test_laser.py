@@ -472,3 +472,10 @@ def test_every_tslot_nut_is_a_keepout_in_the_assembly(body):
         into = body.panel_at(sc.into, sc.at)
         lo, hi = {"x": (b.x0, b.x1), "y": (b.y0, b.y1), "z": (b.z0, b.z1)}[into.normal]
         assert into.z0 - lo == pytest.approx(proud) and hi - (into.z0 + WALL) == pytest.approx(proud)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("angle", range(10, 100, 10))
+def test_laser_assembly_intermediate_lid_angles_have_no_intersections(angle):
+    """The lid's whole swing, not just shut and fully open (finding 7)."""
+    assert clashes(B.assembly("laser", float(angle), 0.0), P.DECLARED_OVERLAPS) == []

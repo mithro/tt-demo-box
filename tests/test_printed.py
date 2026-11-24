@@ -455,3 +455,11 @@ def test_hardware_lists_the_insert_screws(lay):
     assert hw["M3 x 6 pan-head (board, MT2)"] == 1
     assert hw["M3 x 6 pan-head (deck corners)"] == 4
     assert sum(n for k, n in hw.items() if k.startswith("M3 heat-set insert")) == 15
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("angle", range(10, 100, 10))
+def test_assembly_intermediate_lid_angles_have_no_intersections(angle):
+    """The lid's whole swing, not just shut and fully open (finding 7)."""
+    assert _clashes(B.assembly("printed", float(angle), 0.0)) == []
+
