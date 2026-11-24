@@ -165,11 +165,13 @@ def unconfirmed_note(keys: tuple[str, ...] | None = None, lead: str = "") -> str
     return f"UNCONFIRMED inputs{lead} (placeholders; make verify lists each): {body}."
 
 
-#: The UNCONFIRMED names that feed the box's own size: every monitor (the
-#: lid pocket), the board and TinyVGA heights (the deck and the lid's
-#: clearance) and the cables (bend radii size the deck cavity and gutters).
-BODY_KEYS = ("monitor", "USB_C", "TINYVGA", "TinyVGA", "TALLEST", "cable", "length",
-             "connector", "pigtail")
+#: The UNCONFIRMED names that feed the box's own size: the monitor (the
+#: lid's depth and the box's footprint), the bank (the base's height), the
+#: board and TinyVGA heights (the plinth and the closed clearance), the tape
+#: (the monitor's height in the lid) and the cables (bend radii and plugs size
+#: the rows and the lid strip).
+BODY_KEYS = ("monitor", "battery", "USB_C", "TINYVGA", "TinyVGA", "TALLEST", "TAPE", "cable",
+             "length", "connector", "pigtail")
 
 
 # --- placed views ----------------------------------------------------------------------

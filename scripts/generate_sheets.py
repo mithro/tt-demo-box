@@ -24,12 +24,9 @@ from demobox.drafting import sheetkit  # noqa: E402
 
 
 def _renderer(kind: str):
-    if kind in ("part", "packing"):
+    if kind in ("part", "fittings"):
         from demobox.drafting import part_sheet
         return part_sheet.render
-    if kind == "insert":
-        from demobox.drafting import insert_sheet
-        return insert_sheet.render
     from demobox.drafting import ga_sheet
     return ga_sheet.render
 

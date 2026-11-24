@@ -189,7 +189,7 @@ def printed_parts(lay: Layout, bed=PRINT_BED) -> dict[str, Printed]:
         "lid": _printed("lid", lid(lay), (
             "Lid: print top plate down. Supports under the hinge knuckles only. Press two "
             f"{MAGNET_D:g} x {MAGNET_T:g} mm magnets into the catch pockets, flush. Hinge: "
-            f"lid on the base, push the {PIN_ROD_D:g} mm x {rod:.0f} mm rod in from the right "
+            f"lid on the base, push the {PIN_ROD_D:g} mm x {rod:.1f} mm rod in from the right "
             "side face until flush (the last 5 mm is a press fit). Tape the monitor's back "
             "to the flat inside face"
             + (", and the boost module beside it in the cable strip." if lay.boost_in_lid
@@ -212,7 +212,7 @@ def hardware(lay: Layout) -> dict[str, int]:
         tape += " and boost module"
     return {
         f"{MAGNET_D:g} x {MAGNET_T:g} mm disc magnet": 2 * len(lay.lid_catch),
-        f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.0f} mm (hinge pin; steel, or 2.85 mm "
+        f"{PIN_ROD_D:g} mm rod x {H.pin_length(lay):.1f} mm (hinge pin; steel, or 2.85 mm "
         "filament)": 1,
         tape: 1,
     }
