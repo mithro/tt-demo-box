@@ -125,13 +125,13 @@ def test_knuckles_alternate_and_skip_notch(lay):
 
 
 def test_knuckle_plan_printed():
-    """The printed route's plan, by hand from ``knuckle_x`` (R19: 155.4..175.35,
-    181.35..197.7): range 1 (19.95) holds two, (19.95 - FIT) / 2 = 9.725
-    each; range 2 (16.35) one, flush with the right side face.  Lid, base,
-    lid: two stops, the base knuckle caught between them."""
+    """The printed route's plan, by hand from ``knuckle_x`` (R19, R23:
+    155.9..175.35, 181.35..197.7): range 1 (19.45) holds two, (19.45 - FIT)
+    / 2 = 9.475 each; range 2 (16.35) one, flush with the right side face.
+    Lid, base, lid: two stops, the base knuckle caught between them."""
     plan = H.knuckle_plan(L.layout(L.ROUTES["printed"]))
     got = [(round(k.x0, 3), round(k.x1, 3), k.part) for k in plan]
-    assert got == [(155.4, 165.125, "lid"), (165.625, 175.35, "base"), (181.35, 197.7, "lid")]
+    assert got == [(155.9, 165.375, "lid"), (165.875, 175.35, "base"), (181.35, 197.7, "lid")]
 
 
 def test_knuckles_inside_outer(lay):
@@ -220,17 +220,18 @@ def test_rod_enclosed_by_knuckles(lay):
 @pytest.mark.parametrize("corner", [(0, 0), (0, 1), (1, 0), (1, 1)],
                          ids=["-x-y", "-x+y", "+x-y", "+x+y"])
 def test_bank_anywhere_in_its_bay_misses_the_hinge(lay, corner):
-    """R19, R22: the bank pushed into any corner of its bay (along X and Y)
-    misses every knuckle, closed and at the stop, and the rod."""
+    """R19, R22, R23: the bank pushed into any corner of its bay (along X
+    and Y) stays at least FIT off every knuckle, closed and at the stop, and
+    off the rod."""
     l_, w_, h_ = BATTERIES[L.DESIGN_BANK].size
     bay = lay.bank_bay
     x0 = bay.x1 - l_ if corner[0] else bay.x0
     y0 = bay.y1 - w_ if corner[1] else bay.y0
     bank = _box(x0, y0, bay.z0, x0 + l_, y0 + w_, bay.z0 + h_)
-    assert _common(bank, _compound(H.knuckles(lay, "base"))) <= 1e-6
-    assert _common(bank, _rod(lay)) <= 1e-6
+    assert _dist(bank, _compound(H.knuckles(lay, "base"))) >= L.FIT - EPS
+    assert _dist(bank, _rod(lay)) >= L.FIT - EPS
     for a in (0.0, L.LID_OPEN_DEG):
-        assert _common(bank, _lid_at(lay, a)) <= 1e-6, a
+        assert _dist(bank, _lid_at(lay, a)) >= L.FIT - EPS, a
 
 
 # --- the cuts -----------------------------------------------------------------------

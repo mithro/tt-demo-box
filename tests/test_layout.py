@@ -484,10 +484,10 @@ def test_knuckle_x_design_kit():
     X 25.4..155.4, since the bank slides in its SLACK; Y to 170.255, 0.5 in
     front of the axis).  The VGA plug's stiff run ends at Y 151.255, 19.5 in
     front of the axis; the boost is in the lid.  The pigtail's notch is on
-    the plug's run axis, X 178.35 +- 3.  So, of X 0..197.7:  0..2.4,
-    155.4..175.35, 181.35..197.7."""
+    the plug's run axis, X 178.35 +- 3.  R23: FIT clear of each content
+    along X.  So, of X 0..197.7:  0..1.9, 155.9..175.35, 181.35..197.7."""
     lay = L.layout(L.ROUTES["printed"])
-    want = ((0.0, 2.4), (155.4, 175.35), (181.35, 197.7))
+    want = ((0.0, 1.9), (155.9, 175.35), (181.35, 197.7))
     assert len(lay.knuckle_x) == len(want)
     for (a, b), (c, d) in zip(lay.knuckle_x, want):
         assert (a, b) == (pytest.approx(c, abs=1e-6), pytest.approx(d, abs=1e-6))
@@ -501,7 +501,9 @@ def test_knuckle_x_clear_of_base_contents(lay):
     for key, b in boxes.items():
         near = math.hypot(max(b.y0 - hy, 0.0, hy - b.y1), max(b.z0 - hz, 0.0, hz - b.z1))
         if near <= lay.hinge_relief_r:
-            assert all(b.x1 <= x0 or b.x0 >= x1 for x0, x1 in lay.knuckle_x), key
+            # R23: FIT clear along X
+            assert all(b.x1 + L.FIT <= x0 + EPS or b.x0 - L.FIT >= x1 - EPS
+                       for x0, x1 in lay.knuckle_x), key
     n = lay.hinge_notch
     assert all(n.x1 <= x0 or n.x0 >= x1 for x0, x1 in lay.knuckle_x)
 

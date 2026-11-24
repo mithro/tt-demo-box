@@ -345,7 +345,8 @@ class Layout:
     lid_catch: tuple[Cyl, ...]       # the base-side catch magnets
     #: R15, R19: the X ranges where a knuckle may go: no base content
     #: (``base_contents``, and the whole bank bay) within ``hinge_relief_r``
-    #: of the axis in YZ, and not the pigtail's notch.  Everywhere else is
+    #: of the axis in YZ, nor FIT either side of one along X (R23), and not
+    #: the pigtail's notch.  Everywhere else is
     #: an open segment.
     knuckle_x: tuple[tuple[float, float], ...] = ()
 
@@ -446,10 +447,12 @@ def _yz_distance(b: Box, y: float, z: float) -> float:
 def _knuckle_x(lay: Layout) -> tuple[tuple[float, float], ...]:
     """R15: X 0..width less every base content within ``hinge_relief_r`` of
     the axis in YZ, and less the pigtail's notch.  R19: the whole bank bay
-    counts, not the bank as packed, since the bank slides in its SLACK."""
+    counts, not the bank as packed, since the bank slides in its SLACK.
+    R23: FIT clear of each such content along X (the notch has its own FIT)."""
     hy, hz = lay.hinge_axis
     boxes = [*base_contents(lay).values(), lay.bank_bay]
-    blocked = [(b.x0, b.x1) for b in boxes if _yz_distance(b, hy, hz) <= lay.hinge_relief_r]
+    blocked = [(b.x0 - FIT, b.x1 + FIT) for b in boxes
+               if _yz_distance(b, hy, hz) <= lay.hinge_relief_r]
     blocked.append((lay.hinge_notch.x0, lay.hinge_notch.x1))
     ranges, x = [], lay.outer.x0
     for a, b in sorted(blocked):
