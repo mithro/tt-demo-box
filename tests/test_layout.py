@@ -343,3 +343,12 @@ def test_both_routes_cut_the_one_finger_slot(route):
         holes = [Polygon(r) for r in face.shape.interiors]
         assert any(abs(p.area - want) / want < 0.01 and h.covers(*p.centroid.coords[0])
                    for p in holes), [p.area for p in holes]
+
+
+def test_tinyvga_offset_places_the_keepout():
+    """The TinyVGA offset is one function the layout and the scene share."""
+    for key in BOARD_KEYS:
+        dx, dy, dz = L.tinyvga_offset(key)
+        u = L.TINYVGA.pcb.union(L.TINYVGA.de15).union(L.TINYVGA.plug_keepout(L.VGA_PLUG_STRAIGHT))
+        k = L._tinyvga(key, L.VGA_PLUG_STRAIGHT)
+        assert (k.x0, k.y0, k.z0) == pytest.approx((u.x0 + dx, u.y0 + dy, u.z0 + dz))

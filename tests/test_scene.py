@@ -181,3 +181,43 @@ def test_flatpack_has_every_panel_flat_and_apart(manifests):
     for i, a in enumerate(rects):
         for b in rects[i + 1:]:
             assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1], (a, b)
+
+
+def _bb(solid):
+    b = solid.BoundingBox()
+    return (b.xmin, b.ymin, b.zmin, b.xmax, b.ymax, b.zmax)
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_scene_tinyvga_matches_layout_keepout(route):
+    """The rendered TinyVGA (PCB, DE-15, plug, adapter) fills exactly the
+    layout's keep-out: the scene takes its placement from the layout."""
+    lay = layout(ROUTES[route])
+    parts = {n: s for n, s, *_ in ES.bought_parts(lay)}
+    boxes = [_bb(parts[n]) for n in ("tinyvga-pcb", "tinyvga-de15", "vga-plug", "vga-adapter")]
+    got = [min(b[i] for b in boxes) if i < 3 else max(b[i] for b in boxes) for i in range(6)]
+    k = lay.board_keepouts["v3.2/tinyvga"]
+    assert got == pytest.approx([k.x0, k.y0, k.z0, k.x1, k.y1, k.z1])
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_scene_vga_cable_is_a_real_path(route):
+    """The VGA cable is no stub: it starts on the adapter, crosses the hinge
+    axis in the channel, and ends at the monitor's exit point in the lid."""
+    from demobox.checks import _exit_point
+    from demobox.parts.monitors import MONITORS
+    lay = layout(ROUTES[route])
+    hy, hz = lay.hinge_axis
+    ad = ES.tinyvga_boxes(lay)["adapter"]
+    (bf, base), (lf, lid) = ES.vga_cable_path(lay, ad)
+    assert (bf, lf) == ("base", "lid")
+    assert base[0][2] == pytest.approx(ad.z1) and ad.x0 < base[0][0] < ad.x1
+    ch = lay.hinge_cable_channel
+    assert base[-1] == pytest.approx(lid[0])
+    assert lid[0] == pytest.approx(((ch.x0 + ch.x1) / 2, hy, hz))
+    ex, ey, ez = _exit_point(MONITORS[ES.body.ASSEMBLY_MONITOR], lay)
+    assert lid[-1] == pytest.approx((ex, hy + ey, hz + ez))
+    length = sum(math.dist(a, b) for run in (base, lid) for a, b in zip(run, run[1:]))
+    assert length > 50           # the old stub was ~2 mm
+    lid_parts = {n for n, _, _, _, f in ES.bought_parts(lay) if f == "lid"}
+    assert lid_parts and all(n.startswith("vga-cable") for n in lid_parts)

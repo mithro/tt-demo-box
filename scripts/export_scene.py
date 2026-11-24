@@ -66,10 +66,10 @@ sys.path.insert(0, str(ROOT))
 import cadquery as cq  # noqa: E402
 
 import demobox  # noqa: E402,F401  (puts the submodule on sys.path)
-from demobox.checks import panel_in_lid  # noqa: E402
+from demobox.checks import _exit_point, panel_in_lid  # noqa: E402
 from demobox.geom import Box  # noqa: E402
-from demobox.layout import (LID_OPEN_DEG, ROUTES, TINYVGA_Z_OFFSET, Layout,  # noqa: E402
-                            layout)
+from demobox.layout import (LID_OPEN_DEG, ROUTES, VGA_PLUG_STRAIGHT, Layout,  # noqa: E402
+                            exit_edge, layout, tinyvga_offset)
 from demobox.parts.board import board_spec  # noqa: E402
 from demobox.parts.cables import CABLES  # noqa: E402
 from demobox.parts.monitors import MONITORS  # noqa: E402
@@ -223,15 +223,82 @@ def _to_base(lay: Layout, x0, y0, z0, x1, y1, z1) -> Box:
     return Box(ox - x1, oy - y1, oz + z0, ox - x0, oy - y0, oz + z1)
 
 
+def _tube(a, b, r: float) -> cq.Shape:
+    """A cable leg: cylinder of radius ``r`` from point ``a`` to ``b``, with a
+    sphere at ``a`` so consecutive legs join without a gap at the corner."""
+    va, vb = cq.Vector(*a), cq.Vector(*b)
+    leg = cq.Solid.makeCylinder(r, (vb - va).Length, va, vb - va)
+    return leg.fuse(cq.Solid.makeSphere(r, va, angleDegrees1=-90, angleDegrees2=90))
+
+
+def vga_cable_path(lay: Layout, end: Box, monitor: str = body.ASSEMBLY_MONITOR):
+    """The slim VGA cable's centre line, as ``(frame, [points])`` runs in the
+    base frame with the lid shut.  From the top of the plug/adapter (``end``)
+    it rises to the hinge axis and through the hinge cable channel (base run);
+    in the lid it rises into the gutter, runs along the hinge gutter (and the side
+    gutter for a side exit) and ends at the monitor's exit point
+    (``checks._exit_point``) -- the route ``checks.cables_route`` budgets."""
+    m = MONITORS[monitor]
+    hy, hz = lay.hinge_axis
+    ex, ey, ez = _exit_point(m, lay)
+    ey, ez = hy + ey, hz + ez                       # lid frame -> base frame, lid shut
+    cx, cy = (end.x0 + end.x1) / 2, (end.y0 + end.y1) / 2
+    g = lay.hinge_cable_channel
+    gx0 = (g.x0 + g.x1) / 2                          # the channel the cable threads
+    hg = lay.lid_cable_gutters["hinge"]
+    gy = hy + (hg.y0 + hg.y1) / 2                    # the hinge gutter's centre line
+    base = [(cx, cy, end.z1), (cx, cy, hz), (gx0, hy, hz)]
+    lid = [(gx0, hy, hz), (gx0, hy, ez), (gx0, gy, ez)]
+    side = lay.lid_cable_gutters.get(exit_edge(m))
+    if side is not None:                             # along the hinge gutter into the side one
+        sx = (side.x0 + side.x1) / 2
+        lid += [(sx, gy, ez), (sx, ey, ez)]
+    else:
+        lid += [(ex, gy, ez)]
+    lid += [(ex, ey, ez)]
+    return [("base", base), ("lid", lid)]
+
+
+def vga_cable(lay: Layout, end: Box, monitor: str = body.ASSEMBLY_MONITOR):
+    """``(name, solid, frame)`` for each leg of ``vga_cable_path``."""
+    r = CABLES["vga-slim"].dia / 2
+    out = []
+    for frame, pts in vga_cable_path(lay, end, monitor):
+        for i, (a, b) in enumerate(zip(pts, pts[1:])):
+            if a != b:
+                out.append((f"vga-cable-{frame}{i}", _tube(a, b, r), frame))
+    return out
+
+
+def tinyvga_boxes(lay: Layout, board: str = body.ASSEMBLY_BOARD) -> dict[str, Box]:
+    """The TinyVGA's blocks in the base frame: ``pcb``, ``header``, ``de15``,
+    the VGA ``plug`` body and (90 degree plug only) the ``adapter``; the plug
+    and adapter together are ``TINYVGA.plug_keepout(VGA_PLUG_STRAIGHT)``."""
+    dx, dy, dz = tinyvga_offset(board)
+
+    def tv(b: Box) -> Box:
+        m = b.moved(dx, dy, dz)
+        return _to_base(lay, m.x0, m.y0, m.z0, m.x1, m.y1, m.z1)
+
+    keep = TINYVGA.plug_keepout(VGA_PLUG_STRAIGHT)
+    plug = replace(keep, y0=keep.y1 - TINYVGA.plug_body_len)
+    out = {"pcb": tv(TINYVGA.pcb), "header": tv(TINYVGA.header), "de15": tv(TINYVGA.de15),
+           "plug": tv(plug)}
+    if not VGA_PLUG_STRAIGHT:
+        out["adapter"] = tv(replace(keep, y1=plug.y0))
+    return out
+
+
 def bought_parts(lay: Layout, board: str = body.ASSEMBLY_BOARD):
-    """Representative solids the assembly leaves out, in the base frame:
-    ``(name, solid, material, colour)``."""
+    """Representative solids the assembly leaves out, in the base frame
+    (lid shut): ``(name, solid, material, colour, frame)``; ``frame`` is the
+    frame it moves with (``base``, or ``lid`` for the cable inside the lid)."""
     spec = board_spec(board)
     top = spec.outline.thickness
     out = []
 
-    def add(name, solid, material, colour):
-        out.append((name, solid, material, PALETTE[colour]))
+    def add(name, solid, material, colour, frame="base"):
+        out.append((name, solid, material, PALETTE[colour], frame))
 
     for p in spec.pmods:
         add(f"pmod-{p.designator}", _box(_to_base(lay, p.body_x0, p.body_y0, top, p.body_x1,
@@ -252,30 +319,16 @@ def bought_parts(lay: Layout, board: str = body.ASSEMBLY_BOARD):
             add(f"led-{f.designator}", _box(_to_base(lay, f.x0, f.y0, top, f.x1, f.y1,
                                                      top + COMPONENT_H["led"])), "plastic", "led")
 
-    # TinyVGA in J13 (pmod3), placed as demobox.layout._tinyvga places it
-    pmod = next(p for p in spec.pmods if p.key == "pmod3")
-    h = TINYVGA.header
-    dx = (pmod.body_x0 + pmod.body_x1) / 2 - (h.x0 + h.x1) / 2
-    dy = pmod.body_y0
-
-    def tv(b: Box) -> Box:
-        m = b.moved(dx, dy, TINYVGA_Z_OFFSET)
-        return _to_base(lay, m.x0, m.y0, m.z0, m.x1, m.y1, m.z1)
-
-    add("tinyvga-pcb", _box(tv(TINYVGA.pcb)), "pcb", "pcb-tinyvga")
-    add("tinyvga-header", _box(tv(TINYVGA.header)), "plastic", "black")
-    add("tinyvga-de15", _box(tv(TINYVGA.de15)), "plastic", "vga-blue")
-    keep = TINYVGA.plug_keepout(False)            # plug body + the 90 degree adapter
-    plug = replace(keep, y0=keep.y1 - TINYVGA.plug_body_len)
-    adapter = replace(keep, y1=plug.y0)
-    add("vga-plug", _box(tv(plug)), "plastic", "moulded")
-    ad = tv(adapter)
-    add("vga-adapter", _box(ad), "plastic", "moulded")
-    vga = CABLES["vga-slim"]
-    cx, cy = (ad.x0 + ad.x1) / 2, (ad.y0 + ad.y1) / 2
-    rise = lay.hinge_axis[1] - ad.z1           # up the hinge channel to the hinge
-    add("vga-cable", cq.Solid.makeCylinder(vga.dia / 2, rise, cq.Vector(cx, cy, ad.z1)),
-        "rubber", "black")
+    # TinyVGA in J13 (pmod3), placed by demobox.layout.tinyvga_offset
+    tvb = tinyvga_boxes(lay, board)
+    add("tinyvga-pcb", _box(tvb["pcb"]), "pcb", "pcb-tinyvga")
+    add("tinyvga-header", _box(tvb["header"]), "plastic", "black")
+    add("tinyvga-de15", _box(tvb["de15"]), "plastic", "vga-blue")
+    add("vga-plug", _box(tvb["plug"]), "plastic", "moulded")
+    if "adapter" in tvb:
+        add("vga-adapter", _box(tvb["adapter"]), "plastic", "moulded")
+    for name, solid, frame in vga_cable(lay, tvb.get("adapter", tvb["plug"])):
+        add(name, solid, "rubber", "black", frame)
 
     # right-angle USB-C plug in J1, its cable dropping through the deck slot
     up = lay.board_keepouts[f"{board}/usb_plug"]
@@ -380,7 +433,7 @@ def route_parts(route: str, out: Path) -> list[dict]:
         if name.startswith("hw:head-"):
             shape = _round_head(shape)
         parts.append((name, shape, frame, material, colour))
-    parts += [(n, s, "base", mat, c) for n, s, mat, c in bought_parts(lay)]
+    parts += [(n, s, frame, mat, c) for n, s, mat, c, frame in bought_parts(lay)]
     entries = []
     for name, shape, frame, material, colour in parts:
         rel = Path(route) / f"{name.replace(':', '_')}.stl"

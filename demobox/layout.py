@@ -160,15 +160,21 @@ def _usb_plug(key: str) -> Box:
                cx + width / 2, j1.y1 + length, cz + height / 2, f"{key} J1 USB-C plug")
 
 
-def _tinyvga(key: str, straight: bool) -> Box:
-    """TinyVGA PCB + DE-15 + VGA plug keep-out in J13 (pmod3), board frame."""
+def tinyvga_offset(key: str) -> tuple[float, float, float]:
+    """``(dx, dy, dz)`` moving the TinyVGA from its own frame to where it sits
+    in J13 (pmod3) of board ``key``, board frame: centred on the socket, its
+    PCB edge fully inserted at the socket mouth, lifted ``TINYVGA_Z_OFFSET``."""
     pmod = next(p for p in board_spec(key).pmods if p.key == "pmod3")
     h = TINYVGA.header
-    dx = (pmod.body_x0 + pmod.body_x1) / 2 - (h.x0 + h.x1) / 2
-    dy = pmod.body_y0           # fully inserted: PCB edge at the socket mouth
+    return ((pmod.body_x0 + pmod.body_x1) / 2 - (h.x0 + h.x1) / 2,
+            pmod.body_y0, TINYVGA_Z_OFFSET)
+
+
+def _tinyvga(key: str, straight: bool) -> Box:
+    """TinyVGA PCB + DE-15 + VGA plug keep-out in J13 (pmod3), board frame."""
     u = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(straight))
     return Box(u.x0, u.y0, u.z0, u.x1, u.y1, u.z1,
-               f"{key} TinyVGA + VGA plug").moved(dx, dy, TINYVGA_Z_OFFSET)
+               f"{key} TinyVGA + VGA plug").moved(*tinyvga_offset(key))
 
 
 def _board_frame(key: str, straight: bool) -> dict[str, Box]:
