@@ -51,12 +51,13 @@ jobs:
       # stamped with a content hash of demobox/, scripts/, the submodule pin
       # and the Makefile at HEAD (demobox/drafting/sheetkit.py version()), and
       # a merge with a moved base would stamp content the branch never had.
+      # version() reads `git rev-parse HEAD:<path>`, which needs only HEAD's tree, so the
+      # default depth-1 clone is enough (no history).
       # The submodule holds the board data and the shared drawing code.
       - name: Check out the commit that was pushed, with submodules
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
           submodules: true
           persist-credentials: false
 
