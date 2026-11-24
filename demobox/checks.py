@@ -28,6 +28,7 @@ round every counted corner of the polyline without two arcs overlapping.
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from shapely.geometry import Point, Polygon, box as sbox
@@ -680,7 +681,9 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
 
     * ``knuckle_x`` holds no base content within ``hinge_relief_r`` of the
       axis in YZ (a lid knuckle's whole lid, or a base knuckle, sweeps
-      there), and at least two ranges of ``KNUCKLE_LEN``.
+      there) -- the whole bank bay counting, not the bank as packed, since
+      the bank slides in it (R19) -- nor within FIT of one along X (R23);
+      and at least two ranges of ``KNUCKLE_LEN``.
     * At every angle from closed to LID_OPEN_DEG, inside ``knuckle_x`` the
       whole lid misses every base content there.
     * In open segments (R21), the lid cut back to ``hinge_relief_r`` misses
@@ -701,11 +704,14 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
     knuckles, opens = list(lay.knuckle_x), _open_x(lay)
     contents = L.base_contents(lay)
 
-    near = {n: b for n, b in contents.items()
+    near = {n: b for n, b in {**contents, "bank bay": lay.bank_bay}.items()
             if math.hypot(max(b.y0 - hy, 0.0, hy - b.y1), max(b.z0 - hz, 0.0, hz - b.z1)) <= rr}
-    under = sorted(n for n, b in near.items() if _x_overlaps(b, knuckles))
-    report.check(not under, "knuckle_x: no base content within the hinge relief of the axis",
-                 (f"within r {_f(rr)} of the axis and under a knuckle: {', '.join(under)}"
+    under = sorted(n for n, b in near.items()
+                   if _x_overlaps(replace(b, x0=b.x0 - L.FIT, x1=b.x1 + L.FIT), knuckles))
+    report.check(not under, "knuckle_x: no base content (the whole bank bay) within the "
+                 "hinge relief of the axis, nor within FIT of one along X",
+                 (f"within r {_f(rr)} of the axis and within FIT of a knuckle range: "
+                  f"{', '.join(under)}"
                   if under else f"within r {_f(rr)} of the axis: "
                   + (", ".join(f"{n} (X {_f(b.x0)}..{_f(b.x1)})" for n, b in sorted(near.items()))
                      or "nothing") + "; all in open segments"))

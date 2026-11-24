@@ -249,6 +249,17 @@ def test_hinge_sweep_fails_with_a_knuckle_over_the_bank(lay):
     assert any(L.DESIGN_BANK in f for f in failed), failed
 
 
+def test_hinge_sweep_keeps_knuckles_fit_off_the_bank_bay(lay):
+    """R19, R23 in verify: knuckle_x built with no FIT margin along X (a
+    knuckle range touching the bank bay's end) fails hinge_sweep, naming the
+    bank bay; the real knuckle_x passes."""
+    bare = replace(lay, knuckle_x=L._knuckle_x(lay, margin=0.0))
+    assert bare.knuckle_x != lay.knuckle_x
+    failed = _failed(_run(C.hinge_sweep, bare))
+    assert failed and all("knuckle" in f for f in failed), failed
+    assert any("bank bay" in f for f in failed), failed
+
+
 def test_hinge_sweep_needs_two_knuckle_ranges(lay):
     few = replace(lay, knuckle_x=lay.knuckle_x[:1])
     failed = _failed(_run(C.hinge_sweep, few))

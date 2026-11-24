@@ -44,7 +44,12 @@ v 0..TAB_H over it.  The disc reaches the back face (u = R) and is half in
 the base, half in the lid, so nothing is proud of the closed box.  The rod
 (R22) runs from the first knuckle's -X end to the +X side face, flush there
 and pushed in from there, one piece across the notch: ``pin_length``.  It is
-in a knuckle all along but the notch and the FIT gaps.  (A full-width rod
+in a knuckle all along but the notch and the FIT gaps.  R24, what holds it
+axially: the first knuckle's bore is blind, stopping ROD_BLIND short of that
+knuckle's -X face, so the rod goes no further -X; and the last PRESS_LEN of
+the +X knuckle's bore, at the side face, is PRESS_D, a press fit, so it
+can't walk out.  Everywhere else the bore is a PIN_HOLE_D slip fit.  Press
+the rod in from +X; filament can be heat-set.  (A full-width rod
 would cross the port room and the bank bay, which reach 0.5 mm in front of
 the axis: the bank, slid back in its SLACK, would hit it.)
 
@@ -89,6 +94,13 @@ Part = Literal["base", "lid"]
 
 #: The rod's bore: PIN_ROD_D plus a slip clearance, so the rod pushes through.
 PIN_HOLE_D = PIN_ROD_D + 0.2
+#: R24: the first knuckle's bore stops this far short of its -X face (the
+#: rod's blind end) ...
+ROD_BLIND = 1.0
+#: ... and the last PRESS_LEN of the +X knuckle's bore, at the side face, is
+#: PRESS_D: a press fit that keeps the rod in.
+PRESS_LEN = 5.0
+PRESS_D = PIN_ROD_D - 0.1
 #: The lid knuckle's tab, u 0..KNUCKLE_R, v 0..TAB_H: up to where the lid's
 #: back face crosses the base's back face at the stop, R tan(A / 2), plus FIT.
 TAB_H = KNUCKLE_R * math.tan(math.radians(LID_OPEN_DEG) / 2) + FIT
@@ -153,8 +165,9 @@ def knuckle_plan(lay: Layout) -> tuple[Knuckle, ...]:
 
 
 def pin_length(lay: Layout) -> float:
-    """The rod (R22): from the first knuckle's -X end to the +X side face."""
-    return lay.outer.x1 - knuckle_plan(lay)[0].x0
+    """The rod (R22, R24): from the blind end of the first knuckle's bore,
+    ROD_BLIND in from its -X face, to the +X side face."""
+    return lay.outer.x1 - (knuckle_plan(lay)[0].x0 + ROD_BLIND)
 
 
 def _dir(deg: float) -> tuple[float, float]:
@@ -239,17 +252,29 @@ def _prism(axis_yz: tuple[float, float], x0: float, x1: float,
 
 
 def knuckles(lay: Layout, part: Part) -> cq.Workplane:
-    """``part``'s knuckles, each bored PIN_HOLE_D on the axis, in its frame;
-    the base's also include the stop block under each lid knuckle."""
+    """``part``'s knuckles, each bored PIN_HOLE_D on the axis (blind in the
+    first, a PRESS_D press fit for the last PRESS_LEN of the last; R24), in
+    its frame; the base's also include the stop block under each lid
+    knuckle."""
     _check_part(part)
     ax = _axis_yz(lay, part)
     r = KNUCKLE_R
     web = ((0.0, -r), (r, -r), (r, 0.0), (0.0, 0.0)) if part == "base" else _tab_uv()
     out = []
-    for k in knuckle_plan(lay):
+    plan = knuckle_plan(lay)
+    last = plan[-1]
+    if abs(last.x1 - lay.outer.x1) > _EPS or last.x1 - last.x0 < PRESS_LEN + ROD_BLIND:
+        raise ValueError(f"the last knuckle ({last.x0:.2f}..{last.x1:.2f}) must reach the "
+                         f"+X side face ({lay.outer.x1:.2f}) to hold the rod's press fit")
+    for k in plan:
         if k.part == part:
             s = _prism(ax, k.x0, k.x1, r=r).fuse(_prism(ax, k.x0, k.x1, web))
-            out.append(s.cut(_prism(ax, k.x0 - 1.0, k.x1 + 1.0, r=PIN_HOLE_D / 2)).clean())
+            b0 = k.x0 + ROD_BLIND if k is plan[0] else k.x0 - 1.0     # R24: blind end
+            b1 = k.x1 - PRESS_LEN if k is plan[-1] else k.x1 + 1.0    # R24: press zone
+            s = s.cut(_prism(ax, b0, b1, r=PIN_HOLE_D / 2))
+            if k is plan[-1]:
+                s = s.cut(_prism(ax, b1 - 1.0, k.x1 + 1.0, r=PRESS_D / 2))
+            out.append(s.clean())
         elif part == "base":
             out.append(_prism(ax, k.x0, k.x1, _block_uv(lay.hinge_relief_r)))
     return cq.Workplane("XY").newObject(out)

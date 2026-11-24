@@ -176,30 +176,65 @@ def test_knuckles_where_the_plan_says(lay):
 # --- the rod ----------------------------------------------------------------------
 
 def test_pin_flush(lay):
-    """R22: one rod from the first knuckle to the +X side face, flush there
-    (it goes in from there), its -X end in the first knuckle."""
+    """R22, R24: one rod from the blind end of the first knuckle's bore
+    (ROD_BLIND in from its -X face) to the +X side face, flush there (it
+    goes in from there)."""
     first = H.knuckle_plan(lay)[0]
+    assert H.ROD_BLIND == 1.0
     x0 = lay.outer.x1 - H.pin_length(lay)
-    assert first.x0 - EPS <= x0 < first.x1
-    assert H.pin_length(lay) == pytest.approx(lay.outer.x1 - first.x0)
+    assert x0 == pytest.approx(first.x0 + H.ROD_BLIND)
+    assert first.x0 < x0 < first.x1
 
 
-def test_rod_bore(lay):
-    """PIN_HOLE_D = PIN_ROD_D + 0.2 along the axis through every knuckle: the
-    rod is clear, a ring just outside the bore is not."""
+def _cyl(lay, part, d, x0, x1) -> cq.Solid:
+    """A cylinder of diameter d on the axis, x0..x1, in ``part``'s frame."""
+    return cq.Solid.makeCylinder(d / 2, x1 - x0, cq.Vector(x0, *_axis(lay, part)),
+                                 cq.Vector(1, 0, 0))
+
+
+def test_rod_bore_slip_fit(lay):
+    """PIN_HOLE_D = PIN_ROD_D + 0.2 through every knuckle but the press zone:
+    the rod is clear there, a ring just outside the bore is not."""
     assert H.PIN_HOLE_D == pytest.approx(L.PIN_ROD_D + 0.2)
+    x0 = lay.outer.x1 - H.pin_length(lay)
+    slip_x1 = lay.outer.x1 - H.PRESS_LEN
     for part in ("base", "lid"):
         comp = _compound(H.knuckles(lay, part))
-        origin = _axis(lay, part)
-        rod = _rod(lay).moved(lay.lid_location(0).inverse) if part == "lid" else _rod(lay)
-        assert _common(rod, comp) <= 1e-6, part
+        assert _common(_cyl(lay, part, L.PIN_ROD_D, x0, slip_x1), comp) <= 1e-6, part
         for k in _parts(lay, part):
-            ring = cq.Solid.makeCylinder(H.PIN_HOLE_D / 2 + 0.05, k.x1 - k.x0 - 0.2,
-                                         cq.Vector(k.x0 + 0.1, *origin),
-                                         cq.Vector(1, 0, 0)).cut(
-                cq.Solid.makeCylinder(H.PIN_HOLE_D / 2 + 0.01, k.x1 - k.x0,
-                                      cq.Vector(k.x0, *origin), cq.Vector(1, 0, 0)))
+            ring = _cyl(lay, part, H.PIN_HOLE_D + 0.1, k.x0 + 0.1, k.x1 - 0.1).cut(
+                _cyl(lay, part, H.PIN_HOLE_D + 0.02, k.x0, k.x1))
             assert _common(ring, comp) > 0, (part, k)
+
+
+def test_rod_blind_end(lay):
+    """R24: the first knuckle's bore stops ROD_BLIND short of its -X face: a
+    rod a little longer than ``pin_length`` meets solid there."""
+    first = H.knuckle_plan(lay)[0]
+    comp = _compound(H.knuckles(lay, first.part))
+    blind = _cyl(lay, first.part, L.PIN_ROD_D, first.x0 + 0.01, first.x0 + H.ROD_BLIND - 0.01)
+    assert _common(blind, comp) == pytest.approx(blind.Volume(), rel=1e-3)
+    longer = _cyl(lay, first.part, L.PIN_ROD_D, lay.outer.x1 - H.pin_length(lay) - 0.2,
+                  lay.outer.x1 - H.PRESS_LEN)
+    assert _common(longer, comp) > 0.1
+
+
+def test_rod_press_fit(lay):
+    """R24: the last PRESS_LEN of the +X knuckle's bore, at the side face, is
+    PIN_ROD_D - 0.1: narrower than the rod all the way, and the slip bore
+    starts right after it."""
+    last = H.knuckle_plan(lay)[-1]
+    assert last.x1 == pytest.approx(lay.outer.x1)
+    assert H.PRESS_D == pytest.approx(L.PIN_ROD_D - 0.1) and H.PRESS_LEN == 5.0
+    comp = _compound(H.knuckles(lay, last.part))
+    x1 = lay.outer.x1
+    ring = _cyl(lay, last.part, L.PIN_ROD_D, x1 - H.PRESS_LEN + 0.01, x1 - 0.01).cut(
+        _cyl(lay, last.part, H.PRESS_D + 0.02, x1 - H.PRESS_LEN, x1))
+    assert _common(ring, comp) == pytest.approx(ring.Volume(), rel=1e-3)
+    inside = _cyl(lay, last.part, H.PRESS_D - 0.02, x1 - H.PRESS_LEN, x1)
+    assert _common(inside, comp) <= 1e-6
+    slip = _cyl(lay, last.part, H.PIN_HOLE_D - 0.02, last.x0, x1 - H.PRESS_LEN - 0.01)
+    assert _common(slip, comp) <= 1e-6
 
 
 def test_rod_enclosed_by_knuckles(lay):
