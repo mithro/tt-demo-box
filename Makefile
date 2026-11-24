@@ -1,9 +1,9 @@
 # Everything runs through uv; no pyproject.toml.
 PY := uv run --no-project --with pytest --with cadquery --with ezdxf --with pypdf --with pillow --with shapely
-BLENDER := blender -b --factory-startup
+BLENDER := blender -b --factory-startup --python-exit-code 1
 # scripts/export_scene.py RENDERS (tests/test_scene.py checks they agree)
-RENDERS := printed-closed printed-open-front printed-open-back printed-drawer-out \
-	laser-closed laser-open-front laser-open-back laser-drawer-out laser-flatpack
+RENDERS := printed-closed printed-open-front printed-open-back printed-bank-out \
+	laser-closed laser-open-front laser-open-back laser-bank-out laser-flatpack
 
 .PHONY: test test-all verify outputs check check-sheets check-outputs check-readme readme tools fetch renders sheets
 
@@ -49,14 +49,19 @@ fetch:
 	$(PY) python scripts/fetch.py
 
 ## renders: Blender renders -> output/renders/*.png (scene in tmp/scene, logs tmp/render-*.log)
+## Each PNG is deleted first and a render fails unless Blender exits 0 and logs "rendered in"
+## (a crashed render must not leave the old image looking current).
 renders:
 	$(PY) python scripts/export_scene.py
-	mkdir -p output/renders
+	mkdir -p output/renders tmp
 	@for r in $(RENDERS); do \
 	  echo "render $$r (log: tmp/render-$$r.log)"; \
+	  rm -f output/renders/$$r.png; \
 	  $(BLENDER) -P render/render_scene.py -- --manifest tmp/scene/$$r.json \
 	    --out output/renders/$$r.png > tmp/render-$$r.log 2>&1 \
-	    || { tail -n 40 tmp/render-$$r.log; exit 1; }; \
+	    || { tail -n 40 tmp/render-$$r.log; echo "render $$r FAILED"; exit 1; }; \
+	  grep -q "rendered in" tmp/render-$$r.log \
+	    || { tail -n 40 tmp/render-$$r.log; echo "render $$r FAILED: no \"rendered in\""; exit 1; }; \
 	  grep "rendered in" tmp/render-$$r.log; \
 	done
 
