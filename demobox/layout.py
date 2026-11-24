@@ -97,6 +97,17 @@ ROUTES: dict[str, float] = {"printed": 2.4, "laser": 3.0}
 #: The VGA plug is sized for a 90 degree adapter: with a straight plug the base
 #: would be deeper than the print bed (``_base_depth(2.4, straight=True)``).
 VGA_PLUG_STRAIGHT = False
+#: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
+#: in the base's front wall rim and the lid's front band, MAGNET_RECESS below
+#: each seam face, so the shut lid's magnets face each other 2 x MAGNET_RECESS
+#: apart.  Each sits in a CATCH_BLOCK square, CATCH_BLOCK_H tall block against
+#: the front wall, CATCH_INSET_X in from each side wall (clear of the board).
+MAGNET_D = 6.0
+MAGNET_T = 3.0
+MAGNET_RECESS = 0.2
+CATCH_BLOCK = 10.0
+CATCH_BLOCK_H = 6.0
+CATCH_INSET_X = 35.0
 #: Monitor insert material: front bezel plate and rear retainer thickness.
 INSERT_MATERIAL = 1.2
 #: Bare-kit driver board standoff height above the panel's back.
@@ -107,7 +118,11 @@ STANDOFF_MIN = float(math.ceil(HEATSET_DEPTH))
 #: MT1 locating peg: into the board's 3.2 mm hole, below the PCB's top face.
 PEG_DIA = 3.0
 PEG_HEIGHT = 1.2
-#: Finger hole in the drawer face, around the bank's end button.
+#: The boss's hole for the loose pin: PEG_DIA plus a slip clearance, so the
+#: pin pushes in by hand and comes out again for the other revision.
+PEG_HOLE_D = PEG_DIA + 0.2
+#: Finger hole in the drawer face: a slot this wide round the banks' end
+#: buttons (``Layout.drawer_face_hole``, a stadium through the face).
 FINGER_HOLE_D = 20.0
 
 # --- placeholders for part heights not in any source (UNCONFIRMED) -----------
@@ -156,15 +171,21 @@ def _usb_plug(key: str) -> Box:
                cx + width / 2, j1.y1 + length, cz + height / 2, f"{key} J1 USB-C plug")
 
 
-def _tinyvga(key: str, straight: bool) -> Box:
-    """TinyVGA PCB + DE-15 + VGA plug keep-out in J13 (pmod3), board frame."""
+def tinyvga_offset(key: str) -> tuple[float, float, float]:
+    """``(dx, dy, dz)`` moving the TinyVGA from its own frame to where it sits
+    in J13 (pmod3) of board ``key``, board frame: centred on the socket, its
+    PCB edge fully inserted at the socket mouth, lifted ``TINYVGA_Z_OFFSET``."""
     pmod = next(p for p in board_spec(key).pmods if p.key == "pmod3")
     h = TINYVGA.header
-    dx = (pmod.body_x0 + pmod.body_x1) / 2 - (h.x0 + h.x1) / 2
-    dy = pmod.body_y0           # fully inserted: PCB edge at the socket mouth
+    return ((pmod.body_x0 + pmod.body_x1) / 2 - (h.x0 + h.x1) / 2,
+            pmod.body_y0, TINYVGA_Z_OFFSET)
+
+
+def _tinyvga(key: str, straight: bool) -> Box:
+    """TinyVGA PCB + DE-15 + VGA plug keep-out in J13 (pmod3), board frame."""
     u = TINYVGA.pcb.union(TINYVGA.de15).union(TINYVGA.plug_keepout(straight))
     return Box(u.x0, u.y0, u.z0, u.x1, u.y1, u.z1,
-               f"{key} TinyVGA + VGA plug").moved(dx, dy, TINYVGA_Z_OFFSET)
+               f"{key} TinyVGA + VGA plug").moved(*tinyvga_offset(key))
 
 
 def _board_frame(key: str, straight: bool) -> dict[str, Box]:
@@ -264,6 +285,18 @@ def _base_depth(wall: float, straight: bool) -> float:
                _lid_inner_xy()[1] + 2 * wall)
 
 
+def _finger_slot(buttons: list[tuple[float, float]], wall: float) -> Stadium:
+    """The drawer face's finger hole: a FINGER_HOLE_D slot along X through the
+    face (0 .. wall), its centres the two end buttons (y, z) furthest apart.
+    Raises if a third button falls outside it."""
+    a, b = max(((p, q) for p in buttons for q in buttons), key=lambda pq: math.dist(*pq))
+    slot = Stadium(*a, *b, FINGER_HOLE_D / 2, 0.0, wall, "drawer face finger hole", axis="x")
+    for y, z in buttons:
+        if not slot.covers(y, z):
+            raise ValueError(f"end button at (y {y:.2f}, z {z:.2f}) is outside the finger slot")
+    return slot
+
+
 # --- the layout --------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -280,7 +313,7 @@ class Layout:
     usb_slot: Box
     bay: Box
     cable_bay: Box
-    drawer_face_hole: Box
+    drawer_face_hole: Stadium        # along X through the face: centres (y, z)
     drawer_out: tuple[float, float, float]
     drawer_travel: float
     boost_pocket: Box
@@ -289,6 +322,24 @@ class Layout:
     lid_outer: Box                   # lid frame, closed
     lid_pocket: Box                  # lid frame, closed
     lid_cable_gutters: dict[str, Box]  # lid frame, closed: "hinge", and "left"/"right"
+    lid_catch: tuple[Cyl, ...]       # the base-side catch magnets (base frame, in the front wall)
+
+    def catch_base_block(self, c: Cyl) -> Box:
+        """The block holding catch magnet ``c`` under the base's rim (base frame)."""
+        h, w = self.outer.z1, self.wall
+        return Box(c.cx - CATCH_BLOCK / 2, w, h - CATCH_BLOCK_H, c.cx + CATCH_BLOCK / 2,
+                   w + CATCH_BLOCK, h, "lid catch block (base)")
+
+    def catch_lid_block(self, c: Cyl) -> Box:
+        """The block over it in the lid's front band (lid frame, closed)."""
+        b = self.catch_base_block(c)
+        d = self.outer.y1
+        return Box(b.x0, b.y0 - d, 0.0, b.x1, b.y1 - d, CATCH_BLOCK_H, "lid catch block (lid)")
+
+    def catch_lid_magnet(self, c: Cyl) -> Cyl:
+        """The lid-side magnet facing ``c`` across the seam (lid frame, closed)."""
+        return Cyl(c.cx, c.cy - self.outer.y1, MAGNET_RECESS, MAGNET_RECESS + MAGNET_T,
+                   MAGNET_D / 2, "lid catch magnet (lid)")
 
     def _open_yz(self, y: float, z: float, angle_deg: float) -> tuple[float, float]:
         """Lid-frame (y, z) to base-frame (Y, Z) with the lid ``angle_deg`` open:
@@ -331,10 +382,7 @@ def layout(wall: float) -> Layout:
 
     buttons = [(bay.y0 + (BAY_INSIDE[1] - b.size[1]) / 2 + b.button[1], bay.z0 + b.button[2])
                for b in BATTERIES.values() if b.button is not None and b.button[0] == "end"]
-    r = FINGER_HOLE_D / 2
-    drawer_face_hole = Box(0.0, min(y for y, _ in buttons) - r, min(z for _, z in buttons) - r,
-                           wall, max(y for y, _ in buttons) + r, max(z for _, z in buttons) + r,
-                           "drawer face finger hole")
+    drawer_face_hole = _finger_slot(buttons, wall)
 
     # --- deck: over the drawer and the USB-C cable's drop --------------------
     cavity = _USB.min_bend_r + _USB.dia      # right-angle drop turning flat
@@ -360,7 +408,7 @@ def layout(wall: float) -> Layout:
     #  * ``pegs``: a locating peg per revision rising from the boss into that
     #    revision's MT1 hole.  Each revision's peg sits under the other
     #    revision's PCB, so a fixed pair would lift either board: the boss has a
-    #    PEG_DIA hole at each MT1 and only the fitted revision's peg (a loose
+    #    PEG_HOLE_D hole at each MT1 and only the fitted revision's peg (a loose
     #    printed pin) is pushed in;
     #  * ``supports``: plain pads at the other two corners of the hole
     #    rectangle (clear of J1), so two fixings do not let the board rock.
@@ -432,6 +480,10 @@ def layout(wall: float) -> Layout:
                               cx + chan_w / 2, hinge[0], hinge[1] + pocket_depth,
                               "hinge cable channel")
 
+    catch = tuple(Cyl(x, wall + CATCH_BLOCK / 2, height - MAGNET_RECESS - MAGNET_T,
+                      height - MAGNET_RECESS, MAGNET_D / 2, f"lid catch magnet (base) {i + 1}")
+                  for i, x in enumerate((CATCH_INSET_X, width - CATCH_INSET_X)))
+
     return Layout(
         wall=wall, outer=outer, deck_z=deck_z, board_origin=origin,
         board_keepouts=keepouts, standoffs=standoffs, mt1_boss=mt1_boss, pegs=pegs,
@@ -440,4 +492,5 @@ def layout(wall: float) -> Layout:
         drawer_out=(-1.0, 0.0, 0.0), drawer_travel=drawer_travel,
         boost_pocket=boost_pocket, hinge_axis=hinge,
         hinge_cable_channel=hinge_cable_channel,
-        lid_outer=lid_outer, lid_pocket=lid_pocket, lid_cable_gutters=gutters)
+        lid_outer=lid_outer, lid_pocket=lid_pocket, lid_cable_gutters=gutters,
+        lid_catch=catch)

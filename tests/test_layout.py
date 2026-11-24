@@ -41,8 +41,9 @@ def test_bay_size_and_drawer_slides_out_along_minus_x(lay):
     assert lay.cable_bay.x1 == pytest.approx(lay.bay.x0)
     assert lay.cable_bay.size[1:] == pytest.approx(lay.bay.size[1:])
     # the drawer face is the base's left (-X) outside face
-    assert lay.drawer_face_hole.x0 == pytest.approx(lay.outer.x0)
-    assert lay.drawer_face_hole.size[0] == pytest.approx(lay.wall)
+    assert lay.drawer_face_hole.axis == "x"
+    assert lay.drawer_face_hole.z0 == pytest.approx(lay.outer.x0)
+    assert lay.drawer_face_hole.z1 - lay.drawer_face_hole.z0 == pytest.approx(lay.wall)
     # bay and cable bay inside the base walls, with slide clearance
     for b in (lay.bay, lay.cable_bay):
         assert b.y0 >= lay.outer.y0 + 2 * lay.wall + L.FIT - 1e-9
@@ -69,7 +70,8 @@ def test_drawer_face_hole_covers_end_buttons(lay):
         _, u, v = b.button
         y = lay.bay.y0 + (lay.bay.size[1] - b.size[1]) / 2 + u
         z = lay.bay.z0 + v
-        assert h.y0 < y < h.y1 and h.z0 < z < h.z1, b.key
+        assert h.covers(y, z), b.key
+    assert h.width == pytest.approx(L.FINGER_HOLE_D)
 
 
 def test_envelopes_on_the_deck_inside_walls(lay):
@@ -309,3 +311,66 @@ def test_lid_cable_gutters(lay):
     assert h.x0 <= c.x0 and h.x1 >= c.x1          # reaches the channel
     for s in sides:
         assert box_gap(g[s], h) == pytest.approx(0.0)  # side gutters join it
+
+
+def _stadium_area(s) -> float:
+    import math
+    return math.pi * s.r ** 2 + 2 * s.r * math.hypot(s.x1 - s.x0, s.y1 - s.y0)
+
+
+@pytest.mark.parametrize("route", sorted(L.ROUTES))
+def test_both_routes_cut_the_one_finger_slot(route):
+    """Finding 1: the printed drawer face and the laser drawer-face panel both
+    lose exactly the layout's finger slot (a stadium, not a rectangle)."""
+    import cadquery as cq
+    lay = L.layout(L.ROUTES[route])
+    h = lay.drawer_face_hole
+    want = _stadium_area(h)
+    if route == "printed":
+        from demobox.printed import body as B
+        d = B.drawer(lay)
+        # the slot's bounding box, through the face: solid there = box - slot
+        y0, y1 = min(h.x0, h.x1) - h.r, max(h.x0, h.x1) + h.r
+        z0, z1 = min(h.y0, h.y1) - h.r, max(h.y0, h.y1) + h.r
+        t = h.z1 - h.z0
+        win = cq.Solid.makeBox(t, y1 - y0, z1 - z0, cq.Vector(h.z0, y0, z0))
+        got = (y1 - y0) * (z1 - z0) - d.intersect(win).Volume() / t
+        assert got == pytest.approx(want, rel=1e-3)
+    else:
+        from demobox.laser import panels as P
+        face = P.panels(lay, lay.wall)["drawer-face"]
+        from shapely.geometry import Polygon
+        holes = [Polygon(r) for r in face.shape.interiors]
+        assert any(abs(p.area - want) / want < 0.01 and h.covers(*p.centroid.coords[0])
+                   for p in holes), [p.area for p in holes]
+
+
+def test_tinyvga_offset_places_the_keepout():
+    """The TinyVGA offset is one function the layout and the scene share."""
+    for key in BOARD_KEYS:
+        dx, dy, dz = L.tinyvga_offset(key)
+        u = L.TINYVGA.pcb.union(L.TINYVGA.de15).union(L.TINYVGA.plug_keepout(L.VGA_PLUG_STRAIGHT))
+        k = L._tinyvga(key, L.VGA_PLUG_STRAIGHT)
+        assert (k.x0, k.y0, k.z0) == pytest.approx((u.x0 + dx, u.y0 + dy, u.z0 + dz))
+
+
+# --- the lid catch (R22) ------------------------------------------------------------
+
+@pytest.mark.parametrize("wall", sorted(L.ROUTES.values()))
+def test_lid_catch_pairs_face_each_other(wall):
+    """Each base magnet has its lid partner straight over it, the pair
+    2 x MAGNET_RECESS apart (<= 1 mm) with the lid shut, clear of the board."""
+    lay = L.layout(wall)
+    assert len(lay.lid_catch) == 2
+    keep = [b for b in lay.board_keepouts.values()]
+    for c in lay.lid_catch:
+        m = lay.catch_lid_magnet(c)
+        hy, hz = lay.hinge_axis
+        assert (m.cx, m.cy + hy) == pytest.approx((c.cx, c.cy))
+        gap = (hz + m.z0) - c.z1
+        assert gap == pytest.approx(2 * L.MAGNET_RECESS) and 0 <= gap <= 1.0
+        assert c.z1 - c.z0 == pytest.approx(L.MAGNET_T) == pytest.approx(m.z1 - m.z0)
+        blk = lay.catch_base_block(c)
+        assert blk.x1 - blk.x0 == pytest.approx(L.CATCH_BLOCK)
+        assert 0 < blk.x0 and blk.x1 < lay.outer.x1
+        assert all(blk.x1 < k.x0 or blk.x0 > k.x1 for k in keep)   # clear of the board

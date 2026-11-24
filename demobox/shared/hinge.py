@@ -63,7 +63,6 @@ SCREW_HOLE_D = m3.CLEARANCE_D
 SCREW_HEAD_R = m3.HEAD_R
 NYLOC_H = m3.NYLOC_H
 THREAD_PAST = m3.THREAD_PAST
-M3_LENGTHS = m3.LENGTHS
 #: The stop shelf: how far it reaches behind the base leaf, and its thickness
 #: under the stop face at its outer edge; a 45 degree gusset carries it back
 #: to the leaf.  Its face starts STOP_R0 from the axis, so a degree short of

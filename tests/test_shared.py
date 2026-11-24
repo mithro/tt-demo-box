@@ -15,6 +15,7 @@ from demobox import layout as L
 from demobox.parts.batteries import BATTERIES
 from demobox.parts.monitors import MONITORS
 from demobox.shared import hinge as H
+from demobox.shared import m3
 from demobox.shared import inserts as I
 from demobox.shared import packing as P
 from demobox.shared import pin
@@ -118,7 +119,7 @@ def test_hinge_pin_m3_bolt_passes_every_knuckle(lay):
         assert _common(shank, base) <= VOL_TOL
         assert _common(shank.moved(lay.lid_location(0).inverse), lid) <= VOL_TOL
     length = H.hinge_bolt_length(lay)
-    assert length in H.M3_LENGTHS
+    assert length in m3.LENGTHS
     g = max(x1 - x0 for x0, x1 in H.hinge_groups(lay))
     assert length >= g + H.NYLOC_H + H.THREAD_PAST - EPS
 
@@ -319,7 +320,7 @@ def test_kit_retainer_holds_the_driver_on_standoffs(lay):
         assert _common(s, e) <= VOL_TOL
         assert _dist(s, e) < TOUCH
         n = I.driver_screw_length(m)
-        assert n in H.M3_LENGTHS
+        assert n in m3.LENGTHS
         assert n >= (L.DRIVER_STANDOFF - I.COUNTERBORE_H + m.driver_pcb_t + H.NYLOC_H
                      + H.THREAD_PAST)
 
@@ -403,6 +404,31 @@ def test_locating_pin_is_one_valid_solid_of_peg_dia(lay):
     assert math.isclose(s.Volume(), math.pi * (L.PEG_DIA / 2) ** 2 * (bb.zmax - bb.zmin),
                         rel_tol=0.05)
 
+
+
+@pytest.mark.parametrize("route", sorted(L.ROUTES))
+def test_peg_holes_clear_the_pin(route):
+    """The MT1 boss's pin holes are PEG_HOLE_D, a slip fit over the PEG_DIA
+    pin, in both routes: a ring just outside the pin is all air."""
+    assert L.PEG_HOLE_D > L.PEG_DIA
+    lay = L.layout(L.ROUTES[route])
+    if route == "printed":
+        from demobox.printed import body as PB
+        boss = PB.deck(lay)
+    else:
+        from demobox.laser import fittings as F
+        boss = F._mounts(lay)["mt1-boss"][1]
+    b = lay.mt1_boss
+    for p in lay.pegs.values():
+        ring = cq.Solid.makeCylinder(L.PEG_DIA / 2 + 0.05, b.z1 - b.z0 - 0.2,
+                                     cq.Vector(p.cx, p.cy, b.z0 + 0.1)).cut(
+            cq.Solid.makeCylinder(L.PEG_DIA / 2, b.z1 - b.z0, cq.Vector(p.cx, p.cy, b.z0)))
+        assert _common(boss, ring) <= 1e-6, (route, p.what)
+        wall = cq.Solid.makeCylinder(L.PEG_HOLE_D / 2 + 0.05, b.z1 - b.z0 - 0.2,
+                                     cq.Vector(p.cx, p.cy, b.z0 + 0.1)).cut(
+            cq.Solid.makeCylinder(L.PEG_HOLE_D / 2 + 0.01, b.z1 - b.z0,
+                                  cq.Vector(p.cx, p.cy, b.z0)))
+        assert _common(boss, wall) > 0.0, (route, p.what)
 
 
 def test_verify_reports_the_driver_placeholders(capsys):

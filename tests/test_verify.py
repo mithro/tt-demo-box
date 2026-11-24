@@ -14,7 +14,7 @@ from demobox.parts.batteries import BATTERIES
 from demobox.parts.monitors import MONITORS
 
 PROOFS = (C.monitors_fit, C.batteries_fit, C.buttons_reachable, C.boards_seat,
-          C.lid_closed_clears, C.hinge_sweep, C.cables_route)
+          C.lid_closed_clears, C.lid_catch, C.hinge_sweep, C.cables_route)
 
 
 @pytest.fixture(params=sorted(L.ROUTES.items()), ids=lambda r: r[0])
@@ -114,6 +114,17 @@ def test_long_battery_fails(monkeypatch, lay):
     monkeypatch.setitem(BATTERIES, "huge", replace(base, key="huge", size=(170.0, 70.0, 29.0)))
     failed = _failed(_run(C.batteries_fit, lay))
     assert failed and all("huge" in f for f in failed), failed
+
+
+def test_short_cable_bay_fails_the_port_end(lay):
+    """The port-end claim is a real check (M7): a cable bay too short for the
+    plug, or one not ending at the bank's port face, fails."""
+    short = replace(lay, cable_bay=replace(lay.cable_bay, x0=lay.cable_bay.x1 - 10.0))
+    failed = _failed(_run(C.batteries_fit, short))
+    assert any("port end against the cable-bay wall" in f for f in failed), failed
+    gap = replace(lay, cable_bay=lay.cable_bay.moved(-5.0, 0.0, 0.0))
+    failed = _failed(_run(C.batteries_fit, gap))
+    assert any("port end against the cable-bay wall" in f for f in failed), failed
 
 
 def test_bank_buttons_need_the_drawer_open(lay):
@@ -259,3 +270,14 @@ def test_top_exit_has_no_route(monkeypatch, lay):
                                                        connector_exit="top", cable_edge="top"))
     failed = _failed(_run(C.cables_route, lay))
     assert any("top-exit" in f and "in-lid" in f for f in failed), failed
+
+
+def test_lid_catch_fails_when_the_magnets_are_too_far_apart(lay):
+    far = tuple(replace(c, z0=c.z0 - 1.5, z1=c.z1 - 1.5) for c in lay.lid_catch)
+    assert _failed(_run(C.lid_catch, replace(lay, lid_catch=far)))
+
+
+def test_lid_catch_fails_over_the_board(lay):
+    env = lay.board_keepouts["v3.2/envelope"]
+    over = tuple(replace(c, cx=(env.x0 + env.x1) / 2) for c in lay.lid_catch)
+    assert _failed(_run(C.lid_catch, replace(lay, lid_catch=over)))

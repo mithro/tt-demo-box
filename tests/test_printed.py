@@ -130,7 +130,7 @@ def test_split_joints_have_heatset_screws_and_pins(split):
         px, py, pz = j.pin
         for piece, x in ((left, px - 1.0), (right, px + 1.0)):
             assert not _inside(piece, (x, py, pz))
-            assert _inside(piece, (x, py + B.PIN_HOLE_D / 2 + 0.2, pz))
+            assert _inside(piece, (x, py + B.DOWEL_HOLE_D / 2 + 0.2, pz))
     assert any(h.what.startswith("joint") for h in pieces["base-right"].heatsets)
 
 
@@ -342,7 +342,8 @@ def test_lid_has_nothing_below_its_face(lay):
 
 
 def test_lid_front_band_is_hollow_and_ribbed(lay):
-    """R18, direct: the band's cells are empty but for the clip's boss, the
+    """R18, direct: the band's cells are empty but for the clip's boss and the
+    lid catch's blocks (R22), the
     ribs between them are ``wall`` thick, and no cell (the screen-side skin's
     bridge when printed) is wider than RIB_SPAN_MAX."""
     lid, cells = B.lid(lay), B.front_cavities(lay)
@@ -351,6 +352,7 @@ def test_lid_front_band_is_hollow_and_ribbed(lay):
     for a, b in zip(cells, cells[1:]):
         assert b.y0 - a.y1 == pytest.approx(lay.wall)
     bosses = [B.clip_boss(lay, x, y) for x, y in B.clip_screws(lay)]
+    bosses += [lay.catch_lid_block(c) for c in lay.lid_catch]
     allowed = 0.0
     for c in cells:
         for b in bosses:
@@ -388,7 +390,7 @@ def test_screw_heads_clear_when_shut_and_open():
     pan heads) is in the assembly as keep-outs and clears everything."""
     for angle in (0.0, L.LID_OPEN_DEG):
         items = B.assembly("printed", angle, 0.0)
-        heads = [n for n, _, _ in items if n.startswith("hw:")]
+        heads = [n for n, _, _ in items if n.startswith("hw:") and "magnet" not in n]
         assert len(heads) == len(I.bezel_screws(L.layout(2.4))) + 1
         assert _clashes(items) == []
 
@@ -455,3 +457,29 @@ def test_hardware_lists_the_insert_screws(lay):
     assert hw["M3 x 6 pan-head (board, MT2)"] == 1
     assert hw["M3 x 6 pan-head (deck corners)"] == 4
     assert sum(n for k, n in hw.items() if k.startswith("M3 heat-set insert")) == 15
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("angle", range(10, 100, 10))
+def test_assembly_intermediate_lid_angles_have_no_intersections(angle):
+    """The lid's whole swing, not just shut and fully open (finding 7)."""
+    assert _clashes(B.assembly("printed", float(angle), 0.0)) == []
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_lid_catch_magnets_face_each_other_when_shut(route):
+    """R22, in real solids: with the lid shut every catch magnet in the lid
+    sits straight over one in the base, <= 1 mm apart; the whole assembly,
+    magnets included, is clash-free (the 0 degree assembly test, both routes)."""
+    items = dict((n, s) for n, s, _ in B.assembly(route, 0.0, 0.0))
+    base = sorted(n for n in items if n.startswith("hw:catch-magnet-base-"))
+    lid = sorted(n for n in items if n.startswith("hw:catch-magnet-lid-"))
+    assert len(base) == len(lid) == 2
+    for nb, nl in zip(base, lid):
+        a, b = items[nb].BoundingBox(), items[nl].BoundingBox()
+        assert (a.center.x, a.center.y) == pytest.approx((b.center.x, b.center.y))
+        gap = b.zmin - a.zmax
+        assert 0 <= gap <= 1.0
+    if route == "printed":
+        assert _clashes(list(B.assembly("printed", 0.0, 0.0))) == []

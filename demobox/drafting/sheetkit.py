@@ -46,7 +46,6 @@ CENTRE = dict(w=style.W_CENTRE, colour=style.C_LINE, dash=style.D_CENTRE)
 GAP = 16.0
 #: A dimension lane: the first sits LANE0 off the view, the next DIM_STEP on.
 LANE0 = 7.0
-CAPTION_H = 6.0
 
 DRAWN = "generated"
 REV = "A"
@@ -56,24 +55,47 @@ PRINTED_TOL = "+/-0.3 unless noted"
 
 # --- the version stamp ------------------------------------------------------------------
 
-#: Everything that is not build product: a commit that only regenerates
-#: output/ must not change the version the sheets carry, or committing the
-#: sheets would change the sheets (see ``tools.reproducible.source_version``,
-#: whose pathspec is the submodule's layout, not this repository's).
-SOURCE_ONLY = (".", ":(exclude)output")
+#: What the sheets are drawn from: our package, the scripts that draw and
+#: check them, the pinned submodule (its gitlink) and the Makefile.  The stamp
+#: is a hash of these paths' contents at HEAD, so a commit that touches only
+#: output/, the README, the docs or the tests -- or a squash or rebase that
+#: keeps the content -- leaves it unchanged.
+STAMP_PATHS = ("demobox", "scripts", "vendor/fpgas.online-mechanical", "Makefile")
+#: Hex digits of the stamp (fits the A4 title block's VERSION cell).
+STAMP_LEN = 10
 
 
-@functools.lru_cache(maxsize=1)
-def version() -> str:
-    """The abbreviated hash of the last commit that changed a source file,
-    with ``+`` when sources are modified and uncommitted.  The hash alone, not
-    ``git describe``: the tag adds nothing a hash does not say, and on an A4
-    title block it does not fit the VERSION cell."""
-    commit = reproducible._git(ROOT, "log", "-1", "--format=%h", "--", *SOURCE_ONLY)
-    if not commit:
-        return reproducible.UNVERSIONED
-    dirty = reproducible._git(ROOT, "status", "--porcelain", "--", *SOURCE_ONLY)
-    return commit + (reproducible.DIRTY_MARK if dirty else "")
+def _git(root: Path, *args: str) -> str | None:
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
+                           check=False)
+    except FileNotFoundError:
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def stamp(objects: dict[str, str]) -> str:
+    """The content stamp of ``objects`` (path -> git object id): the first
+    STAMP_LEN hex digits of the SHA-256 of ``path id`` lines in path order."""
+    import hashlib
+    text = "".join(f"{p} {objects[p]}\n" for p in sorted(objects))
+    return hashlib.sha256(text.encode()).hexdigest()[:STAMP_LEN]
+
+
+@functools.lru_cache(maxsize=None)
+def version(root: Path = ROOT) -> str:
+    """The sheets' version stamp: ``stamp`` of STAMP_PATHS' object ids at
+    HEAD (``git rev-parse HEAD:<path>``: a tree, a blob, or the submodule's
+    pinned commit), with ``+`` when any of them has uncommitted changes."""
+    objects = {}
+    for p in STAMP_PATHS:
+        oid = _git(root, "rev-parse", f"HEAD:{p}")
+        if not oid:
+            return reproducible.UNVERSIONED
+        objects[p] = oid
+    dirty = _git(root, "status", "--porcelain", "--", *STAMP_PATHS)
+    return stamp(objects) + (reproducible.DIRTY_MARK if dirty else "")
 
 
 # --- UNCONFIRMED ------------------------------------------------------------------------

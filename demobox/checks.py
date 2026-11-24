@@ -29,8 +29,10 @@ the screen faces -Z (down onto the deck), the bezel plate fills Z 0 ..
 ``INSERT_MATERIAL`` and the panel's front face is at Z = ``INSERT_MATERIAL``.
 The panel is mounted buttons-down: its bottom edge is at the hinge end (lid
 Y = 0 side), so panel x runs along lid +X (the visitor's right, with the lid
-open) and panel y runs along lid -Y.  It is centred in X and sits FIT +
-INSERT_MATERIAL off the pocket's hinge-end wall, where its cable leaves.
+open) and panel y runs along lid -Y.  It sits FIT + INSERT_MATERIAL off the
+pocket's hinge-end wall; across X it is centred, except that a side-exit
+panel is pushed FIT + INSERT_MATERIAL off the pocket wall away from its exit,
+leaving the room by its cable edge (``panel_in_lid``).
 """
 
 from __future__ import annotations
@@ -291,9 +293,17 @@ def batteries_fit(report: Report, lay: Layout) -> None:
                      f"{_f(packing)} mm (+ FIT {FIT}), side spacers {_f((bw - W_) / 2)} mm each, "
                      f"headroom {_f(bh - H_)} mm")
         if b.port_face == "end":
-            report.check(True, f"{b.key}: port end against the cable-bay wall",
-                         f"ports face -X into the {_f(lay.cable_bay.size[0])} mm cable bay; "
-                         "the end-stop sits at the far end")
+            # the bank lies on the bay floor from bay.x0 (its packing's end-stop at
+            # the far end), so its port face is the bay/cable-bay boundary
+            cb = lay.cable_bay
+            plug = BOARD_CABLE.plug[0]
+            ok = (abs(cb.x1 - lay.bay.x0) <= EPS and cb.size[1] >= W_ - EPS
+                  and cb.size[2] >= H_ - EPS and cb.size[0] >= plug + FIT - EPS)
+            report.check(ok, f"{b.key}: port end against the cable-bay wall",
+                         f"port face at x {_f(lay.bay.x0)}, cable bay x {_f(cb.x0)}.."
+                         f"{_f(cb.x1)}, {_f(cb.size[1])} x {_f(cb.size[2])} over the "
+                         f"{W_} x {H_} face; {_f(cb.size[0])} mm long >= {plug} mm plug + "
+                         f"FIT {FIT}")
         elif b.port_face == "top":
             plug_h = BOARD_CABLE.plug[2]
             room = (lay.deck_z - lay.wall) - (lay.bay.z0 + H_)
@@ -325,10 +335,11 @@ def buttons_reachable(report: Report, lay: Layout) -> None:
             z = lay.bay.z0 + v
             behind = lay.bay.x0 - out
             open_end = lay.cable_bay.x1 - travel
-            report.check(hole.y0 < y < hole.y1 and hole.z0 < z < hole.z1,
+            report.check(hole.axis == "x" and hole.covers(y, z),
                          f"{b.key}: end button under the drawer-face finger hole",
-                         f"button (y {_f(y)}, z {_f(z)}) in hole y {_f(hole.y0)}..{_f(hole.y1)}, "
-                         f"z {_f(hole.z0)}..{_f(hole.z1)}")
+                         f"button (y {_f(y)}, z {_f(z)}) in the {_f(hole.width)} x "
+                         f"{_f(hole.length)} slot (centres y, z ({_f(hole.x0)}, {_f(hole.y0)})"
+                         f" .. ({_f(hole.x1)}, {_f(hole.y1)}))")
             report.check(open_end <= out + EPS,
                          f"{b.key}: end button reachable with the drawer out",
                          f"{_f(behind)} mm behind the drawer face when shut; drawer out "
@@ -466,6 +477,32 @@ def lid_closed_clears(report: Report, lay: Layout) -> None:
             report.check(lid_under - b.z1 >= need - EPS, f"{k}: closed lid clears the {part}",
                          f"lid underside z {_f(lid_under)}, {part} top {_f(b.z1)}: "
                          f"{_f(lid_under - b.z1)} >= {need} mm")
+
+
+#: The lid catch's magnets may be this far apart with the lid shut (R22).
+CATCH_MAX_GAP = 1.0
+
+
+def lid_catch(report: Report, lay: Layout) -> None:
+    """R22: the shut lid is held by pairs of disc magnets.  Each base magnet has
+    its lid partner straight over it, the two faces at most CATCH_MAX_GAP apart
+    (not touching through the rim); each block stands inside the walls and
+    clear of every board keep-out in X (the board's parts hang right under it)."""
+    hy, hz = lay.hinge_axis
+    for i, c in enumerate(lay.lid_catch, 1):
+        m = lay.catch_lid_magnet(c)
+        off = math.hypot(m.cx - c.cx, (m.cy + hy) - c.cy)
+        gap = (hz + m.z0) - c.z1
+        report.check(off <= EPS and 0 <= gap <= CATCH_MAX_GAP + EPS,
+                     f"lid catch {i}: magnets face each other when shut",
+                     f"lid magnet {_f(off)} mm off the base's, faces {_f(gap)} <= "
+                     f"{CATCH_MAX_GAP:g} mm apart")
+        blk = lay.catch_base_block(c)
+        inside = blk.x0 >= lay.outer.x0 + lay.wall - EPS and blk.x1 <= lay.outer.x1 - lay.wall + EPS
+        clear = all(blk.x1 <= k.x0 or blk.x0 >= k.x1 for k in lay.board_keepouts.values())
+        report.check(inside and clear, f"lid catch {i}: block clear of walls and board",
+                     f"block X {_f(blk.x0)}..{_f(blk.x1)} between the side walls and outside "
+                     "every board keep-out's X range")
 
 
 def sweep_angles() -> list[float]:
@@ -693,4 +730,4 @@ def _exit_point(m: Monitor, lay: Layout) -> tuple[float, float, float]:
 
 #: Every proof, in the order verify.py prints them.
 PROOFS = (monitors_fit, batteries_fit, buttons_reachable, boards_seat,
-          lid_closed_clears, hinge_sweep, cables_route)
+          lid_closed_clears, lid_catch, hinge_sweep, cables_route)

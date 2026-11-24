@@ -8,6 +8,9 @@ Open it and the lid stands at 100 degrees showing the VGA designs cycling; the b
 in front of it is what starts the conversation. Nothing to plug in. The power bank slides out
 of a drawer so it can be taken out at airport security.
 
+Shut, two pairs of 6 x 3 mm disc magnets in the front of the base and the lid hold it closed, so
+it survives a backpack.
+
 Two build routes from one design: 3D printed (220 x 220 mm bed) and laser-cut 3 mm plywood
 (300 x 200 mm bed).
 
@@ -41,8 +44,9 @@ does not compare `output/renders/*.png`. Everything else under `output/` is chec
 
 ## Bill of materials
 
-Counts are generated (`demobox.printed.body.hardware`, `demobox.laser.fittings.hardware`, listed
-in `output/laser/hardware.txt`) and checked on the GA sheets' parts lists.
+The hardware tables below are generated from `demobox.printed.body.hardware` and
+`demobox.laser.fittings.hardware` (`make readme`; `make check-readme` fails when they are stale);
+the same counts are in `output/laser/hardware.txt` and on the GA sheets' parts lists.
 
 Bought parts, both routes (one each):
 
@@ -63,8 +67,10 @@ Bought parts, both routes (one each):
 
 Hardware, printed route (M3 throughout):
 
+<!-- hardware-printed:begin -->
 | Qty | Part |
 |---:|---|
+| 4 | 6 x 3 mm disc magnet |
 | 15 | M3 heat-set insert, D4.0 x 5.7 |
 | 2 | M3 x 40 bolt + nyloc (hinge pin) |
 | 1 | M3 x 6 pan-head (bezel clip) |
@@ -72,13 +78,15 @@ Hardware, printed route (M3 throughout):
 | 1 | M3 x 6 pan-head (board, MT2) |
 | 4 | M3 x 6 pan-head (deck corners) |
 | 6 | M3 x 8 pan-head (hinge leaves) |
+<!-- hardware-printed:end -->
 
 Hardware, laser route (3 mm plywood, plus the printed hinge, bezel, clip, pin and packing):
 
+<!-- hardware-laser:begin -->
 | Qty | Part |
 |---:|---|
 | 4 | 12 x 4 mm self-adhesive rubber foot |
-| 2 | 6 x 3 mm disc magnet |
+| 6 | 6 x 3 mm disc magnet |
 | 2 | M3 nyloc nut (hinge) |
 | 40 | M3 square nut |
 | 1 | M3 x 10 pan-head screw (bezel clip) |
@@ -88,6 +96,7 @@ Hardware, laser route (3 mm plywood, plus the printed hinge, bezel, clip, pin an
 | 2 | M3 x 40 bolt (hinge) |
 | 3 | M3 x 8 pan-head screw (bezel) |
 | 1 | hook-and-loop tape, 51 x 16 mm pair (boost converter) |
+<!-- hardware-laser:end -->
 
 ## Building
 
@@ -106,19 +115,28 @@ Everything runs through `uv` and `make`; there is no `pyproject.toml`.
   every STEP, STL, DXF, SVG, PDF and preview PNG into `tmp/check-outputs/` and compares them
   with `output/` byte for byte; `output/renders` is excluded) and `check-readme`
 
-Sheets are stamped with the hash of the last commit that changed anything outside `output/`,
-so after any source commit run `make outputs sheets` and commit `output/` again.
+Sheets are stamped with a content hash of what they are drawn from: the first 10 hex digits
+of a SHA-256 over `git rev-parse HEAD:<path>` for `demobox/`, `scripts/`, the
+`vendor/fpgas.online-mechanical` pin and the `Makefile` (`+` when any of them has uncommitted
+changes). Commits to the README, docs, tests or `output/` -- and squash or rebase merges that
+keep the content -- leave it unchanged; after a commit that changes those sources, run
+`make outputs sheets` and commit `output/` again.
 
 CI (`.github/workflows/check.yml`) runs `make fetch check` in a Debian 13 container with
 Inkscape 1.4, the same packages that drew the committed PDFs. It does not install Blender.
 
 ### Adding a monitor
 
-Add a `Monitor` entry to `demobox/parts/monitors.py` (panel size, active area and offset,
-connector exit, power, `cable_edge`, `window`, sources, `confirmed=False` until measured), then
-run `make verify outputs sheets`. The window rule, insert stack and cable path are checked for
-it; its bezel, retainer and insert sheet appear in `output/`. Only monitors without rear-facing
-sockets fit.
+Only monitors without rear-facing sockets fit.
+
+1. Add a `Monitor` entry to `MONITORS` in `demobox/parts/monitors.py`: its `key`, a short
+   unique `code` (upper-case letters and digits; it names the insert sheet `TDB-INS-<code>`),
+   panel size, active area and offset, connector exit, power, `cable_edge`, `window`, sources,
+   and `confirmed=False` until measured.
+2. `make verify`: the window rule, insert stack and cable path are checked for it.
+3. `make outputs sheets readme`: its bezel, retainer and insert sheet appear in `output/`, and
+   the README's UNCONFIRMED list picks up its placeholders.
+4. `make check`, then commit the entry and `output/`.
 
 ## UNCONFIRMED figures, and what to measure
 

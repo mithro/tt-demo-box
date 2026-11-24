@@ -59,3 +59,12 @@ def test_stadium_covers():
     assert s.covers(0.0, 0.0) and s.covers(0.0, 5.0) and s.covers(3.2, 2.5)
     assert s.covers(0.0, 8.2) and not s.covers(0.0, 8.3)
     assert not s.covers(3.3, 2.5) and not s.covers(2.5, -2.5)
+
+
+def test_stadium_along_x_covers_its_plane_and_sizes():
+    from demobox.geom import Stadium
+    s = Stadium(10.0, 5.0, 10.0, 6.5, 10.0, 0.0, 2.4, "finger slot", axis="x")
+    assert s.covers(10.0, 15.0) and s.covers(19.9, 5.75) and not s.covers(10.0, 16.6)
+    assert s.width == pytest.approx(20.0) and s.length == pytest.approx(21.5)
+    with pytest.raises(ValueError):
+        Stadium(0, 0, 0, 0, 1, 0, 1, "bad", axis="w")

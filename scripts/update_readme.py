@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Write the UNCONFIRMED list into README.md from ``verify.py``'s output.
+"""Write README.md's generated sections.
 
-The list sits between the ``<!-- unconfirmed:begin -->`` and
-``<!-- unconfirmed:end -->`` markers.  ``--check`` changes nothing and exits 1
-if the README is out of date (``make check`` runs it).
+Each sits between ``<!-- <name>:begin -->`` and ``<!-- <name>:end -->``:
+
+* ``unconfirmed``: the UNCONFIRMED list, from ``verify.py``'s output;
+* ``hardware-printed``: the printed route's bought hardware
+  (``demobox.printed.body.hardware``);
+* ``hardware-laser``: the laser route's (``demobox.laser.fittings.hardware``).
+
+``--check`` changes nothing and exits 1 if any section is out of date
+(``make check`` runs it).
 
 Run: make readme
 """
@@ -16,8 +22,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 README = ROOT / "README.md"
-BEGIN, END = "<!-- unconfirmed:begin -->", "<!-- unconfirmed:end -->"
+
+
+def _markers(name: str) -> tuple[str, str]:
+    return f"<!-- {name}:begin -->", f"<!-- {name}:end -->"
 
 
 def unconfirmed() -> list[str]:
@@ -39,15 +49,51 @@ def unconfirmed() -> list[str]:
     return [f"{head}.", ""] + items
 
 
+def table(hw: dict[str, int]) -> list[str]:
+    """A hardware list as a Markdown table, in the list's own order."""
+    return ["| Qty | Part |", "|---:|---|"] + [f"| {n} | {k} |" for k, n in hw.items()]
+
+
+def hardware_printed() -> list[str]:
+    import demobox  # noqa: F401  (puts the submodule on sys.path)
+    from demobox.layout import ROUTES, layout
+    from demobox.printed import body
+    return table(body.hardware(layout(ROUTES["printed"])))
+
+
+def hardware_laser() -> list[str]:
+    import demobox  # noqa: F401
+    from demobox.laser import fittings
+    from demobox.layout import ROUTES, layout
+    t = ROUTES["laser"]
+    return table(fittings.hardware(layout(t), t))
+
+
+SECTIONS = {"unconfirmed": unconfirmed, "hardware-printed": hardware_printed,
+            "hardware-laser": hardware_laser}
+
+
+def rewrite(text: str, made: dict[str, list[str]]) -> str:
+    """``text`` with each named section's lines replaced by ``made[name]``."""
+    for name, lines in made.items():
+        begin, end = _markers(name)
+        if text.count(begin) != 1 or text.count(end) != 1:
+            raise SystemExit(f"README.md needs exactly one {begin} ... {end} pair")
+        a, b = text.index(begin) + len(begin), text.index(end)
+        text = text[:a] + "\n" + "\n".join(lines) + "\n" + text[b:]
+    return text
+
+
 def main(argv: list[str]) -> int:
     text = README.read_text()
-    a, b = text.index(BEGIN) + len(BEGIN), text.index(END)
-    new = text[:a] + "\n" + "\n".join(unconfirmed()) + "\n" + text[b:]
+    made = {name: make() for name, make in SECTIONS.items()}
+    new = rewrite(text, made)
     if "--check" in argv:
-        if new != text:
-            print("README.md's UNCONFIRMED list is out of date: run `make readme`")
+        stale = [n for n in made if rewrite(text, {n: made[n]}) != text]
+        if stale:
+            print(f"README.md is out of date ({', '.join(stale)}): run `make readme`")
             return 1
-        print("README.md's UNCONFIRMED list is up to date")
+        print("README.md's generated sections are up to date")
         return 0
     README.write_text(new)
     return 0

@@ -96,6 +96,28 @@ def test_every_insert_monitor_has_a_sheet():
     assert keys == set(MONITORS)
 
 
+def test_insert_sheets_come_from_the_monitor_codes(monkeypatch):
+    """Finding 4: a new MONITORS entry gets its TDB-INS-<code> sheet with no
+    edit to names.py; codes are short, upper case and unique."""
+    import importlib
+    from dataclasses import replace
+    from demobox.parts.monitors import MONITORS
+    codes = [m.code for m in MONITORS.values()]
+    assert len(set(codes)) == len(codes)
+    assert all(re.fullmatch(r"[A-Z0-9]{1,4}", c) for c in codes)
+    base = MONITORS["taobao-tim"]
+    monkeypatch.setitem(MONITORS, "new-mon", replace(base, key="new-mon", code="N7"))
+    try:
+        fresh = importlib.reload(names)
+        s = fresh.SHEETS["TDB-INS-N7"]
+        assert (s.kind, s.subject, s.size) == ("insert", "new-mon", "A4")
+        assert s.title == "MONITOR INSERT, N7"
+    finally:
+        monkeypatch.undo()
+        importlib.reload(names)
+    assert "TDB-INS-N7" not in names.SHEETS
+
+
 # --- check_sheets ----------------------------------------------------------------
 
 _SVG = ('<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" '
@@ -179,3 +201,82 @@ def test_hinge_profiles_read_their_true_depth():
         values = [abs(d.b[0] - d.a[0]) for d in PS.overall_dims(part) if d.side == "bottom"]
         assert any(abs(v - want) < 0.005 for v in values), (n, values)
         assert f">{want:.2f}</text>" in names.svg_path(n).read_text(), n
+
+
+def _sheet_words(n: str) -> str:
+    """Every text line on a generated sheet, joined by spaces."""
+    import html
+    svg = names.svg_path(n).read_text()
+    return " ".join(html.unescape(t) for t in re.findall(r"<text[^>]*>([^<]*)</text>", svg))
+
+
+@pytest.mark.parametrize("n", ["TDB-GA-P", "TDB-GA-L"])
+def test_ga_buy_note_does_not_claim_one_shop(n):
+    """M6: a monitor row reads Taobao, so the note may not say every listing
+    is an AliExpress item number."""
+    words = _sheet_words(n)
+    assert "AliExpress item numbers" not in words
+    assert "listing numbers or shops" in words
+
+
+# --- the version stamp (finding 3, R23) -----------------------------------------------
+
+def _git(root, *args):
+    import subprocess
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True,
+                   env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+                        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+                        "PATH": "/usr/bin:/bin", "HOME": str(root)})
+
+
+def test_stamp_follows_the_sources_not_the_docs(tmp_path):
+    """Doc, README and output commits leave the stamp alone; a change to
+    demobox/, scripts/, the Makefile or the submodule pin moves it."""
+    from demobox.drafting import sheetkit as K
+    r = tmp_path / "repo"
+    (r / "demobox").mkdir(parents=True)
+    (r / "scripts").mkdir()
+    (r / "output").mkdir()
+    (r / "vendor" / "fpgas.online-mechanical").mkdir(parents=True)   # an unfetched submodule
+    (r / "demobox" / "a.py").write_text("A = 1\n")
+    (r / "scripts" / "s.py").write_text("pass\n")
+    (r / "Makefile").write_text("all:\n")
+    (r / "README.md").write_text("readme\n")
+    _git(r, "init", "-q")
+    _git(r, "update-index", "--add", "--cacheinfo",
+         "160000,1111111111111111111111111111111111111111,vendor/fpgas.online-mechanical")
+    _git(r, "add", "demobox", "scripts", "Makefile", "README.md")
+    _git(r, "commit", "-q", "-m", "one")
+
+    def v():
+        K.version.cache_clear()
+        return K.version(r)
+
+    first = v()
+    assert re.fullmatch(r"[0-9a-f]{%d}" % K.STAMP_LEN, first), first
+    (r / "README.md").write_text("readme, edited\n")
+    (r / "output" / "x.svg").write_text("<svg/>\n")
+    _git(r, "add", "README.md", "output")
+    _git(r, "commit", "-q", "-m", "docs and outputs only")
+    assert v() == first
+    (r / "demobox" / "a.py").write_text("A = 2\n")
+    assert v() == first + "+"                     # uncommitted source change
+    _git(r, "commit", "-q", "-am", "source")
+    second = v()
+    assert second not in (first, first + "+")
+    (r / "Makefile").write_text("all: x\n")
+    _git(r, "commit", "-q", "-am", "make")
+    third = v()
+    assert third != second
+    _git(r, "update-index", "--cacheinfo",
+         "160000,2222222222222222222222222222222222222222,vendor/fpgas.online-mechanical")
+    _git(r, "commit", "-q", "-m", "bump the submodule")
+    assert v() != third
+    K.version.cache_clear()
+
+
+def test_stamp_is_order_independent_and_short():
+    from demobox.drafting import sheetkit as K
+    a = K.stamp({"demobox": "1" * 40, "Makefile": "2" * 40})
+    assert a == K.stamp({"Makefile": "2" * 40, "demobox": "1" * 40})
+    assert len(a) == K.STAMP_LEN and a != K.stamp({"demobox": "1" * 40, "Makefile": "3" * 40})

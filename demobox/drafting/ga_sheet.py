@@ -44,10 +44,6 @@ PART_W = 56.0
 LID_PARTS = ("lid", "hinge-lid", "bezel", "retainer", "panel", "monitor-driver")
 
 
-def _ins_name(key: str) -> str:
-    return next(n for n, s in names.SHEETS.items() if s.kind == "insert" and s.subject == key)
-
-
 def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
     """Where to buy it, as the part's sources say: a listing number or a site."""
     for s in sources:
@@ -60,8 +56,10 @@ def _where(sources, pattern=r"(AliExpress \d+|[a-z]+\.com)") -> str:
 def printed_hardware(lay) -> dict[str, int]:
     """The printed route's bought hardware (``body.hardware``), plus the
     board's screw check: the assembly's screw-head ``hw:`` solids are the
-    bezel's and the clip's, and must agree with them."""
-    heads = [n for n, _, _ in B.assembly("printed", 0.0, 0.0) if n.startswith("hw:")]
+    bezel's and the clip's, and must agree with them (the catch magnets are
+    counted by ``body.hardware``)."""
+    heads = [n for n, _, _ in B.assembly("printed", 0.0, 0.0)
+             if n.startswith("hw:") and "magnet" not in n]
     if len(heads) != len(I.bezel_screws(lay)) + len(B.clip_screws(lay)):
         raise ValueError(f"hw: solids {heads} disagree with the bezel and clip screws")
     return B.hardware(lay)
@@ -222,8 +220,8 @@ def render_ga(defn: names.SheetDef):
             f"Bay {' x '.join(F(v) for v in lay.bay.size)} inside plus a "
             f"{F(lay.cable_bay.x1 - lay.cable_bay.x0)} cable bay; the drawer slides out of "
             f"the left side by {F(lay.drawer_travel)}.",
-            "Bought parts are counted from the route's data; monitor listings are AliExpress "
-            "item numbers. 1*: fit one monitor and one "
+            "Bought parts are counted from the route's data; monitor sources are listing "
+            "numbers or shops. 1*: fit one monitor and one "
             "power bank of those listed, with its insert and its packing. Hinge axis: the "
             f"base's back-top edge, Y {F(hy)}, Z {F(hz)}.",
             K.unconfirmed_note(None),
