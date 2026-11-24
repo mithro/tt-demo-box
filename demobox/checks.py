@@ -230,13 +230,31 @@ def _lid_from_base(lay: Layout, p, angle_deg: float) -> tuple[float, float, floa
 PIGTAIL_OVER_DROP = tuple(2.5 * i for i in range(1, 25))
 
 
+#: R18: the pigtail's centre keeps this far from the hinge axis: cable radius
+#: + the full-width hinge rod's radius + FIT.
+ROD_CLEAR = PIGTAIL.dia / 2 + L.PIN_ROD_D / 2 + L.FIT
+
+
 def _drop_xy(lay: Layout, rev: str) -> tuple[float, float]:
     """Where the pigtail goes down to the plug: straight over the plug's run
-    axis, as far back as the back wall allows, and no further back than the
-    hinge axis."""
+    axis, ``ROD_CLEAR`` in front of the hinge axis (the rod is full width, and
+    the axis is only ``KNUCKLE_R`` from the back face, so the cable can't
+    pass behind it)."""
     end = _plug_ends(lay, rev)[0]
-    r = PIGTAIL.dia / 2
-    return end[0], min(lay.hinge_axis[0], lay.outer.y1 - lay.wall - r)
+    return end[0], lay.hinge_axis[0] - ROD_CLEAR
+
+
+def rod_distance(lay: Layout, pts) -> float:
+    """The least YZ distance of a base-frame polyline from the hinge axis
+    (the rod runs the full width, so X doesn't matter)."""
+    hy, hz = lay.hinge_axis
+    best = math.inf
+    for (_, ay, az), (_, by, bz) in zip(pts, pts[1:]):
+        dy, dz = by - ay, bz - az
+        n = dy * dy + dz * dz
+        t = 0.0 if n == 0 else max(0.0, min(1.0, ((hy - ay) * dy + (hz - az) * dz) / n))
+        best = min(best, math.hypot(ay + t * dy - hy, az + t * dz - hz))
+    return best
 
 
 def _in_free_room(lay: Layout, p_lid, angle_deg: float) -> bool:
@@ -279,9 +297,12 @@ def _pigtail_best(lay: Layout, angle_deg: float, rev: str):
     best = None
     for lid, base in _pigtail_routes(lay, rev, angle_deg):
         path = [_lid_to_base(lay, p, angle_deg) for p in lid] + base
-        bend = max_bend_r(path[:-1], stiff_last=True)
-        if best is None or bend > best[0] + EPS:
-            best = (bend, lid, base, path)
+        # a route through the hinge rod ranks below every route clear of it
+        key = (rod_distance(lay, path) >= ROD_CLEAR - EPS,
+               max_bend_r(path[:-1], stiff_last=True))
+        if best is None or key[0] > best[0][0] or (key[0] == best[0][0]
+                                                   and key[1] > best[0][1] + EPS):
+            best = (key, lid, base, path)
     return best[1:]
 
 
@@ -745,10 +766,17 @@ def cables_route(report: Report, lay: Layout) -> None:
     for k in BOARD_KEYS:
         x, yd = _drop_xy(lay, k)
         end, back, face = _plug_ends(lay, k)
-        through = n.x0 <= x - r + EPS and x + r <= n.x1 + EPS and n.y0 <= yd <= n.y1
+        through = n.x0 <= x - r + EPS and x + r <= n.x1 + EPS
         report.check(through, f"{m.key} pigtail ({k}): drops through the hinge notch",
-                     f"over the plug's run axis x {_f(x)}, y {_f(yd)}: notch x {_f(n.x0)}.."
-                     f"{_f(n.x1)}, y {_f(n.y0)}..{_f(n.y1)} round the {PIGTAIL.dia} cable")
+                     f"over the plug's run axis x {_f(x)}: notch x {_f(n.x0)}..{_f(n.x1)} round "
+                     f"the {PIGTAIL.dia} cable")
+        clear = [(rod_distance(lay, pigtail_path(lay, a, k)), a) for a in sweep_angles()]
+        least_d, at_d = min(clear)
+        report.check(least_d >= ROD_CLEAR - EPS,
+                     f"{m.key} pigtail ({k}): clear of the hinge rod",
+                     f"drop at y {_f(yd)}, {_f(hy - yd)} in front of the axis; the path keeps "
+                     f"{_f(least_d)} from it at worst ({at_d:g} deg) >= cable r {r:g} + rod r "
+                     f"{L.PIN_ROD_D / 2:g} + FIT {L.FIT} = {_f(ROD_CLEAR)}")
         # the drop and the run in to the stiff run's end, as boxes round the cable
         legs = {"drop": Box(x - r, yd - r, end[2] - r, x + r, yd + r, hz),
                 "run in": Box(x - r, end[1], end[2] - r, x + r, yd + r, end[2] + r)}
@@ -837,8 +865,18 @@ def _budget(lay: Layout) -> dict[str, float]:
     bay_x, bay_y = b.size[0] + 2 * s, b.size[1] + 2 * s
     plug_x = max(vga_plug_box(lay, k).x1 for k in BOARD_KEYS) - w + s
     width = max(board_x, port + bay_x, plug_x, mw + 2 * s) + 2 * w
-    depth = max(w + s + board_y + s + bay_y + s + w, mh + 2 * s + 2 * w + L.CATCH_BLOCK)
+    # R18b: the catch blocks push the monitor back only if they reach over it
+    ms_x0 = (width - (mw + 2 * s)) / 2
+    over = any(lay.catch_base_block(c).x0 < ms_x0 + mw + 2 * s
+               and ms_x0 < lay.catch_base_block(c).x1 for c in lay.lid_catch)
+    # R18: the pigtail's turn behind the stiff run's end, in front of the rod
+    run_end = max(_plug_ends(lay, k)[0][1] for k in BOARD_KEYS)
+    terms = {"rows": w + s + board_y + s + bay_y + s + w,
+             "monitor": mh + 2 * s + 2 * w + (L.CATCH_BLOCK if over else 0.0),
+             "pigtail": run_end + PIGTAIL.min_bend_r + ROD_CLEAR + L.KNUCKLE_R}
+    depth = max(terms.values())
     return {"width": width, "depth": depth, "height": w + max(b.size[2], stack) + s,
+            "depth terms": terms,
             "lid width": width, "lid depth": depth,
             "lid height": w + L.TAPE_T + md + L.CLOSED_CLEARANCE}
 
@@ -848,13 +886,15 @@ def size_budget(report: Report, lay: Layout) -> None:
     dimension within SIZE_TOL of the formula recomputed from the part data.
     Reports the sizes and the closed volume."""
     f = _budget(lay)
+    terms = f.pop("depth terms")
     o, lid = lay.outer, lay.lid_outer
     real = {"width": o.size[0], "depth": o.size[1], "height": o.size[2],
             "lid width": lid.size[0], "lid depth": lid.size[1], "lid height": lid.size[2]}
     litres = o.size[0] * o.size[1] * (o.size[2] + lid.size[2]) / 1e6
     sizes = (f"base {_f(o.size[0])} x {_f(o.size[1])} x {_f(o.size[2])}, lid {_f(lid.size[0])} "
              f"x {_f(lid.size[1])} x {_f(lid.size[2])}; closed {_f(o.size[2] + lid.size[2])} "
-             f"high, {litres:.3f} L")
+             f"high, {litres:.3f} L; depth terms "
+             + ", ".join(f"{n} {_f(v)}" for n, v in terms.items()))
     for n, v in real.items():
         report.check(v <= f[n] + SIZE_TOL, f"size budget: {n}",
                      f"{_f(v)} <= formula {_f(f[n])} + {SIZE_TOL}; {sizes}")

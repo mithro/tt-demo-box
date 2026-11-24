@@ -263,8 +263,10 @@ def test_pigtail_path_runs_exit_notch_plug(lay):
     for a in C.sweep_angles():
         path = C.pigtail_path(lay, a)
         assert all(len(p) == 3 for p in path)
-        assert any(n.x0 < x < n.x1 and n.y0 < y < n.y1 and n.z0 < z < n.z1
-                   for x, y, z in path), "through the hinge notch"
+        hy, hz = lay.hinge_axis
+        assert any(n.x0 < x < n.x1 and math.isclose(z, hz) and y < hy
+                   for x, y, z in path), "across the seam in the notch, in front of the rod"
+        assert C.rod_distance(lay, path) >= C.ROD_CLEAR - 1e-9
         x, y, z = path[-1]                      # the TinyVGA's DE-15 face
         assert v.x0 <= x <= v.x1 and v.y0 <= y <= v.y1 and v.z0 <= z <= v.z1
     x0, y0, _ = C.pigtail_path(lay, 0.0)[0]
@@ -274,17 +276,33 @@ def test_pigtail_path_runs_exit_notch_plug(lay):
 
 
 def test_pigtail_takes_the_widest_closed_u_turn(lay):
-    """R13, R17: closed, the cable turns round from the lid's inside face to
-    the stiff run's height (cable centrelines), in the plane over the run, and
-    the route rounds it to half that: the widest U-turn the closed box allows,
-    15.75 against the 15 placeholder."""
+    """R13, R17, R18: closed, the cable turns round from the lid's inside face
+    to the stiff run's height (cable centrelines), in the plane over the run.
+    The height allows half that span (15.75); the room from the run's end to
+    the drop in front of the rod allows the rest, and R18 sizes the depth so
+    it is exactly the bend radius (15).  The route reaches the lesser."""
     r = C.PIGTAIL.dia / 2
     end = C._plug_ends(lay, "v3.2")[0]
     span = (lay.rim_z + lay.lid_strip.z1 - r) - end[2]
+    room = (lay.hinge_axis[0] - C.ROD_CLEAR) - end[1]
     path = C.pigtail_path(lay, 0.0)
-    assert C.max_bend_r(path[:-1], stiff_last=True) == pytest.approx(span / 2, abs=1e-6)
+    assert C.max_bend_r(path[:-1], stiff_last=True) == pytest.approx(min(span / 2, room),
+                                                                     abs=1e-6)
     assert span / 2 == pytest.approx(15.75, abs=0.01)
+    assert room == pytest.approx(C.PIGTAIL.min_bend_r, abs=1e-6)
     assert C.PIGTAIL.key == "monitor-pigtail" and C.PIGTAIL.min_bend_r == 15.0
+
+
+def test_pigtail_drop_on_the_axis_fails(lay, monkeypatch):
+    """R18: a drop on the hinge axis runs through the rod; cables_route fails,
+    naming the rod, and no other proof changes."""
+    before = _failures_by_proof(lay)
+    real = C._drop_xy
+    monkeypatch.setattr(C, "_drop_xy", lambda l, rev: (real(l, rev)[0], l.hinge_axis[0]))
+    after = _failures_by_proof(lay)
+    new = {p: after[p] - before[p] for p in after}
+    assert new["cables_route"] and any("hinge rod" in f for f in new["cables_route"])
+    assert not {p: f for p, f in new.items() if p != "cables_route" and f}
 
 
 def test_pigtail_meets_the_stiff_run_in_line(lay):
