@@ -100,8 +100,10 @@ _TAOBAO_TIM = Monitor(
                "Measure depth with calipers (20.0 is item H's rim depth); measure the "
                "active-area offset in the bezel and each button's position on the front."),
         Source("Placeholder: pigtail length and exit point", _PHOTOS,
-               "Not measured: 300 mm cable length and 167 mm exit position from the "
-               "panel's left are guesses read off photos 1, 2, 11; measure both."),
+               "Not measured. 300 mm length and 167 mm exit position are design "
+               "assumptions (cable seen leaving the bottom edge near the button side "
+               "in photos 1, 2, 11, but its length and offset are not read from "
+               "them); measure both."),
         Source("Stand clip taken off", "docs/superpowers/specs/2026-11-24-compact-box-design.md",
                "Decision 3: the monitor is taped to the lid with its stand clip taken off."),
     ),

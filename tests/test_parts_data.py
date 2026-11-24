@@ -115,6 +115,9 @@ def test_design_monitor_has_pigtail_placeholders():
     m = MONITORS["taobao-tim"]
     assert m.pigtail_len == 300.0 and 0 < m.pigtail_exit_u < m.panel[0]
     assert any("pigtail" in s.label.lower() for s in m.sources) and not m.confirmed
+    for k, other in MONITORS.items():
+        if k != "taobao-tim":
+            assert other.pigtail_len is None and other.pigtail_exit_u is None
 
 
 def test_bank_cable_kinds():
@@ -126,3 +129,4 @@ def test_bank_cable_kinds():
 def test_bank_built_in_cable_data():
     c = CABLES["bank-built-in"]
     assert (c.dia, c.min_bend_r) == (4.0, 20.0)
+    assert c.plug == (20.0, 9.0, 8.5) and c.confirmed is False
