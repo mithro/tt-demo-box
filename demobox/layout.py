@@ -90,8 +90,12 @@ line at the X of the monitor's pigtail exit, the pigtail's diameter
 cable is threaded first.  ``hinge_relief_r`` is the radius about the axis
 within which the hinge's two kinds of segment are relieved (ruling R11): the
 furthest any lid point that enters the base's YZ profile, at any angle of
-``sweep_angles()``, gets from the axis, plus FIT.  At lid-knuckle segments the
-base is cut back to it; at base-knuckle segments the lid is.
+``sweep_angles()``, gets from the axis, plus FIT.  Along X there are three
+kinds of segment (ruling R15): lid-knuckle (the base cut back to
+``hinge_relief_r``, the lid whole), base-knuckle (the lid cut back, the base
+keeps a ``KNUCKLE_R`` knuckle) and open (both cut back).  Knuckles go only in
+``knuckle_x``: the X ranges with no ``base_contents`` within ``hinge_relief_r``
+of the axis in YZ, less the notch.
 ``lid_catch`` is two magnets under the front rim, each in a ``CATCH_BLOCK``
 block against the inside of the front wall, at the X nearest its front
 corner where the block clears every board-row keep-out in XY.
@@ -100,7 +104,7 @@ corner where the block clears every board-row keep-out in XY.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import demobox  # noqa: F401  (puts the submodule on sys.path)
 from tools.schema import Source
@@ -133,6 +137,8 @@ BANK_SIDE_PLUGS = ("usb-c-right-angle", "usb-a-c", "bank-built-in")
 # --- design choices ----------------------------------------------------------
 #: Hinge knuckle radius (``demobox.shared.hinge`` uses this one).
 KNUCKLE_R = 4.0
+#: Hinge knuckle length along X (``demobox.shared.hinge`` uses this one).
+KNUCKLE_LEN = 10.0
 #: The bought hinge rod: "3 mm steel rod or 2.85 mm filament".
 PIN_ROD_D = 3.0
 #: Disc magnets (6 x 3 mm, bought) and the lid catch built from them: a pair
@@ -285,6 +291,10 @@ class Layout:
     monitor_space: Box               # lid frame, closed
     lid_strip: Box                   # lid frame, closed
     lid_catch: tuple[Cyl, ...]       # the base-side catch magnets
+    #: R15: the X ranges where a knuckle may go: no base content
+    #: (``base_contents``) within ``hinge_relief_r`` of the axis in YZ, and
+    #: not the pigtail's notch.  Everywhere else is an open segment.
+    knuckle_x: tuple[tuple[float, float], ...] = ()
 
     def catch_base_block(self, c: Cyl) -> Box:
         """The block holding catch magnet ``c`` under the base's rim (base frame)."""
@@ -352,6 +362,49 @@ def _hinge_relief_r(lid: Box, base: Box, hy: float, hz: float) -> float:
         if inside.area > 0:
             far = max(far, max(math.hypot(y - hy, z - hz) for y, z in inside.exterior.coords))
     return far + FIT
+
+
+def base_contents(lay: Layout) -> dict[str, Box]:
+    """Everything in the base a lid or knuckle must miss, base frame: the
+    board keep-outs, the plinth, the pins (as boxes), the design bank as
+    packed (centred in the bay), the boost module's pocket (when in the base),
+    the port room (the bank cables' room) and the catch blocks."""
+    b = BATTERIES[DESIGN_BANK]
+    bay = lay.bank_bay
+    l_, w, h = b.size
+    x0, y0 = (bay.x0 + bay.x1 - l_) / 2, (bay.y0 + bay.y1 - w) / 2
+    out = dict(lay.board_keepouts)
+    out["plinth"] = lay.plinth
+    out.update({k: Box(p.cx - p.r, p.cy - p.r, p.z0, p.cx + p.r, p.cy + p.r, p.z1, p.what)
+                for k, p in lay.pins.items()})
+    out[f"bank {b.key}"] = Box(x0, y0, bay.z0, x0 + l_, y0 + w, bay.z0 + h, f"bank {b.key}")
+    if not lay.boost_in_lid:
+        out["boost pocket"] = lay.boost_pocket
+    out["port room"] = lay.port_room
+    for i, c in enumerate(lay.lid_catch, 1):
+        out[f"lid catch block {i}"] = lay.catch_base_block(c)
+    return out
+
+
+def _yz_distance(b: Box, y: float, z: float) -> float:
+    return math.hypot(max(b.y0 - y, 0.0, y - b.y1), max(b.z0 - z, 0.0, z - b.z1))
+
+
+def _knuckle_x(lay: Layout) -> tuple[tuple[float, float], ...]:
+    """R15: X 0..width less every base content within ``hinge_relief_r`` of
+    the axis in YZ, and less the pigtail's notch."""
+    hy, hz = lay.hinge_axis
+    blocked = [(b.x0, b.x1) for b in base_contents(lay).values()
+               if _yz_distance(b, hy, hz) <= lay.hinge_relief_r]
+    blocked.append((lay.hinge_notch.x0, lay.hinge_notch.x1))
+    ranges, x = [], lay.outer.x0
+    for a, b in sorted(blocked):
+        if a > x:
+            ranges.append((x, a))
+        x = max(x, b)
+    if x < lay.outer.x1:
+        ranges.append((x, lay.outer.x1))
+    return tuple(ranges)
 
 
 def _catch_x0(keepouts: dict[str, Box], wall: float, width: float, from_left: bool) -> float:
@@ -488,7 +541,7 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
                       rim_z - MAGNET_RECESS - MAGNET_T, rim_z - MAGNET_RECESS, MAGNET_D / 2,
                       f"lid catch magnet (base) {i + 1}") for i, x in enumerate(xs))
 
-    return Layout(
+    lay = Layout(
         wall=wall, outer=outer, rim_z=rim_z, board_origin=origin,
         board_keepouts=keepouts, vga_adapter=adapter, plinth=plinth,
         plinth_relief=plinth_relief, pins=pins,
@@ -497,3 +550,4 @@ def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) 
         hinge_relief_r=hinge_relief_r,
         lid_outer=lid_outer, monitor_space=monitor_space, lid_strip=lid_strip,
         lid_catch=catch)
+    return replace(lay, knuckle_x=_knuckle_x(lay))

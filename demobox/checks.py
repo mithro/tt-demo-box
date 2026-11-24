@@ -452,8 +452,8 @@ def packed_bank(lay: Layout) -> Box:
 def bank_lifts_out(report: Report, lay: Layout) -> None:
     """R12: with the lid at LID_OPEN_DEG nothing (the lid included) is over
     the design bank's own footprint, as packed in the bay, above the rim: the
-    bank lifts straight out.  And over the whole swing the lid, outside the
-    hinge relief (where the knuckles are), never meets the bank."""
+    bank lifts straight out.  (The swinging lid against the bank, and every
+    other base content, is ``hinge_sweep``'s.)"""
     bank, a = packed_bank(lay), L.LID_OPEN_DEG
     lid, rim = lay.lid_outer, lay.rim_z
     big = 10 * (lid.size[1] + lid.size[2] + lay.outer.size[1])
@@ -466,19 +466,6 @@ def bank_lifts_out(report: Report, lay: Layout) -> None:
                  f"bank footprint Y {_f(bank.y0)}..{_f(bank.y1)} (centred in the bay); the lid "
                  f"above the rim starts at Y {_f(above.bounds[0])}: clearance {_f(clearance)} mm, "
                  f"overlap {over:.3g} mm^2")
-
-    hy, hz = lay.hinge_axis
-    relief = Point(hy, hz).buffer(lay.hinge_relief_r, quad_segs=64)
-    shape = sbox(bank.y0, bank.z0, bank.y1, bank.z1)
-    worst = max(((lay.lid_profile_yz(t).difference(relief).intersection(shape).area, t)
-                 for t in sweep_angles()))
-    corner = math.dist((hy, hz), (bank.y1, bank.z1))
-    report.check(worst[0] <= AREA_TOL,
-                 f"{bank.what} in the bank bay: clear of the swinging lid outside the hinge relief",
-                 f"largest overlap {worst[0]:.3g} mm^2 over {len(sweep_angles())} angles; the "
-                 f"bank's back-top edge is {_f(corner)} mm from the hinge axis (relief r "
-                 f"{_f(lay.hinge_relief_r)}, knuckle r {L.KNUCKLE_R}): no knuckle over X "
-                 f"{_f(bank.x0)}..{_f(bank.x1)}")
 
     things = dict(lay.board_keepouts)
     things.update({p.what: Box(p.cx - p.r, p.cy - p.r, p.z0, p.cx + p.r, p.cy + p.r, p.z1, p.what)
@@ -587,14 +574,33 @@ def sweep_angles() -> list[float]:
     return L.sweep_angles()
 
 
-def hinge_sweep(report: Report, lay: Layout) -> None:
-    """R11: the hinge alternates two kinds of segment along X, and at every
-    angle from closed to LID_OPEN_DEG their YZ profiles stay apart:
+def _x_overlaps(b: Box, ranges) -> bool:
+    return any(min(b.x1, x1) - max(b.x0, x0) > EPS for x0, x1 in ranges)
 
-    * lid-knuckle segments: the base, cut back to ``hinge_relief_r`` about
-      the axis, against the whole lid;
-    * base-knuckle segments: the whole base against the lid cut back to
-      ``hinge_relief_r``.
+
+def _open_x(lay: Layout) -> list[tuple[float, float]]:
+    """X 0..width less ``knuckle_x``: the open segments."""
+    out, x = [], lay.outer.x0
+    for a, b in sorted(lay.knuckle_x):
+        if a > x + EPS:
+            out.append((x, a))
+        x = max(x, b)
+    if x < lay.outer.x1 - EPS:
+        out.append((x, lay.outer.x1))
+    return out
+
+
+def hinge_sweep(report: Report, lay: Layout) -> None:
+    """R15: along X the hinge has knuckle segments (only inside
+    ``knuckle_x``) and open segments (everywhere else).
+
+    * ``knuckle_x`` holds no base content within ``hinge_relief_r`` of the
+      axis in YZ (a lid knuckle's whole lid, or a base knuckle, sweeps
+      there), and at least two ranges of ``KNUCKLE_LEN``.
+    * At every angle from closed to LID_OPEN_DEG, inside ``knuckle_x`` the
+      whole lid misses every base content there.
+    * In open segments, the lid cut back to ``hinge_relief_r`` misses every
+      base content there, and the base's walls cut back the same.
 
     Closed, the lid rests on the base: contact (below AREA_TOL), not a
     collision.  The profile turns about the hinge axis (checked against an
@@ -602,24 +608,41 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
     stop is the hinge's (Task 4's tests and the solid sweep)."""
     lid, o = lay.lid_outer, lay.outer
     hy, hz = lay.hinge_axis
-    base = sbox(o.y0, o.z0, o.y1, o.z1)
-    relief = Point(hy, hz).buffer(lay.hinge_relief_r, quad_segs=64)
-    base_cut = base.difference(relief)
+    rr = lay.hinge_relief_r
+    relief = Point(hy, hz).buffer(rr, quad_segs=64)
+    walls = sbox(o.y0, o.z0, o.y1, o.z1).difference(relief)
+    knuckles, opens = list(lay.knuckle_x), _open_x(lay)
+    contents = L.base_contents(lay)
+
+    near = {n: b for n, b in contents.items()
+            if math.hypot(max(b.y0 - hy, 0.0, hy - b.y1), max(b.z0 - hz, 0.0, hz - b.z1)) <= rr}
+    under = sorted(n for n, b in near.items() if _x_overlaps(b, knuckles))
+    report.check(not under, "knuckle_x: no base content within the hinge relief of the axis",
+                 (f"within r {_f(rr)} of the axis and under a knuckle: {', '.join(under)}"
+                  if under else f"within r {_f(rr)} of the axis: "
+                  + (", ".join(f"{n} (X {_f(b.x0)}..{_f(b.x1)})" for n, b in sorted(near.items()))
+                     or "nothing") + "; all in open segments"))
+    long_ = [(a, b) for a, b in knuckles if b - a >= L.KNUCKLE_LEN - EPS]
+    report.check(len(long_) >= 2, f"knuckle_x: at least 2 ranges of KNUCKLE_LEN {L.KNUCKLE_LEN:g}",
+                 f"{len(long_)} long enough of " + ", ".join(f"{_f(a)}..{_f(b)}" for a, b in knuckles))
+
     corners = ((lid.y0, lid.z0), (lid.y1, lid.z0), (lid.y1, lid.z1), (lid.y0, lid.z1))
+    in_k = {n: sbox(b.y0, b.z0, b.y1, b.z1) for n, b in contents.items() if _x_overlaps(b, knuckles)}
+    in_o = {n: sbox(b.y0, b.z0, b.y1, b.z1) for n, b in contents.items() if _x_overlaps(b, opens)}
     angles = sweep_angles()
-    drift, need = 0.0, 0.0
-    worst = {"lid": (0.0, 0.0), "base": (0.0, 0.0)}
+    drift = 0.0
+    worst = {"knuckle": (0.0, 0.0, ""), "open": (0.0, 0.0, "")}
     for a in angles:
         prof = lay.lid_profile_yz(a)
         drift = max(drift, max(prof.exterior.distance(Point(lid_point_open(lay, y, z, a)))
                                for y, z in corners))
-        inside = prof.intersection(base)
-        if inside.area > AREA_TOL:
-            need = max(need, max(math.hypot(y - hy, z - hz) for y, z in inside.exterior.coords))
-        for kind, area in (("lid", prof.intersection(base_cut).area),
-                           ("base", prof.difference(relief).intersection(base).area)):
-            if area > worst[kind][0]:
-                worst[kind] = (area, a)
+        cut = prof.difference(relief)
+        for kind, shape, things in (("knuckle", prof, in_k),
+                                    ("open", cut, {**in_o, "base walls": walls})):
+            for n, t in things.items():
+                area = shape.intersection(t).area
+                if area > worst[kind][0]:
+                    worst[kind] = (area, a, n)
     report.check(drift <= EPS, "lid profile turns about the hinge axis",
                  f"lid_profile_yz agrees with an independent rotation to {drift:.2g} mm "
                  f"over {len(angles)} angles")
@@ -627,16 +650,17 @@ def hinge_sweep(report: Report, lay: Layout) -> None:
                  and angles[0] == 0.0,
                  f"lid sweep runs 0..{L.LID_OPEN_DEG:g} deg (LID_OPEN_DEG)",
                  f"{len(angles)} angles, {angles[0]:g} to {angles[-1]:g}")
-    common = (f"; the lid enters the base up to {_f(need)} mm from the axis, relief r "
-              f"{_f(lay.hinge_relief_r)} (contact below {AREA_TOL:g} mm^2 is not a collision)")
-    for kind, what in (("lid", "lid-knuckle segments: whole lid clears the base cut back to "
-                               "the hinge relief"),
-                       ("base", "base-knuckle segments: lid cut back to the hinge relief "
-                                "clears the whole base")):
-        area, a = worst[kind]
+    for kind, what, n_things in (
+            ("knuckle", "knuckle segments: whole lid misses every base content in knuckle_x",
+             len(in_k)),
+            ("open", "open segments: lid cut back to the hinge relief misses every base "
+                     "content and the cut base walls", len(in_o) + 1)):
+        area, a, n = worst[kind]
         report.check(area <= AREA_TOL, what,
-                     f"{len(angles)} angles; largest YZ overlap {area:.3g} mm^2"
-                     + (f" at {a:g} deg" if area > 0 else "") + common)
+                     f"{n_things} parts, {len(angles)} angles; largest YZ overlap {area:.3g} mm^2"
+                     + (f" ({n} at {a:g} deg)" if area > 0 else "")
+                     + f"; hinge relief r {_f(rr)} (contact below {AREA_TOL:g} mm^2 is not a "
+                     "collision)")
 
 
 def cables_route(report: Report, lay: Layout) -> None:

@@ -96,8 +96,9 @@ def _pins_moved(lay, mp):
 
 
 def _bay_under_the_open_lid(lay, mp):
-    # the bay runs 10 mm further back, under the lid standing at 100 degrees
-    return replace(lay, bank_bay=replace(lay.bank_bay, y1=lay.bank_bay.y1 + 10.0))
+    # the bay 4 mm deeper at the back: the packed bank 2 mm further back,
+    # under the lid standing at 100 degrees
+    return replace(lay, bank_bay=replace(lay.bank_bay, y1=lay.bank_bay.y1 + 4.0))
 
 
 def _short_port_room(lay, mp):
@@ -137,7 +138,7 @@ MUTATIONS = [
     ("bank_lifts_out", "bank bay", _bay_under_the_open_lid),
     ("button_reachable", "port room", _short_port_room),
     ("lid_closed_clears", "monitor face", _shallow_lid),
-    ("hinge_sweep", "relief", _small_hinge_relief),
+    ("hinge_sweep", "hinge relief", _small_hinge_relief),
     ("cables_route", "pigtail", _short_pigtail),
     ("lid_catch", "lid catch 1", _magnet_moved),
     ("size_budget", "width", _wider_box),
@@ -235,6 +236,23 @@ def test_closed_lid_touches_but_is_no_collision(lay):
     closed = lay.lid_profile_yz(0.0)
     assert closed.intersects(base)                     # it sits on the base
     assert closed.intersection(base).area <= C.AREA_TOL
+
+
+def test_hinge_sweep_fails_with_a_knuckle_over_the_bank(lay):
+    """R15: a knuckle range claimed over the bank, whose back-top edge is
+    inside the hinge relief, fails hinge_sweep and names the bank."""
+    bank = C.packed_bank(lay)
+    mid = (bank.x0 + bank.x1) / 2
+    over = replace(lay, knuckle_x=lay.knuckle_x + ((mid - 5.0, mid + 5.0),))
+    failed = _failed(_run(C.hinge_sweep, over))
+    assert failed and all("knuckle" in f for f in failed), failed
+    assert any(L.DESIGN_BANK in f for f in failed), failed
+
+
+def test_hinge_sweep_needs_two_knuckle_ranges(lay):
+    few = replace(lay, knuckle_x=lay.knuckle_x[:1])
+    failed = _failed(_run(C.hinge_sweep, few))
+    assert any("KNUCKLE_LEN" in f for f in failed), failed
 
 
 # --- the pigtail path ---------------------------------------------------------------
