@@ -637,3 +637,13 @@ def test_knuckle_x_is_the_kits_own():
     assert port == pytest.approx(23.0)
     first = min(a for a, b in lay.knuckle_x if b - a >= L.KNUCKLE_LEN)
     assert first == pytest.approx(2.4 + 23.0 + 104.0 + 2.0 + 0.5)
+
+
+def test_bank_ports_must_face_the_port_room(monkeypatch):
+    """The layout puts the bank's ports on its end facing the port room; a
+    bank whose ports are elsewhere must fail loudly, not be laid out wrongly."""
+    from dataclasses import replace
+    b = BATTERIES["iniu-p512"]
+    monkeypatch.setitem(BATTERIES, "iniu-p512", replace(b, port_face="top"))
+    with pytest.raises(ValueError, match="port"):
+        L.layout(L.ROUTES["printed"], bank="iniu-p512")

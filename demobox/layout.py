@@ -492,6 +492,9 @@ def _catch_x0(keepouts: dict[str, Box], wall: float, width: float, from_left: bo
 def layout(wall: float, bank: str = DESIGN_BANK, monitor: str = DESIGN_MONITOR) -> Layout:
     b = BATTERIES[bank]
     m = MONITORS[monitor]
+    if b.port_face != "end":
+        raise ValueError(f"bank {bank!r} has its ports on its {b.port_face} face: the layout "
+                         "puts them on the end facing the port room")
     if exit_edge(m) != "bottom" or m.pigtail_exit_u is None:
         raise ValueError(f"monitor {monitor!r} has no pigtail exit on its bottom edge: "
                          "only a taped design-kit monitor can be laid out")
