@@ -241,7 +241,12 @@ def _dist_mm(e) -> float:
 
 
 def _labels(dims) -> list[str]:
-    return [d["label"] for d in dims]
+    """The labelled dimensions' labels (outlines have none)."""
+    return [d["label"] for d in dims if d["kind"] != "outline"]
+
+
+def _outlines(dims) -> list[list[list[float]]]:
+    return [d["points"] for d in dims if d["kind"] == "outline"]
 
 
 def _open_extent(lay):
@@ -270,11 +275,18 @@ def test_view_dimensions_per_view(route):
         assert _labels(dims) == _expected_labels(lay, view), (route, view)
         for d in dims:
             assert d["fallback"] is False
-            if d["kind"] == "linear":
+            if d["kind"] == "outline":
+                assert set(d) == {"kind", "points", "fallback"}
+                assert len(d["points"]) >= 2
+            elif d["kind"] == "linear":
                 assert set(d) == {"label", "kind", "a", "b", "offset", "fallback"}
-                # the line stands DIM_OFFSET out, square to the measured span
+                # the line stands out (DIM_OFFSET, or clear of the box on
+                # bank-out), square to the measured span
                 off = d["offset"]
-                assert math.hypot(*off) == pytest.approx(ES.DIM_OFFSET)
+                if view == "bank-out":
+                    assert math.hypot(*off) > ES.DIM_OFFSET
+                else:
+                    assert math.hypot(*off) == pytest.approx(ES.DIM_OFFSET)
                 ab = [q - p for p, q in zip(d["a"], d["b"])]
                 assert sum(u * v for u, v in zip(ab, off)) == pytest.approx(0.0, abs=1e-9)
             else:
@@ -290,6 +302,9 @@ def test_view_dimensions_per_view(route):
                 assert c[1:] == pytest.approx(list(lay.hinge_axis))
                 m = ES.frame_matrix(lay, "lid", LID_OPEN_DEG, False)
                 assert list(_apply(m, d["a"])) == pytest.approx(d["b"])
+                # P7: a radius that reads along the lid edge and the rim
+                assert math.hypot(*ca) == pytest.approx(ES.DIM_ARC_R)
+                assert ES.DIM_ARC_R == pytest.approx(90.0)
 
 
 @pytest.mark.parametrize("route", ["printed", "laser"])
@@ -321,6 +336,12 @@ def test_open_dimensions_match_assembly(route):
     behind = ES.view_dimensions(lay, route, "open-back")
     assert front[1]["label"] == geom.mm(top)
     assert behind[1]["label"] == geom.mm(back - lay.outer.y1)
+    # P6: a projection line from the open lid's far corner down to the
+    # reach's far anchor
+    (proj,) = _outlines(behind)
+    assert proj[0][1] == pytest.approx(back, abs=1e-6)
+    assert proj[0][2] > lay.outer.z0
+    assert proj[-1] == pytest.approx(behind[1]["b"])
     # the open height's top anchor is on the open lid's top
     assert front[1]["b"][2] == pytest.approx(top, abs=1e-6)
 
@@ -331,10 +352,25 @@ def test_dims_follow_layout(bank):
     for route, w in ROUTES.items():
         lay = layout(w, bank=bank)
         dims = ES.view_dimensions(lay, route, "bank-out")
-        assert _labels(dims) == [geom.mm(lay.bank_bay.size[0]), geom.mm(lay.bank_bay.size[1])]
-        for d in dims:
+        bay, o = lay.bank_bay, lay.outer
+        assert _labels(dims) == [geom.mm(bay.size[0]), geom.mm(bay.size[1])]
+        # P4: the bay's rim-level rectangle as an outline, closed
+        (rim,) = _outlines(dims)
+        corners = [[bay.x0, bay.y0, bay.z1], [bay.x1, bay.y0, bay.z1],
+                   [bay.x1, bay.y1, bay.z1], [bay.x0, bay.y1, bay.z1]]
+        assert sum(rim, []) == pytest.approx(sum(corners + corners[:1], []))
+        lin = [d for d in dims if d["kind"] == "linear"]
+        for d in lin:
             assert d["label"] == geom.mm(_dist_mm(d))
-            assert d["a"][2] == pytest.approx(lay.bank_bay.z1)
+            assert d["a"][2] == pytest.approx(bay.z1)
+        # the lines clear the box (and its contents): X in front, Y to the
+        # right, so the extension lines from their shared front-right corner
+        # leave it square to each other (-Y and +X), not as a squiggle
+        x, y = lin
+        assert x["a"][1] + x["offset"][1] < o.y0
+        assert y["a"][0] + y["offset"][0] > o.x1
+        assert x["offset"][0] == 0 and x["offset"][1] < 0
+        assert y["offset"][1] == 0 and y["offset"][0] > 0
 
 
 def test_flatpack_dimensions():
@@ -360,6 +396,9 @@ def test_flatpack_dimensions():
     assert over_x["label"] == geom.mm(x1 - x0)
     assert over_y["label"] == geom.mm(y1 - y0)
     assert over_x["b"][1] == over_x["a"][1] and over_y["b"][0] == over_y["a"][0]
+    # P5: the X extent behind the kit, where its widest (back) row is
+    assert over_x["a"][1] == pytest.approx(y1)
+    assert over_x["offset"][1] > 0
     for d in dims:
         assert d["kind"] == "linear" and d["label"] == geom.mm(_dist_mm(d))
 

@@ -87,7 +87,7 @@ def test_labels_inside_and_apart():
 def test_label_longer_than_its_line_raises():
     png, side = _write("short", (400, 200), [
         _linear("1234.5", (100, 100), (150, 100), (100, 120), (150, 120))])
-    with pytest.raises(A.PlacementError, match="between the arrowheads"):
+    with pytest.raises(A.PlacementError, match="between its arrowheads"):
         A.annotate(png, side)
 
 
@@ -107,10 +107,76 @@ def test_resolution_mismatch_raises():
 
 
 def test_unresolvable_overlap_raises():
+    """Same line twice: every place on it covers the other's line."""
     png, side = _write("overlap", (200, 40), [
         _linear("100", (20, 10), (180, 10), (20, 20), (180, 20)),
         _linear("101", (20, 10), (180, 10), (20, 20), (180, 20))])
-    with pytest.raises(A.PlacementError):
+    with pytest.raises(A.PlacementError, match="covers a line"):
+        A.annotate(png, side)
+
+
+def test_label_overlap_raises():
+    """Two parallel lines 28 px apart, nothing crossing: their labels (32 px
+    font at h = 1600, so about 29 px tall) cannot be nudged apart along lines
+    too short to let them pass each other."""
+    w, h = 400, 1600
+    # lines at y = 100 and 128; extension lines at x = 100 and 300 only, from
+    # y = 60 down to 108 and from y = 170 up to 120: nothing crosses a label
+    dims = [_linear("100.00", (100, 60), (300, 60), (100, 100), (300, 100)),
+            _linear("101.00", (100, 170), (300, 170), (100, 128), (300, 128))]
+    plan_one = A.plan({"resolution": [w, h], "dimensions": dims[1:]})
+    assert plan_one.placed                 # alone, the second label fits
+    png, side = _write("label-overlap", (w, h), dims)
+    with pytest.raises(A.PlacementError, match="overlaps label '100.00'"):
+        A.annotate(png, side)
+
+
+def test_frame_edge_nudges_along_line():
+    """A shallow diagonal near the bottom edge: the centred label would clip
+    the frame, so it moves along the line, up and inward, staying on it."""
+    w, h = 400, 200
+    la, lb = (50, 199), (350, 180)
+    png, side = _write("edge", (w, h), [_linear("100", (50, 170), (350, 150), la, lb)])
+    plan = A.plan(_sidecar(png))
+    p = plan.placed[0]
+    x0, y0, x1, y1 = p.box
+    assert 0 <= x0 and x1 <= w and 0 <= y0 and y1 <= h
+    # centred at the middle it would have clipped
+    mid = ((la[0] + lb[0]) / 2, (la[1] + lb[1]) / 2)
+    assert mid[1] + (y1 - y0) / 2 > h - A.GAP
+    cx, cy = p.centre
+    # still on its line, nudged towards line_b (inward)
+    t = (cx - la[0]) / (lb[0] - la[0])
+    assert cy == pytest.approx(la[1] + t * (lb[1] - la[1]), abs=0.5)
+    assert cx > mid[0]
+
+
+def test_outline_drawn_without_label():
+    pts = [[100, 100], [300, 100], [300, 250], [100, 250], [100, 100]]
+    dims = [{"kind": "outline", "fallback": False, "points": pts},
+            _linear("200", (100, 250), (300, 250), (100, 290), (300, 290))]
+    png, side = _write("outline", (400, 320), dims)
+    plan = A.plan(_sidecar(png))
+    assert [p.label for p in plan.placed] == ["200"]
+    assert plan.dims[0]["kind"] == "outline"
+    A.annotate(png, side)
+    img = Image.open(png).convert("RGB")
+    for xy in ((200, 100), (300, 175), (100, 175)):
+        assert img.getpixel(xy) == DIM_RGB, xy
+
+
+def test_outline_point_outside_raises():
+    png, side = _write("outline-out", (400, 300), [
+        {"kind": "outline", "fallback": False, "points": [[10, 10], [500, 10]]}])
+    with pytest.raises(ValueError, match="outside"):
+        A.annotate(png, side)
+
+
+def test_missing_key_raises():
+    d = _linear("100", (10, 10), (300, 10), (10, 30), (300, 30))
+    del d["fallback"]
+    png, side = _write("nokey", (400, 300), [d])
+    with pytest.raises(ValueError, match="fallback"):
         A.annotate(png, side)
 
 

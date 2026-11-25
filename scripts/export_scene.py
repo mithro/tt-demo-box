@@ -476,8 +476,9 @@ def pigtail_parts(route: str, angle_deg: float, out: Path) -> list[dict]:
 
 #: How far a dimension line stands out from its anchors (mm, outward).
 DIM_OFFSET = 15.0
-#: The lid-angle arc's radius about the hinge axis (mm).
-DIM_ARC_R = 40.0
+#: The lid-angle arc's radius about the hinge axis (mm): long enough to read
+#: as an angle along the lid edge and the rim (ruling P7).
+DIM_ARC_R = 90.0
 
 
 def _apply(m: list[float], p) -> list[float]:
@@ -495,6 +496,13 @@ def _linear(value: float, a, b, offset, fallback: bool = False) -> dict:
     return {"label": label, "kind": "linear", "a": [float(v) for v in a],
             "b": [float(v) for v in b], "offset": [float(v) for v in offset],
             "fallback": fallback}
+
+
+def _outline(points) -> dict:
+    """An unlabelled polyline (world, mm) drawn thin in the dimension colour:
+    the bank bay's rim, a projection line (rulings P4, P6)."""
+    return {"kind": "outline", "points": [[float(v) for v in p] for p in points],
+            "fallback": False}
 
 
 def _open_lid_corners(lay: Layout, lid_deg: float) -> list[list[float]]:
@@ -539,9 +547,10 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
 
     Each is ``{"label", "kind": "linear", "a", "b", "offset", "fallback"}``
     (anchors ``a``, ``b`` on the model; the line at ``a + offset`` ..
-    ``b + offset``, DIM_OFFSET out, away from the model) or ``{"label",
+    ``b + offset``, DIM_OFFSET out, away from the model), ``{"label",
     "kind": "angle", "centre", "a", "b", "fallback"}`` (the arc about
-    ``centre`` from arm point ``a`` to ``b``).  Labels are the layout's
+    ``centre`` from arm point ``a`` to ``b``) or ``{"kind": "outline",
+    "points", "fallback"}`` (an unlabelled polyline, ``_outline``).  Labels are the layout's
     numbers through ``geom.mm`` (the sheets' rounding); the anchors come
     from the layout's boxes moved by ``frame_matrix``, and must span them.
 
@@ -551,14 +560,19 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
       layout's ``lid_profile_yz``) up the right side, and the lid's
       LID_OPEN_DEG arc about the hinge axis at the right face;
     * open-back: D and, chained behind it, the open lid's reach behind the
-      back face, both along the left side on the ground;
-    * bank-out: the bank bay's length (X) along its front rim edge and its
-      width (Y) along its left rim edge;
+      back face, both along the left side on the ground, with a projection
+      line from the open lid's far corner down to the reach's far anchor
+      (P6);
+    * bank-out: the bank bay's rim-level rectangle as an outline, its
+      length (X) off its front rim edge, out in front of the box, and its
+      width (Y) off its right rim edge, out to the right of the box (P4:
+      DIM_OFFSET clear of the box, so the lines clear its contents and
+      the extension lines leave their shared corner square, -Y and +X);
     * flatpack: each panel's (u, v) size at its place in the kit (W along
       its front edge, H along its left), then two ``fallback`` entries, the
-      kit's overall extent in X (2 DIM_OFFSET in front of it) and in Y (2
-      DIM_OFFSET left of it) (rulings P2, P2b: drawn only when the
-      per-panel labels do not fit).
+      kit's overall extent in X (2 DIM_OFFSET behind it, along the back
+      row, which is the widest: P5) and in Y (2 DIM_OFFSET left of it)
+      (rulings P2, P2b: drawn only when the per-panel labels do not fit).
     """
     off = DIM_OFFSET
     if view == "flatpack":
@@ -573,7 +587,7 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
         y0 = min(y for _x, y, _w, _h, _t in place.values())
         x1 = max(x + w for x, _y, w, _h, _t in place.values())
         y1 = max(y + h for _x, y, _w, h, _t in place.values())
-        dims.append(_linear(x1 - x0, (x0, y0, 0.0), (x1, y0, 0.0), (0.0, -2 * off, 0.0),
+        dims.append(_linear(x1 - x0, (x0, y1, 0.0), (x1, y1, 0.0), (0.0, 2 * off, 0.0),
                             fallback=True))
         dims.append(_linear(y1 - y0, (x0, y0, 0.0), (x0, y1, 0.0), (-2 * off, 0.0, 0.0),
                             fallback=True))
@@ -600,13 +614,21 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
                  "centre": [x1, hy, hz], "a": list(arm), "b": _apply(m, arm),
                  "fallback": False}]
     if view == "open-back":
-        far = max(corners, key=lambda p: p[1])
+        # the far corner on the left (dimensioned) side; the highest of a tie
+        far = max(corners, key=lambda p: (round(p[1], 9), -p[0], p[2]))
+        foot = (x0, far[1], z0)
+        proj = [far] + ([[far[0], far[1], z0]] if far[0] != x0 else []) + [foot]
         return [_linear(o.size[1], (x0, y0, z0), (x0, y1, z0), (-off, 0.0, 0.0)),
-                _linear(back - y1, (x0, y1, z0), (x0, far[1], z0), (-off, 0.0, 0.0))]
+                _linear(back - y1, (x0, y1, z0), foot, (-off, 0.0, 0.0)),
+                _outline(proj)]
     if view == "bank-out":
         z = bay.z1
-        return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (0.0, -off, 0.0)),
-                _linear(bay.size[1], (bay.x0, bay.y0, z), (bay.x0, bay.y1, z), (-off, 0.0, 0.0))]
+        rim = [(bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (bay.x1, bay.y1, z), (bay.x0, bay.y1, z)]
+        return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z),
+                        (0.0, (y0 - off) - bay.y0, 0.0)),
+                _linear(bay.size[1], (bay.x1, bay.y0, z), (bay.x1, bay.y1, z),
+                        ((x1 + off) - bay.x1, 0.0, 0.0)),
+                _outline(rim + rim[:1])]
     raise ValueError(f"no dimensions for view {view!r}")
 
 

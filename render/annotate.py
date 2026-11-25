@@ -13,21 +13,23 @@ top-left pixels; see ``render_scene.project_dimensions``) and draws, in
   line ``line_a`` .. ``line_b`` (a little past it), the line with filled
   arrowheads, and the label centred on it;
 * angle: the arms from ``centre`` to ``a`` and ``b``, the ``arc`` polyline
-  with arrowheads, and the label at its middle.
+  with arrowheads, and the label at its middle;
+* outline: the ``points`` polyline, thin, with no label (the bank bay's
+  rim, a projection line: rulings P4, P6).
 
 Labels are DejaVu Sans at ``max(18, h // 50)`` px on a white backing (3 px
 padding).  Each is centred on its own line, at the middle if it can be,
 otherwise nudged along the line; it must lie wholly between the arrowheads,
 inside the image, and clear of every other label and every other
-dimension's lines.
-A label with no such place is a ``PlacementError``: never a silent overlap.
+dimension's lines (outlines included).  A label with no such place is a
+``PlacementError`` naming what blocked it: never a silent overlap.
 
 Fallback (rulings P2, P2b): entries with ``"fallback": true`` (the
 flat-pack's overall X and Y extents) are drawn only when the others'
 labels cannot all be placed, and then they replace them all.
 
-Fails loudly: a missing sidecar, a resolution that is not the image's, or
-a point off the image raises.  No ``bpy``: plain Pillow.
+Fails loudly: a missing sidecar, a resolution that is not the image's, an
+entry missing a key, or a point off the image raises.  No ``bpy``: plain Pillow.
 """
 
 from __future__ import annotations
@@ -68,8 +70,8 @@ class Placed:
 
 @dataclass(frozen=True)
 class Plan:
-    dims: list[dict]          # the dimensions drawn
-    placed: list[Placed]      # their labels, in the same order
+    dims: list[dict]          # the dimensions drawn, outlines included
+    placed: list[Placed]      # the labelled ones' labels, in the same order
     fallback: bool            # True if the fallback entries replaced the others
     font_px: int
 
@@ -93,7 +95,19 @@ def _font(px: int):
 
 # --- geometry -----------------------------------------------------------------------
 
+#: Each kind's keys (``render_scene.project_dimensions``).
+KEYS = {"linear": {"label", "kind", "fallback", "a", "b", "line_a", "line_b"},
+        "angle": {"label", "kind", "fallback", "centre", "a", "b", "arc"},
+        "outline": {"kind", "fallback", "points"}}
+
+
+def _name(d: dict, i: int) -> str:
+    return repr(d["label"]) if "label" in d else f"#{i} ({d.get('kind')})"
+
+
 def _points(d: dict) -> list[tuple[str, list[float]]]:
+    if d["kind"] == "outline":
+        return [(f"points[{i}]", p) for i, p in enumerate(d["points"])]
     keys = ("a", "b", "line_a", "line_b") if d["kind"] == "linear" else ("centre", "a", "b")
     pts = [(k, d[k]) for k in keys]
     if d["kind"] == "angle":
@@ -102,12 +116,14 @@ def _points(d: dict) -> list[tuple[str, list[float]]]:
 
 
 def _path(d: dict) -> list[tuple[float, float]]:
-    """The polyline the label sits on."""
+    """The polyline drawn heavy (and the label sits on)."""
     if d["kind"] == "linear":
         return [tuple(d["line_a"]), tuple(d["line_b"])]
     if d["kind"] == "angle":
         return [tuple(p) for p in d["arc"]]
-    raise ValueError(f"dimension {d['label']!r}: unknown kind {d['kind']!r}")
+    if d["kind"] == "outline":
+        return [tuple(p) for p in d["points"]]
+    raise ValueError(f"dimension {_name(d, -1)}: unknown kind {d['kind']!r}")
 
 
 def _ext_end(anchor, line_pt) -> tuple[float, float]:
@@ -123,6 +139,8 @@ def _segments(d: dict, w: int, h: int) -> list[tuple[tuple, tuple]]:
     """Every line segment drawn for ``d`` (path, extension lines or arms)."""
     path = _path(d)
     segs = list(zip(path, path[1:]))
+    if d["kind"] == "outline":
+        return segs
     if d["kind"] == "linear":
         for a, la in ((d["a"], d["line_a"]), (d["b"], d["line_b"])):
             e = _ext_end(a, la)
@@ -191,28 +209,44 @@ def _candidates(path, bw: float, bh: float, head: float):
 
 
 def _place(dims: list[dict], w: int, h: int, draw, font) -> list[Placed]:
+    """Place the labelled ``dims``' labels, in order; outlines are only
+    obstacles.  Raises ``PlacementError`` naming what blocked a label."""
     head = head_px(h)
     segs = [_segments(d, w, h) for d in dims]
     placed: list[Placed] = []
     for i, d in enumerate(dims):
+        if d["kind"] == "outline":
+            continue
         l, t, r, b = draw.textbbox((0, 0), d["label"], font=font, anchor="mm")
         bw, bh = (r - l) + 2 * PAD, (b - t) + 2 * PAD
-        others = [s for j, ss in enumerate(segs) if j != i for s in ss]
-        for cx, cy in _candidates(_path(d), bw, bh, head):
+        others = [(j, s) for j, ss in enumerate(segs) if j != i for s in ss]
+        cands = _candidates(_path(d), bw, bh, head)
+        blocked: dict[str, int] = {}
+        for cx, cy in cands:
             box = (cx + l - PAD, cy + t - PAD, cx + r + PAD, cy + b + PAD)
+            why = None
             if not (GAP <= box[0] and box[2] <= w - GAP and GAP <= box[1] and box[3] <= h - GAP):
-                continue
-            if any(_overlap(box, p.box) for p in placed):
-                continue
-            if any(_seg_hits_box(p, q, box) for p, q in others):
-                continue
-            placed.append(Placed(d["label"], box, (cx, cy)))
-            break
+                why = "outside the frame"
+            if why is None:
+                hit = next((p for p in placed if _overlap(box, p.box)), None)
+                if hit is not None:
+                    why = f"overlaps label {hit.label!r}"
+            if why is None:
+                hit = next((j for j, (p, q) in others if _seg_hits_box(p, q, box)), None)
+                if hit is not None:
+                    why = f"covers a line of {_name(dims[hit], hit)}"
+            if why is None:
+                placed.append(Placed(d["label"], box, (cx, cy)))
+                break
+            blocked[why] = blocked.get(why, 0) + 1
         else:
-            raise PlacementError(
-                f"label {d['label']!r} ({d['kind']}, line {_path(d)[0]}..{_path(d)[-1]}) has "
-                f"no place on its line, between the arrowheads, inside the {w}x{h} image and "
-                f"clear of the other labels and lines")
+            where = f"({d['kind']}, line {_path(d)[0]}..{_path(d)[-1]}, {w}x{h} image)"
+            if not cands:
+                raise PlacementError(f"label {d['label']!r} {where} does not fit between "
+                                     f"its arrowheads")
+            reasons = "; ".join(f"{k} ({n} of {len(cands)})" for k, n in blocked.items())
+            raise PlacementError(f"label {d['label']!r} {where} has no place on its line: "
+                                 f"{reasons}")
     return placed
 
 
@@ -220,10 +254,16 @@ def _check(side: dict, size: tuple[int, int] | None = None) -> tuple[int, int]:
     w, h = side["resolution"]
     if size is not None and tuple(size) != (w, h):
         raise ValueError(f"sidecar resolution {w}x{h} is not the image's {size[0]}x{size[1]}")
-    for d in side["dimensions"]:
+    for i, d in enumerate(side["dimensions"]):
+        want = KEYS.get(d.get("kind"))
+        if want is None:
+            raise ValueError(f"dimension {_name(d, i)}: unknown kind {d.get('kind')!r}")
+        if set(d) != want:
+            raise ValueError(f"dimension {_name(d, i)} ({d['kind']}): keys {sorted(set(d))}, "
+                             f"want {sorted(want)} (missing {sorted(want - set(d))})")
         for key, (x, y) in _points(d):
             if not (0 <= x <= w and 0 <= y <= h):
-                raise ValueError(f"dimension {d['label']!r} {key} ({x}, {y}) is outside "
+                raise ValueError(f"dimension {_name(d, i)} {key} ({x}, {y}) is outside "
                                  f"the {w}x{h} image")
     return w, h
 
@@ -276,13 +316,16 @@ def annotate(png: Path, sidecar: Path) -> Plan:
     draw = ImageDraw.Draw(img)
     for d in p.dims:
         path = _path(d)
+        if d["kind"] == "outline":
+            draw.line(path, fill=C_DIM, width=max(1, lw - 1), joint="curve")
+            continue
         for a, q in _segments(d, w, h)[len(path) - 1:]:     # extension lines / arms
             draw.line([a, q], fill=C_DIM, width=max(1, lw - 1))
         draw.line(path, fill=C_DIM, width=lw, joint="curve")
         _arrow(draw, path[0], path[1], head)
         _arrow(draw, path[-1], path[-2], head)
     font = _font(p.font_px)
-    for d, pl in zip(p.dims, p.placed):
+    for pl in p.placed:
         x0, y0, x1, y1 = pl.box
         draw.rectangle([round(x0), round(y0), round(x1), round(y1)], fill="white")
         draw.text(pl.centre, pl.label, fill=C_DIM, font=font, anchor="mm")
@@ -296,7 +339,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     for png in a.png:
         p = annotate(png, sidecar_for(png))
-        print(f"annotate: {png}: {len(p.dims)} dimensions drawn"
+        n_out = sum(d["kind"] == "outline" for d in p.dims)
+        print(f"annotate: {png}: {len(p.placed)} dimensions and {n_out} outlines drawn"
               f"{' (fallback: overall extent)' if p.fallback else ''}: "
               + ", ".join(pl.label for pl in p.placed))
     return 0
