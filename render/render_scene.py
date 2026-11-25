@@ -50,6 +50,9 @@ import bpy
 from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # Blender's -P does not
+from dim_px import _to_px  # noqa: E402
+
 MM = 0.001
 #: Margin round the fitted framing (the camera backs off by this factor).
 FRAME_MARGIN = 1.10
@@ -218,12 +221,7 @@ def project_dimensions(scene, cam, dims) -> dict:
 
     def px(p_mm: Vector, label: str, key: str) -> list[float]:
         v = world_to_camera_view(scene, cam, p_mm * MM)
-        x, y = v.x * w, (1.0 - v.y) * h
-        if v.z <= 0 or not (0.0 <= x <= w and 0.0 <= y <= h):
-            raise ValueError(f"dimension {label!r} {key} {tuple(p_mm)} projects to "
-                             f"({x:.1f}, {y:.1f}, depth {v.z:.3f}), outside the "
-                             f"{w}x{h} image")
-        return [round(x, 3), round(y, 3)]
+        return _to_px((v.x, v.y, v.z), w, h, f"dimension {label!r} {key} {tuple(p_mm)}")
 
     out = []
     for d in dims:

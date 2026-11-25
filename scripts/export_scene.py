@@ -555,9 +555,10 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
     * bank-out: the bank bay's length (X) along its front rim edge and its
       width (Y) along its left rim edge;
     * flatpack: each panel's (u, v) size at its place in the kit (W along
-      its front edge, H along its left), then one ``fallback`` entry, the
-      kit's overall extent in X, 2 DIM_OFFSET in front of the kit (ruling P2:
-      drawn only when the per-panel labels do not fit).
+      its front edge, H along its left), then two ``fallback`` entries, the
+      kit's overall extent in X (2 DIM_OFFSET in front of it) and in Y (2
+      DIM_OFFSET left of it) (rulings P2, P2b: drawn only when the
+      per-panel labels do not fit).
     """
     off = DIM_OFFSET
     if view == "flatpack":
@@ -568,35 +569,40 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
         for x, y, w, h, t in place.values():
             dims.append(_linear(w, (x, y, t), (x + w, y, t), (0.0, -off, 0.0)))
             dims.append(_linear(h, (x, y, t), (x, y + h, t), (-off, 0.0, 0.0)))
+        x0 = min(x for x, _y, _w, _h, _t in place.values())
+        y0 = min(y for _x, y, _w, _h, _t in place.values())
         x1 = max(x + w for x, _y, w, _h, _t in place.values())
-        dims.append(_linear(x1, (0.0, 0.0, 0.0), (x1, 0.0, 0.0), (0.0, -2 * off, 0.0),
+        y1 = max(y + h for _x, y, _w, h, _t in place.values())
+        dims.append(_linear(x1 - x0, (x0, y0, 0.0), (x1, y0, 0.0), (0.0, -2 * off, 0.0),
+                            fallback=True))
+        dims.append(_linear(y1 - y0, (x0, y0, 0.0), (x0, y1, 0.0), (-2 * off, 0.0, 0.0),
                             fallback=True))
         return dims
     v = VIEWS[view]
     o, lo, bay = lay.outer, lay.lid_outer, lay.bank_bay
-    W, D = o.size[0], o.size[1]
+    x0, y0, z0, x1, y1 = o.x0, o.y0, o.z0, o.x1, o.y1
     if view == "closed":
         lid_top = max(p[2] for p in _open_lid_corners(lay, v.lid_deg))
-        return [_linear(W, (0.0, 0.0, 0.0), (W, 0.0, 0.0), (0.0, -off, 0.0)),
-                _linear(D, (0.0, 0.0, 0.0), (0.0, D, 0.0), (-off, 0.0, 0.0)),
-                _linear(o.size[2] + lo.size[2], (W, 0.0, 0.0), (W, 0.0, lid_top),
+        return [_linear(o.size[0], (x0, y0, z0), (x1, y0, z0), (0.0, -off, 0.0)),
+                _linear(o.size[1], (x0, y0, z0), (x0, y1, z0), (-off, 0.0, 0.0)),
+                _linear(o.size[2] + lo.size[2], (x1, y0, z0), (x1, y0, lid_top),
                         (off, 0.0, 0.0))]
-    _y0, _z0, back, top = lay.lid_profile_yz(v.lid_deg).bounds
+    _py0, _pz0, back, top = lay.lid_profile_yz(v.lid_deg).bounds
     corners = _open_lid_corners(lay, v.lid_deg)
     if view == "open-front":
         hi = max(corners, key=lambda p: p[2])
         hy, hz = lay.hinge_axis
         m = frame_matrix(lay, "lid", v.lid_deg, False)
-        arm = (W, hy - DIM_ARC_R, hz)                      # along the shut lid, forward
-        return [_linear(W, (0.0, 0.0, 0.0), (W, 0.0, 0.0), (0.0, -off, 0.0)),
-                _linear(top, (W, hi[1], 0.0), (W, hi[1], hi[2]), (off, 0.0, 0.0)),
+        arm = (x1, hy - DIM_ARC_R, hz)                     # along the shut lid, forward
+        return [_linear(o.size[0], (x0, y0, z0), (x1, y0, z0), (0.0, -off, 0.0)),
+                _linear(top - z0, (x1, hi[1], z0), (x1, hi[1], hi[2]), (off, 0.0, 0.0)),
                 {"label": f"{v.lid_deg:g}\N{DEGREE SIGN}", "kind": "angle",
-                 "centre": [W, hy, hz], "a": list(arm), "b": _apply(m, arm),
+                 "centre": [x1, hy, hz], "a": list(arm), "b": _apply(m, arm),
                  "fallback": False}]
     if view == "open-back":
         far = max(corners, key=lambda p: p[1])
-        return [_linear(D, (0.0, 0.0, 0.0), (0.0, D, 0.0), (-off, 0.0, 0.0)),
-                _linear(back - o.y1, (0.0, D, 0.0), (0.0, far[1], 0.0), (-off, 0.0, 0.0))]
+        return [_linear(o.size[1], (x0, y0, z0), (x0, y1, z0), (-off, 0.0, 0.0)),
+                _linear(back - y1, (x0, y1, z0), (x0, far[1], z0), (-off, 0.0, 0.0))]
     if view == "bank-out":
         z = bay.z1
         return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (0.0, -off, 0.0)),

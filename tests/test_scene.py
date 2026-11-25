@@ -338,22 +338,28 @@ def test_dims_follow_layout(bank):
 
 
 def test_flatpack_dimensions():
-    """Each panel's (u, v) size, at its place in the kit, plus one
-    overall-extent entry (ruling P2: ``fallback``) spanning the kit in X."""
+    """Each panel's (u, v) size, at its place in the kit, plus two
+    overall-extent entries (rulings P2, P2b: ``fallback``): the kit in X
+    and in Y."""
     from demobox.laser import panels as P
     lay = layout(ROUTES["laser"])
     pans = P.build(lay, lay.wall, P.KERF).panels
     dims = ES.view_dimensions(lay, "laser", "flatpack")
     per = [d for d in dims if not d["fallback"]]
-    (overall,) = [d for d in dims if d["fallback"]]
+    over_x, over_y = [d for d in dims if d["fallback"]]
     assert len(per) == 2 * len(pans)
     want = sorted(geom.mm(v) for p in pans.values()
                   for v in (p.shape.bounds[2] - p.shape.bounds[0],
                             p.shape.bounds[3] - p.shape.bounds[1]))
     assert sorted(_labels(per)) == want
     place = ES.flatpack_placement(lay)
+    x0 = min(x for x, _y, _w, _h, _t in place.values())
+    y0 = min(y for _x, y, _w, _h, _t in place.values())
     x1 = max(x + w for x, _y, w, _h, _t in place.values())
-    assert overall["label"] == geom.mm(x1)
+    y1 = max(y + h for _x, y, _w, h, _t in place.values())
+    assert over_x["label"] == geom.mm(x1 - x0)
+    assert over_y["label"] == geom.mm(y1 - y0)
+    assert over_x["b"][1] == over_x["a"][1] and over_y["b"][0] == over_y["a"][0]
     for d in dims:
         assert d["kind"] == "linear" and d["label"] == geom.mm(_dist_mm(d))
 
@@ -370,6 +376,24 @@ def test_manifest_has_dimensions():
     m = ES.flatpack(OUT)
     assert m["dimensions"] == ES.view_dimensions(layout(ROUTES["laser"]), "laser", "flatpack")
     assert any(d["fallback"] for d in m["dimensions"])
+
+
+def test_to_px():
+    """The sidecar's pixel conversion (``render/dim_px.py``, no bpy):
+    camera-view (x, y, depth) to pixels from the top-left; a point off the
+    image or behind the camera raises."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import _to_px
+    assert "bpy" not in sys.modules
+    assert _to_px((0.25, 0.75, 1.0), 1600, 1200) == [400.0, 300.0]
+    assert _to_px((0.0, 1.0, 0.5), 1600, 1200) == [0.0, 0.0]
+    assert _to_px((1.0, 0.0, 0.5), 1600, 1200) == [1600.0, 1200.0]
+    for bad in ((-0.01, 0.5, 1.0), (1.01, 0.5, 1.0), (0.5, -0.01, 1.0), (0.5, 1.01, 1.0)):
+        with pytest.raises(ValueError, match="outside"):
+            _to_px(bad, 1600, 1200)
+    for depth in (0.0, -1.0):
+        with pytest.raises(ValueError, match="outside"):
+            _to_px((0.5, 0.5, depth), 1600, 1200)
 
 
 # --- the manifests (slow: every STL) ------------------------------------------------------
