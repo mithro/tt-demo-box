@@ -569,8 +569,11 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
       to that edge, between the front (seen) and right (unseen) faces, so
       it stays clear of W's extension line and faces the camera;
     * open-front: W, the open height (ground to the open lid's top, the
-      layout's ``lid_profile_yz``) up the right side, and the lid's
-      LID_OPEN_DEG arc about the hinge axis at the right face;
+      layout's ``lid_profile_yz``) up the right side's back edge, its foot
+      on the box's back-bottom-right corner, with a projection line from
+      the open lid's top (behind the back face) to its top anchor (F3,
+      like P6), and the lid's LID_OPEN_DEG arc about the hinge axis at the
+      right face;
     * open-back: D and, chained behind it, the open lid's reach behind the
       back face, both along the left side on the ground, with a projection
       line from the open lid's far corner down to the reach's far anchor
@@ -616,15 +619,18 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
     _py0, _pz0, back, top = lay.lid_profile_yz(v.lid_deg).bounds
     corners = _open_lid_corners(lay, v.lid_deg)
     if view == "open-front":
-        hi = max(corners, key=lambda p: p[2])
+        # the open lid's top on the right (dimensioned) side
+        hi = max(corners, key=lambda p: (round(p[2], 9), p[0]))
         hy, hz = lay.hinge_axis
         m = frame_matrix(lay, "lid", v.lid_deg, False)
         arm = (x1, hy - DIM_ARC_R, hz)                     # along the shut lid, forward
+        head = (x1, y1, hi[2])
         return [_linear(o.size[0], (x0, y0, z0), (x1, y0, z0), (0.0, -off, 0.0)),
-                _linear(top - z0, (x1, hi[1], z0), (x1, hi[1], hi[2]), (off, 0.0, 0.0)),
+                _linear(top - z0, (x1, y1, z0), head, (off, 0.0, 0.0)),
                 {"label": f"{v.lid_deg:g}\N{DEGREE SIGN}", "kind": "angle",
                  "centre": [x1, hy, hz], "a": list(arm), "b": _apply(m, arm),
-                 "fallback": False}]
+                 "fallback": False},
+                _outline([hi] + ([[x1, hi[1], hi[2]]] if hi[0] != x1 else []) + [head])]
     if view == "open-back":
         # the far corner on the left (dimensioned) side; the highest of a tie
         far = max(corners, key=lambda p: (round(p[1], 9), -p[0], p[2]))

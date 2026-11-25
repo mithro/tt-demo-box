@@ -343,8 +343,19 @@ def test_open_dimensions_match_assembly(route):
     assert proj[0][1] == pytest.approx(back, abs=1e-6)
     assert proj[0][2] > lay.outer.z0
     assert proj[-1] == pytest.approx(behind[1]["b"])
-    # the open height's top anchor is on the open lid's top
+    # the open height's top anchor is at the open lid's top
     assert front[1]["b"][2] == pytest.approx(top, abs=1e-6)
+    # F3 (M3): its foot sits on the box (its back-bottom-right corner), not
+    # on the ground behind it; a projection line runs from the open lid's
+    # top (behind the back face) to the top anchor, square to the line
+    o = lay.outer
+    foot, head = front[1]["a"], front[1]["b"]
+    assert foot == pytest.approx([o.x1, o.y1, o.z0])
+    assert head[:2] == pytest.approx(foot[:2])
+    (hproj,) = _outlines(front)
+    assert [d["style"] for d in front if d["kind"] == "outline"] == ["line"]
+    assert hproj[0][1] > o.y1 and hproj[0][2] == pytest.approx(top, abs=1e-6)
+    assert hproj[-1] == pytest.approx(head)
 
 
 @pytest.mark.parametrize("bank", sorted(BATTERIES))
