@@ -19,7 +19,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import export_scene as ES  # noqa: E402
 
+from demobox import geom  # noqa: E402
 from demobox.checks import pigtail_path  # noqa: E402
+from demobox.parts.batteries import BATTERIES  # noqa: E402
 from demobox.layout import LID_OPEN_DEG, ROUTES, layout  # noqa: E402
 from demobox.printed import body  # noqa: E402
 from demobox.shared.solids import BANK_OUT_LIFT  # noqa: E402
@@ -222,6 +224,176 @@ def test_bought_parts_present(route):
                  "display-7seg"):
         assert want in names, (route, want)
     assert names["board"] == "pcb"
+
+
+# --- dimensions ---------------------------------------------------------------------
+#
+# The manifests are in mm: the parts' ``transform``s are mm (``frame_matrix``)
+# and the dimension anchors are in the same frame and units, so a scene-unit
+# distance is already mm (ruling P1: convert before comparing; the factor is 1).
+
+SCENE_UNIT_MM = 1.0
+DEG = "\N{DEGREE SIGN}"
+
+
+def _dist_mm(e) -> float:
+    return math.dist(e["a"], e["b"]) * SCENE_UNIT_MM
+
+
+def _labels(dims) -> list[str]:
+    return [d["label"] for d in dims]
+
+
+def _open_extent(lay):
+    """The open lid's top (Z) and back (Y), from the layout's own profile."""
+    _y0, _z0, y1, z1 = lay.lid_profile_yz(LID_OPEN_DEG).bounds
+    return z1, y1
+
+
+def _expected_labels(lay, view) -> list[str]:
+    o, lo, bay = lay.outer, lay.lid_outer, lay.bank_bay
+    top, back = _open_extent(lay)
+    return {"closed": [geom.mm(o.size[0]), geom.mm(o.size[1]), geom.mm(o.size[2] + lo.size[2])],
+            "open-front": [geom.mm(o.size[0]), geom.mm(top), f"{LID_OPEN_DEG:g}{DEG}"],
+            "open-back": [geom.mm(o.size[1]), geom.mm(back - o.y1)],
+            "bank-out": [geom.mm(bay.size[0]), geom.mm(bay.size[1])]}[view]
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_view_dimensions_per_view(route):
+    """The spec's table: closed W, D, H; open-front W, the open height and
+    the lid's angle; open-back D and the reach behind the back face;
+    bank-out the bay's L and W."""
+    lay = layout(ROUTES[route])
+    for view in ES.VIEWS:
+        dims = ES.view_dimensions(lay, route, view)
+        assert _labels(dims) == _expected_labels(lay, view), (route, view)
+        for d in dims:
+            assert d["fallback"] is False
+            if d["kind"] == "linear":
+                assert set(d) == {"label", "kind", "a", "b", "offset", "fallback"}
+                # the line stands DIM_OFFSET out, square to the measured span
+                off = d["offset"]
+                assert math.hypot(*off) == pytest.approx(ES.DIM_OFFSET)
+                ab = [q - p for p, q in zip(d["a"], d["b"])]
+                assert sum(u * v for u, v in zip(ab, off)) == pytest.approx(0.0, abs=1e-9)
+            else:
+                assert d["kind"] == "angle"
+                assert set(d) == {"label", "kind", "centre", "a", "b", "fallback"}
+                c = d["centre"]
+                ca = [p - q for p, q in zip(d["a"], c)]
+                cb = [p - q for p, q in zip(d["b"], c)]
+                assert math.hypot(*ca) == pytest.approx(math.hypot(*cb))
+                cos = sum(u * v for u, v in zip(ca, cb)) / math.hypot(*ca) / math.hypot(*cb)
+                assert math.degrees(math.acos(cos)) == pytest.approx(LID_OPEN_DEG)
+                # on the hinge axis, the arms swept by the lid's own transform
+                assert c[1:] == pytest.approx(list(lay.hinge_axis))
+                m = ES.frame_matrix(lay, "lid", LID_OPEN_DEG, False)
+                assert list(_apply(m, d["a"])) == pytest.approx(d["b"])
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_labels_use_geom_mm(route):
+    """Every linear label is ``geom.mm`` of its anchors' span (in mm) and
+    the layout's value: the same text as the sheets."""
+    lay = layout(ROUTES[route])
+    for view in ES.VIEWS:
+        for d in ES.view_dimensions(lay, route, view):
+            if d["kind"] == "linear":
+                assert d["label"] == geom.mm(_dist_mm(d)), (route, view, d)
+    closed = ES.view_dimensions(lay, route, "closed")
+    assert closed[0]["label"] == geom.mm(lay.outer.size[0])
+    assert closed[1]["label"] == geom.mm(lay.outer.size[1])
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_open_dimensions_match_assembly(route):
+    """The open height and reach (from the layout's lid profile) are what the
+    GA sheet measures off the open lid's solids: the top of every part the
+    lid moves, and how far behind the back face they go."""
+    lay = layout(ROUTES[route])
+    still = {n: s.Center() for n, s, _ in body.assembly(route, 0.0, False)}
+    moved = [_bb(s) for n, s, _ in body.assembly(route, LID_OPEN_DEG, False)
+             if (s.Center() - still[n]).Length > 1e-6]
+    top = max(b[5] for b in moved)
+    back = max(b[4] for b in moved)
+    front = ES.view_dimensions(lay, route, "open-front")
+    behind = ES.view_dimensions(lay, route, "open-back")
+    assert front[1]["label"] == geom.mm(top)
+    assert behind[1]["label"] == geom.mm(back - lay.outer.y1)
+    # the open height's top anchor is on the open lid's top
+    assert front[1]["b"][2] == pytest.approx(top, abs=1e-6)
+
+
+@pytest.mark.parametrize("bank", sorted(BATTERIES))
+def test_dims_follow_layout(bank):
+    """The bank-out dimensions are the bay laid out for that bank."""
+    for route, w in ROUTES.items():
+        lay = layout(w, bank=bank)
+        dims = ES.view_dimensions(lay, route, "bank-out")
+        assert _labels(dims) == [geom.mm(lay.bank_bay.size[0]), geom.mm(lay.bank_bay.size[1])]
+        for d in dims:
+            assert d["label"] == geom.mm(_dist_mm(d))
+            assert d["a"][2] == pytest.approx(lay.bank_bay.z1)
+
+
+def test_flatpack_dimensions():
+    """Each panel's (u, v) size, at its place in the kit, plus two
+    overall-extent entries (rulings P2, P2b: ``fallback``): the kit in X
+    and in Y."""
+    from demobox.laser import panels as P
+    lay = layout(ROUTES["laser"])
+    pans = P.build(lay, lay.wall, P.KERF).panels
+    dims = ES.view_dimensions(lay, "laser", "flatpack")
+    per = [d for d in dims if not d["fallback"]]
+    over_x, over_y = [d for d in dims if d["fallback"]]
+    assert len(per) == 2 * len(pans)
+    want = sorted(geom.mm(v) for p in pans.values()
+                  for v in (p.shape.bounds[2] - p.shape.bounds[0],
+                            p.shape.bounds[3] - p.shape.bounds[1]))
+    assert sorted(_labels(per)) == want
+    place = ES.flatpack_placement(lay)
+    x0 = min(x for x, _y, _w, _h, _t in place.values())
+    y0 = min(y for _x, y, _w, _h, _t in place.values())
+    x1 = max(x + w for x, _y, w, _h, _t in place.values())
+    y1 = max(y + h for _x, y, _w, h, _t in place.values())
+    assert over_x["label"] == geom.mm(x1 - x0)
+    assert over_y["label"] == geom.mm(y1 - y0)
+    assert over_x["b"][1] == over_x["a"][1] and over_y["b"][0] == over_y["a"][0]
+    for d in dims:
+        assert d["kind"] == "linear" and d["label"] == geom.mm(_dist_mm(d))
+
+
+def test_manifest_has_dimensions():
+    """Every view's manifest and the flat-pack's carry their dimensions."""
+    for route in ROUTES:
+        lay = layout(ROUTES[route])
+        for view in ES.VIEWS:
+            m = ES.view_manifest(route, view, [], [], "pattern.png")
+            assert m["dimensions"], (route, view)
+            assert m["dimensions"] == ES.view_dimensions(lay, route, view)
+            json.dumps(m)
+    m = ES.flatpack(OUT)
+    assert m["dimensions"] == ES.view_dimensions(layout(ROUTES["laser"]), "laser", "flatpack")
+    assert any(d["fallback"] for d in m["dimensions"])
+
+
+def test_to_px():
+    """The sidecar's pixel conversion (``render/dim_px.py``, no bpy):
+    camera-view (x, y, depth) to pixels from the top-left; a point off the
+    image or behind the camera raises."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import _to_px
+    assert "bpy" not in sys.modules
+    assert _to_px((0.25, 0.75, 1.0), 1600, 1200) == [400.0, 300.0]
+    assert _to_px((0.0, 1.0, 0.5), 1600, 1200) == [0.0, 0.0]
+    assert _to_px((1.0, 0.0, 0.5), 1600, 1200) == [1600.0, 1200.0]
+    for bad in ((-0.01, 0.5, 1.0), (1.01, 0.5, 1.0), (0.5, -0.01, 1.0), (0.5, 1.01, 1.0)):
+        with pytest.raises(ValueError, match="outside"):
+            _to_px(bad, 1600, 1200)
+    for depth in (0.0, -1.0):
+        with pytest.raises(ValueError, match="outside"):
+            _to_px((0.5, 0.5, depth), 1600, 1200)
 
 
 # --- the manifests (slow: every STL) ------------------------------------------------------

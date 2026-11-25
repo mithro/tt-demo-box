@@ -17,6 +17,23 @@ Look: Cycles on the CPU (all cores), the manifest's samples, denoising OFF
 ground under the lowest part, a three-point light rig (key, fill, rim) sized
 from the scene's bounding box, and a 35 mm camera at the manifest's bearing
 and elevation fitted to the bounding box.
+
+Dimensions: the manifest's ``dimensions`` (world, mm, as the transforms;
+``export_scene.view_dimensions``) are fitted into the frame with the parts,
+and every point is projected through the placed camera
+(``world_to_camera_view``) to pixels, origin top-left, and written to
+``<out>.dims.json`` once the render is written::
+
+    {"resolution": [w, h],
+     "dimensions": [{"label", "kind", "fallback", "a", "b",
+                     "line_a", "line_b"},                 # linear
+                    {"label", "kind", "fallback", "centre", "a", "b",
+                     "arc"}]}                             # angle
+
+``line_a``/``line_b`` are the dimension line's ends (``a``/``b`` + offset);
+``arc`` is the angle's arc from ``a`` to ``b`` sampled at ARC_STEPS + 1
+points (it projects to an ellipse, not a circle).  A point behind the camera
+or outside the image raises.
 """
 
 from __future__ import annotations
@@ -30,7 +47,11 @@ import time
 from pathlib import Path
 
 import bpy
+from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # Blender's -P does not
+from dim_px import _to_px  # noqa: E402
 
 MM = 0.001
 #: Margin round the fitted framing (the camera backs off by this factor).
@@ -40,6 +61,8 @@ SCREEN_STRENGTH = 1.6
 WORLD_LIGHT = 0.3
 #: Light power (W per square metre of the scene's bounding radius).
 LIGHT_W = {"key": 90.0, "fill": 30.0, "rim": 70.0}
+#: Segments the angle arc is sampled in.
+ARC_STEPS = 32
 
 
 def _args():
@@ -147,6 +170,67 @@ def _screen_material(image: Path):
     nt.links.new(tex.outputs["Color"], em.inputs["Color"])
     nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
     return mat
+
+
+# --- dimensions -------------------------------------------------------------------------
+
+def _arc(centre, a, b, steps=ARC_STEPS) -> list[Vector]:
+    """Points on the circular arc about ``centre`` from ``a`` to ``b`` (equal
+    radii), the short way round."""
+    c, va, vb = Vector(centre), Vector(a) - Vector(centre), Vector(b) - Vector(centre)
+    r = va.length
+    if r <= 0 or abs(vb.length - r) > 1e-6 * max(r, 1.0):
+        raise ValueError(f"angle arms differ: {va.length} and {vb.length}")
+    u = va.normalized()
+    theta = va.angle(vb)
+    w = (vb - u * vb.dot(u)).normalized()
+    return [c + (u * math.cos(theta * i / steps) + w * math.sin(theta * i / steps)) * r
+            for i in range(steps + 1)]
+
+
+def dim_points(d) -> dict[str, list]:
+    """A dimension's named points (manifest mm): linear ``a``, ``b``,
+    ``line_a``, ``line_b``; angle ``centre``, ``a``, ``b`` and ``arc`` (a
+    list)."""
+    if d["kind"] == "linear":
+        off = Vector(d["offset"])
+        return {"a": Vector(d["a"]), "b": Vector(d["b"]),
+                "line_a": Vector(d["a"]) + off, "line_b": Vector(d["b"]) + off}
+    if d["kind"] == "angle":
+        return {"centre": Vector(d["centre"]), "a": Vector(d["a"]), "b": Vector(d["b"]),
+                "arc": _arc(d["centre"], d["a"], d["b"])}
+    raise ValueError(f"unknown dimension kind {d['kind']!r}")
+
+
+def _flat_points(dims) -> list[Vector]:
+    """Every dimension point, in Blender's metres."""
+    out = []
+    for d in dims:
+        for v in dim_points(d).values():
+            out += [p * MM for p in (v if isinstance(v, list) else [v])]
+    return out
+
+
+def project_dimensions(scene, cam, dims) -> dict:
+    """The sidecar: every dimension point in pixels (origin top-left) of the
+    rendered image; raises if one is behind the camera or off the image."""
+    bpy.context.view_layer.update()          # the camera's matrix_world after _camera
+    pct = scene.render.resolution_percentage
+    w = scene.render.resolution_x * pct // 100
+    h = scene.render.resolution_y * pct // 100
+
+    def px(p_mm: Vector, label: str, key: str) -> list[float]:
+        v = world_to_camera_view(scene, cam, p_mm * MM)
+        return _to_px((v.x, v.y, v.z), w, h, f"dimension {label!r} {key} {tuple(p_mm)}")
+
+    out = []
+    for d in dims:
+        e = {k: d[k] for k in ("label", "kind", "fallback")}
+        for key, v in dim_points(d).items():
+            e[key] = ([px(p, d["label"], key) for p in v] if isinstance(v, list)
+                      else px(v, d["label"], key))
+        out.append(e)
+    return {"resolution": [w, h], "dimensions": out}
 
 
 # --- scene ------------------------------------------------------------------------------
@@ -257,7 +341,7 @@ def _lights(centre, radius, az_deg):
           LIGHT_W["rim"] * radius ** 2, radius * 1.2)
 
 
-def _camera(cam_cfg, objs, res):
+def _camera(cam_cfg, objs, res, extra=()):
     scene = bpy.context.scene
     data = bpy.data.cameras.new("camera")
     data.lens = cam_cfg["lens_mm"]
@@ -273,8 +357,9 @@ def _camera(cam_cfg, objs, res):
     right, up = rot @ Vector((1, 0, 0)), rot @ Vector((0, 1, 0))
     data.clip_start, data.clip_end = 0.01, 100.0
     # Points to fit: every object's bounding-box corners (tighter than the
-    # scene box's corners, which overshoot an L-shaped open box).
-    pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
+    # scene box's corners, which overshoot an L-shaped open box), and
+    # ``extra`` (the dimensions' points, metres).
+    pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box] + list(extra)
     tan_x = data.sensor_width / 2 / data.lens / FRAME_MARGIN
     tan_y = tan_x * res[1] / res[0]
 
@@ -320,6 +405,8 @@ def _camera(cam_cfg, objs, res):
 def main() -> int:
     a = _args()
     man = json.loads(a.manifest.read_text())
+    sidecar = a.out.with_name(a.out.name + ".dims.json")
+    sidecar.unlink(missing_ok=True)          # no stale sidecar survives a failure
     base = a.manifest.parent
     _clear()
     scene = bpy.context.scene
@@ -337,7 +424,8 @@ def main() -> int:
     res = man["resolution"]
     scene.render.resolution_x, scene.render.resolution_y = res
     scene.render.resolution_percentage = a.scale
-    centre, radius, lo = _camera(man["camera"], objs, res)
+    dims = man["dimensions"]
+    centre, radius, lo = _camera(man["camera"], objs, res, _flat_points(dims))
     _ground(lo.z, radius * 40)
     _world()
     _lights(centre, radius, man["camera"]["azimuth_deg"])
@@ -359,11 +447,16 @@ def main() -> int:
     scene.render.image_settings.color_mode = "RGB"
     scene.render.filepath = str(a.out.resolve())
     a.out.parent.mkdir(parents=True, exist_ok=True)
+    # Projected before the (long) render, so a dimension off the frame fails
+    # fast and leaves no image; written after it, so a sidecar means a render.
+    side = project_dimensions(scene, scene.camera, dims)
     t1 = time.time()
     bpy.ops.render.render(write_still=True)
     print(f"render_scene: {man['name']} {res[0]}x{res[1]} @{a.scale}% "
           f"{scene.cycles.samples} samples, {scene.render.threads} threads: "
           f"rendered in {time.time() - t1:.1f} s -> {a.out}")
+    sidecar.write_text(json.dumps(side, indent=1) + "\n")
+    print(f"render_scene: {len(dims)} dimensions projected -> {sidecar}")
     return 0
 
 
