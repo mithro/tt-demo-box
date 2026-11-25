@@ -48,6 +48,7 @@
   },
   {
    "kind": "outline",
+   "style": "line",
    "fallback": false,
    "points": [
     [
