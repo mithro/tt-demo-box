@@ -28,9 +28,12 @@ and every point is projected through the placed camera
      "dimensions": [{"label", "kind", "fallback", "a", "b",
                      "line_a", "line_b"},                 # linear
                     {"label", "kind", "fallback", "centre", "a", "b",
-                     "arc"}]}                             # angle
+                     "arc"},                              # angle
+                    {"kind", "fallback", "points",
+                     "style"}]}                           # outline (no label)
 
 ``line_a``/``line_b`` are the dimension line's ends (``a``/``b`` + offset);
+``points`` is an outline's polyline;
 ``arc`` is the angle's arc from ``a`` to ``b`` sampled at ARC_STEPS + 1
 points (it projects to an ellipse, not a circle).  A point behind the camera
 or outside the image raises.
@@ -191,7 +194,7 @@ def _arc(centre, a, b, steps=ARC_STEPS) -> list[Vector]:
 def dim_points(d) -> dict[str, list]:
     """A dimension's named points (manifest mm): linear ``a``, ``b``,
     ``line_a``, ``line_b``; angle ``centre``, ``a``, ``b`` and ``arc`` (a
-    list)."""
+    list); outline ``points`` (a list)."""
     if d["kind"] == "linear":
         off = Vector(d["offset"])
         return {"a": Vector(d["a"]), "b": Vector(d["b"]),
@@ -199,6 +202,8 @@ def dim_points(d) -> dict[str, list]:
     if d["kind"] == "angle":
         return {"centre": Vector(d["centre"]), "a": Vector(d["a"]), "b": Vector(d["b"]),
                 "arc": _arc(d["centre"], d["a"], d["b"])}
+    if d["kind"] == "outline":
+        return {"points": [Vector(p) for p in d["points"]]}
     raise ValueError(f"unknown dimension kind {d['kind']!r}")
 
 
@@ -219,16 +224,17 @@ def project_dimensions(scene, cam, dims) -> dict:
     w = scene.render.resolution_x * pct // 100
     h = scene.render.resolution_y * pct // 100
 
-    def px(p_mm: Vector, label: str, key: str) -> list[float]:
+    def px(p_mm: Vector, name: str, key: str) -> list[float]:
         v = world_to_camera_view(scene, cam, p_mm * MM)
-        return _to_px((v.x, v.y, v.z), w, h, f"dimension {label!r} {key} {tuple(p_mm)}")
+        return _to_px((v.x, v.y, v.z), w, h, f"dimension {name} {key} {tuple(p_mm)}")
 
     out = []
-    for d in dims:
-        e = {k: d[k] for k in ("label", "kind", "fallback")}
+    for i, d in enumerate(dims):
+        e = {k: d[k] for k in ("label", "kind", "style", "fallback") if k in d}
+        name = repr(d["label"]) if "label" in d else f"#{i} ({d['kind']})"
         for key, v in dim_points(d).items():
-            e[key] = ([px(p, d["label"], key) for p in v] if isinstance(v, list)
-                      else px(v, d["label"], key))
+            e[key] = ([px(p, name, key) for p in v] if isinstance(v, list)
+                      else px(v, name, key))
         out.append(e)
     return {"resolution": [w, h], "dimensions": out}
 
