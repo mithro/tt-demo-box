@@ -22,10 +22,14 @@ Every extension line starts EXT_GAP px off its anchor (a drafting gap, P8),
 so corners read as corners.
 
 Labels are DejaVu Sans at ``max(18, h // 50)`` px on a white backing (3 px
-padding).  Each is centred on its own line, at the middle if it can be,
+padding), turned to run along their line, the drafting convention (P9):
+the angle is the line's (the arc's tangent there, for an angle), turned
+into (-90, 90] so no label reads upside down, and the backing turns with
+the text.  Each is centred on its own line, at the middle if it can be,
 otherwise nudged along the line; it must lie wholly between the arrowheads,
 inside the image, and clear of every other label and every other
-dimension's lines (outlines included).  A label with no such place is a
+dimension's lines (outlines included), all checked against the turned
+label's shape.  A label with no such place is a
 ``PlacementError`` naming what blocked it: never a silent overlap.
 
 Fallback (rulings P2, P2b): entries with ``"fallback": true`` (the
@@ -46,6 +50,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+from shapely.geometry import LineString, Point, Polygon
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -71,8 +76,11 @@ class PlacementError(ValueError):
 @dataclass(frozen=True)
 class Placed:
     label: str
-    box: tuple[float, float, float, float]      # x0, y0, x1, y1 of the white backing
     centre: tuple[float, float]
+    angle: float                                  # degrees, anticlockwise on screen, (-90, 90]
+    size: tuple[float, float]                     # the backing's length along / depth across
+    poly: tuple[tuple[float, float], ...]         # its four corners
+    box: tuple[float, float, float, float]        # the corners' bounds, x0, y0, x1, y1
 
 
 @dataclass(frozen=True)
@@ -161,31 +169,6 @@ def _segments(d: dict, w: int, h: int) -> list[tuple[tuple, tuple]]:
     return segs
 
 
-def _seg_hits_box(p, q, box) -> bool:
-    """Liang-Barsky: does segment ``p``-``q`` touch the box's interior?"""
-    x0, y0, x1, y1 = box
-    dx, dy = q[0] - p[0], q[1] - p[1]
-    t0, t1 = 0.0, 1.0
-    for pk, qk in ((-dx, p[0] - x0), (dx, x1 - p[0]), (-dy, p[1] - y0), (dy, y1 - p[1])):
-        if pk == 0:
-            if qk <= 0:
-                return False
-        else:
-            t = qk / pk
-            if pk < 0:
-                t0 = max(t0, t)
-            else:
-                t1 = min(t1, t)
-            if t0 >= t1:
-                return False
-    return True
-
-
-def _overlap(p, q) -> bool:
-    return (p[0] < q[2] + GAP and q[0] < p[2] + GAP
-            and p[1] < q[3] + GAP and q[1] < p[3] + GAP)
-
-
 def _along(path, s: float):
     """Point and unit tangent at fraction ``s`` of ``path``'s length."""
     lens = [math.dist(p, q) for p, q in zip(path, path[1:])]
@@ -204,50 +187,83 @@ def _along(path, s: float):
 
 # --- placement ----------------------------------------------------------------------
 
-def _candidates(path, bw: float, bh: float, head: float):
-    """Label centres to try, on the line from the middle outwards, keeping
-    the whole label between the arrowheads.  None if it does not fit there:
-    a label off its own line, beside a short one, is ambiguous (that is when
-    the flat-pack falls back to its overall extent)."""
+def text_angle(tx: float, ty: float) -> float:
+    """The screen angle (degrees, anticlockwise, image y down) of text along
+    direction (tx, ty), turned into (-90, 90] so it never reads upside down."""
+    a = math.degrees(math.atan2(-ty, tx))
+    if a > 90.0:
+        a -= 180.0
+    elif a <= -90.0:
+        a += 180.0
+    return a
+
+
+def label_poly(c, angle: float, bw: float, bh: float) -> tuple[tuple[float, float], ...]:
+    """The corners of a ``bw`` x ``bh`` backing centred on ``c``, turned to
+    ``angle`` (``text_angle``)."""
+    r = math.radians(angle)
+    ux, uy = math.cos(r), -math.sin(r)            # along the text
+    vx, vy = math.sin(r), math.cos(r)             # down the text
+    hx, hy = bw / 2, bh / 2
+    return tuple((c[0] + sx * hx * ux + sy * hy * vx, c[1] + sx * hx * uy + sy * hy * vy)
+                 for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)))
+
+
+def _candidates(path, bw: float, head: float):
+    """(centre, tangent) to try, on the line from the middle outwards, the
+    label (turned along the line, ``bw`` long) wholly between the
+    arrowheads.  None if it does not fit there: a label off its own line,
+    beside a short one, is ambiguous (that is when the flat-pack falls back
+    to its overall extent)."""
     total = sum(math.dist(p, q) for p, q in zip(path, path[1:]))
     out = []
     for s in [0.5] + [0.5 + sgn * 0.5 * k / STEPS for k in range(1, STEPS + 1) for sgn in (-1, 1)]:
-        c, (tx, ty) = _along(path, s)
-        half = (abs(tx) * bw + abs(ty) * bh) / 2          # the box's reach along the line
-        if head <= s * total - half and s * total + half <= total - head:
-            out.append(c)
+        if head <= s * total - bw / 2 and s * total + bw / 2 <= total - head:
+            out.append(_along(path, s))
     return out
 
 
+def _seg_geom(p, q):
+    return Point(p) if tuple(p) == tuple(q) else LineString([p, q])
+
+
 def _place(dims: list[dict], w: int, h: int, draw, font) -> list[Placed]:
-    """Place the labelled ``dims``' labels, in order; outlines are only
-    obstacles.  Raises ``PlacementError`` naming what blocked a label."""
+    """Place the labelled ``dims``' labels, in order, each turned along its
+    line (P9); outlines are only obstacles.  The frame, other labels and
+    other dimensions' lines are checked against the turned label's shape.
+    Raises ``PlacementError`` naming what blocked a label."""
     head = head_px(h)
     segs = [_segments(d, w, h) for d in dims]
     placed: list[Placed] = []
+    shapes: list[Polygon] = []
     for i, d in enumerate(dims):
         if d["kind"] == "outline":
             continue
         l, t, r, b = draw.textbbox((0, 0), d["label"], font=font, anchor="mm")
         bw, bh = (r - l) + 2 * PAD, (b - t) + 2 * PAD
-        others = [(j, s) for j, ss in enumerate(segs) if j != i for s in ss]
-        cands = _candidates(_path(d), bw, bh, head)
+        others = [(j, _seg_geom(p, q)) for j, ss in enumerate(segs) if j != i for p, q in ss]
+        cands = _candidates(_path(d), bw, head)
         blocked: dict[str, int] = {}
-        for cx, cy in cands:
-            box = (cx + l - PAD, cy + t - PAD, cx + r + PAD, cy + b + PAD)
+        for c, (tx, ty) in cands:
+            angle = text_angle(tx, ty)
+            poly = label_poly(c, angle, bw, bh)
+            shape = Polygon(poly)
             why = None
-            if not (GAP <= box[0] and box[2] <= w - GAP and GAP <= box[1] and box[3] <= h - GAP):
+            if not all(GAP <= x <= w - GAP and GAP <= y <= h - GAP for x, y in poly):
                 why = "outside the frame"
             if why is None:
-                hit = next((p for p in placed if _overlap(box, p.box)), None)
+                hit = next((k for k, o in enumerate(shapes) if shape.distance(o) < GAP), None)
                 if hit is not None:
-                    why = f"overlaps label {hit.label!r}"
+                    why = f"overlaps label {placed[hit].label!r}"
             if why is None:
-                hit = next((j for j, (p, q) in others if _seg_hits_box(p, q, box)), None)
+                hit = next((j for j, g in others if shape.intersects(g)), None)
                 if hit is not None:
                     why = f"covers a line of {_name(dims[hit], hit)}"
             if why is None:
-                placed.append(Placed(d["label"], box, (cx, cy)))
+                xs, ys = [x for x, _ in poly], [y for _, y in poly]
+                placed.append(Placed(d["label"], (c[0], c[1]), angle, (bw, bh), poly,
+                                     (min(xs), min(ys), max(xs), max(ys))))
+                shapes.append(shape)
                 break
             blocked[why] = blocked.get(why, 0) + 1
         else:
@@ -315,6 +331,23 @@ def _arrow(draw, tip, frm, size: float) -> None:
     draw.polygon([tip, (bx - uy * hw, by + ux * hw), (bx + uy * hw, by - ux * hw)], fill=C_DIM)
 
 
+def _paste_label(img, pl: Placed, font):
+    """The label on its white backing, drawn upright on a tile, turned to
+    ``pl.angle`` and pasted centred on ``pl.centre``."""
+    bw, bh = (math.ceil(v) for v in pl.size)
+    tile = Image.new("RGBA", (bw, bh), (255, 255, 255, 255))
+    ImageDraw.Draw(tile).text((bw / 2, bh / 2), pl.label, fill=C_DIM, font=font, anchor="mm")
+    if pl.angle:
+        tile = tile.rotate(pl.angle, resample=Image.Resampling.BICUBIC, expand=True)
+    x = round(pl.centre[0] - tile.width / 2)
+    y = round(pl.centre[1] - tile.height / 2)
+    if img.mode == "RGBA":
+        img.alpha_composite(tile, (x, y))
+    else:
+        img.paste(tile, (x, y), tile)
+    return img
+
+
 def annotate(png: Path, sidecar: Path) -> Plan:
     """Draw ``sidecar``'s dimensions onto ``png``, in place."""
     png, sidecar = Path(png), Path(sidecar)
@@ -351,9 +384,7 @@ def annotate(png: Path, sidecar: Path) -> Plan:
         _arrow(draw, path[-1], path[-2], head)
     font = _font(p.font_px)
     for pl in p.placed:
-        x0, y0, x1, y1 = pl.box
-        draw.rectangle([round(x0), round(y0), round(x1), round(y1)], fill="white")
-        draw.text(pl.centre, pl.label, fill=C_DIM, font=font, anchor="mm")
+        img = _paste_label(img, pl, font)
     img.save(png)
     return p
 

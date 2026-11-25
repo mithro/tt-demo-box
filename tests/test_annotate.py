@@ -7,6 +7,7 @@ every point in top-left pixels); no Blender.
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -215,7 +216,6 @@ def test_fallback_not_drawn_when_panels_fit():
 
 
 def test_angle_drawn_along_arc():
-    import math
     c = (400, 300)
     arc = [[c[0] + 150 * math.cos(math.radians(-90 + 100 * i / 32)),
             c[1] + 150 * math.sin(math.radians(-90 + 100 * i / 32))] for i in range(33)]
@@ -305,3 +305,64 @@ def test_outline_unknown_style_raises():
          "points": [[10, 10], [200, 10]]}])
     with pytest.raises(ValueError, match="style"):
         A.annotate(png, side)
+
+
+# --- P9: labels follow their line ----------------------------------------------------
+
+def test_label_rotated_to_slanted_line():
+    dims = [_linear("300", (100, 330), (400, 180), (100, 300), (400, 150))]
+    plan = A.plan(_sidecar(_write("slant", (500, 400), dims)[0]))
+    want = math.degrees(math.atan2(150, 300))           # rising to the right: +26.6
+    assert plan.placed[0].angle == pytest.approx(want, abs=1.0)
+
+
+def test_label_never_upside_down():
+    """A line drawn right to left reads the same as left to right; angles
+    stay in (-90, 90]."""
+    ltr = [_linear("300", (100, 330), (400, 180), (100, 300), (400, 150))]
+    rtl = [_linear("300", (400, 180), (100, 330), (400, 150), (100, 300))]
+    a = A.plan(_sidecar(_write("ltr", (500, 400), ltr)[0])).placed[0].angle
+    b = A.plan(_sidecar(_write("rtl", (500, 400), rtl)[0])).placed[0].angle
+    assert a == pytest.approx(b, abs=1e-6)
+    up = [_linear("300", (130, 350), (130, 50), (100, 350), (100, 50))]
+    down = [_linear("300", (130, 50), (130, 350), (100, 50), (100, 350))]
+    for d in (up, down):
+        assert A.plan(_sidecar(_write("vert", (400, 400), d)[0])).placed[0].angle \
+            == pytest.approx(90.0)
+
+
+def test_rotated_label_fits_where_upright_box_would_clip():
+    """A vertical line 15 px from the left edge: an upright label box would
+    run off the frame; turned along the line it fits."""
+    w, h = 400, 400
+    png, side = _write("rot-frame", (w, h), [
+        _linear("123.45", (40, 20), (40, 380), (15, 20), (15, 380))])
+    plan = A.plan(_sidecar(png))
+    p = plan.placed[0]
+    assert p.angle == pytest.approx(90.0)
+    assert p.centre[0] == pytest.approx(15, abs=0.5)
+    for x, y in p.poly:
+        assert A.GAP <= x <= w - A.GAP and A.GAP <= y <= h - A.GAP
+    upright_w = p.size[0]                                # the label's length along its line
+    assert 15 - upright_w / 2 < 0                        # upright, it would have clipped
+    A.annotate(png, side)
+
+
+def test_rotated_labels_overlap_by_shape_not_bounding_box():
+    """Two parallel 45-degree lines 40 px apart: their labels' bounding boxes
+    overlap but the turned labels do not, so both stay at their middles."""
+    r2 = math.sqrt(2)
+    n = (1 / r2, -1 / r2)
+
+    def sh(p, k):
+        return (p[0] + n[0] * k, p[1] + n[1] * k)
+    l1 = ((100, 100), (300, 300))
+    l2 = (sh(l1[0], 40), sh(l1[1], 40))
+    dims = [_linear("150.0", sh(l1[0], -30), sh(l1[1], -30), *l1),
+            _linear("151.0", sh(l2[0], 30), sh(l2[1], 30), *l2)]
+    plan = A.plan(_sidecar(_write("rot-overlap", (400, 400), dims)[0]))
+    p, q = plan.placed
+    assert p.angle == pytest.approx(-45.0) and q.angle == pytest.approx(-45.0)
+    assert p.centre == pytest.approx((200, 200), abs=0.5)
+    assert q.centre == pytest.approx(sh((200, 200), 40), abs=0.5)
+    assert _overlap(p.box, q.box)                        # the bounding boxes do
