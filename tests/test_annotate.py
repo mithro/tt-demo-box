@@ -366,3 +366,72 @@ def test_rotated_labels_overlap_by_shape_not_bounding_box():
     assert p.centre == pytest.approx((200, 200), abs=0.5)
     assert q.centre == pytest.approx(sh((200, 200), 40), abs=0.5)
     assert _overlap(p.box, q.box)                        # the bounding boxes do
+
+
+# --- F4: a label keeps off outlines; the drawn tile lands on Placed.poly ---------------------
+
+def _outline(points, style="line"):
+    return {"kind": "outline", "style": style, "fallback": False,
+            "points": [list(p) for p in points]}
+
+
+def test_label_avoids_an_outline():
+    """An outline (a projection line) crossing a dimension line's middle:
+    the label is nudged along its line until it is clear of the outline."""
+    w, h = 500, 200
+    dims = [_outline([(250, 60), (250, 140)]),
+            _linear("123.45", (50, 140), (450, 140), (50, 100), (450, 100))]
+    plan = A.plan(_sidecar(_write("avoid-outline", (w, h), dims)[0]))
+    (p,) = plan.placed
+    assert p.label == "123.45"
+    from shapely.geometry import LineString, Polygon
+    assert not Polygon(p.poly).intersects(LineString([(250, 60), (250, 140)]))
+    assert p.centre[1] == pytest.approx(100, abs=0.5)        # still on its line
+    assert abs(p.centre[0] - 250) > p.size[0] / 2             # off the middle
+    # alone, it would have sat at the middle, over the outline's path
+    alone = A.plan({"resolution": [w, h], "dimensions": dims[1:]}).placed[0]
+    assert alone.centre == pytest.approx((250, 100), abs=0.5)
+
+
+def test_label_on_an_outline_raises():
+    """An outline running the whole length of the dimension line: no place
+    on the line is clear of it, so placement fails naming the outline."""
+    dims = [_outline([(50, 100), (450, 100)]),
+            _linear("123.45", (50, 140), (450, 140), (50, 100), (450, 100))]
+    png, side = _write("on-outline", (500, 200), dims)
+    with pytest.raises(A.PlacementError, match=r"covers a line of #0 \(outline\)"):
+        A.annotate(png, side)
+
+
+def test_rotated_label_drawn_on_its_poly():
+    """The label's white backing, turned along a 30-degree line and pasted,
+    covers ``Placed.poly``; just outside it the background shows (away from
+    the dimension line, which runs on under the label's ends)."""
+    from shapely.geometry import LineString, Point, Polygon
+    bg = (200, 60, 60)                                   # no label or line colour
+    w, h = 600, 400
+    t = math.tan(math.radians(30))
+    la, lb = (100, 350), (500, 350 - 400 * t)
+    dims = [_linear("123.45", (la[0], la[1] + 30), (lb[0], lb[1] + 30), la, lb)]
+    png, side = _write("rot-pixels", (w, h), dims)
+    Image.new("RGB", (w, h), bg).save(png)
+    (p,) = A.annotate(png, side).placed
+    assert p.angle == pytest.approx(30.0, abs=0.5)
+    img = Image.open(png).convert("RGB")
+    poly = Polygon(p.poly)
+    segs = [LineString(s) for s in A._segments(_sidecar(png)["dimensions"][0], w, h)]
+    inside = poly.buffer(-1.5)
+    ring = poly.buffer(5).difference(poly.buffer(1.5))
+    x0, y0, x1, y1 = (int(v) for v in poly.buffer(6).bounds)
+    n_in = n_out = 0
+    for y in range(max(0, y0), min(h, y1 + 1)):
+        for x in range(max(0, x0), min(w, x1 + 1)):
+            c = Point(x + 0.5, y + 0.5)
+            px = img.getpixel((x, y))
+            if inside.contains(c):
+                n_in += 1
+                assert px != bg, ("background inside the label", x, y)
+            elif ring.contains(c) and all(s.distance(c) > A.head_px(h) for s in segs):
+                n_out += 1
+                assert px == bg, ("label outside its poly", x, y, px)
+    assert n_in > 500 and n_out > 200, (n_in, n_out)

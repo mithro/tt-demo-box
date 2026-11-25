@@ -54,7 +54,7 @@ from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # Blender's -P does not
-from dim_px import _to_px  # noqa: E402
+from dim_px import _to_px, direction  # noqa: E402
 
 MM = 0.001
 #: Margin round the fitted framing (the camera backs off by this factor).
@@ -330,9 +330,8 @@ def _area(name, loc, target, power, size):
 
 def _direction(az_deg, el_deg) -> Vector:
     """Unit vector from the scene towards the camera: bearing 0 in front (-Y),
-    +90 at the right (+X)."""
-    az, el = math.radians(az_deg), math.radians(el_deg)
-    return Vector((math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el)))
+    +90 at the right (+X) (``dim_px.direction``, which the tests use)."""
+    return Vector(direction(az_deg, el_deg))
 
 
 def _lights(centre, radius, az_deg):

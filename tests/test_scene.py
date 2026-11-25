@@ -88,6 +88,20 @@ def test_makefile_renders_fail_loudly():
     assert 'grep -q "rendered in" tmp/render-$$r.log' in recipe
 
 
+def test_makefile_annotate_failure_leaves_no_image():
+    """F2 (M1): if annotate fails, the fresh un-annotated PNG and its
+    sidecar are deleted before the recipe exits non-zero, so nothing in
+    output/renders looks current."""
+    text = (ROOT / "Makefile").read_text()
+    recipe = text.split("\nrenders:", 1)[1].split("\n\n", 1)[0].replace("\\\n", " ")
+    annotate = recipe.index("render/annotate.py output/renders/$$r.png")
+    branch = recipe[annotate:]
+    branch = branch[branch.index("||"):branch.index("}") + 1]
+    rm = "rm -f output/renders/$$r.png output/renders/$$r.png.dims.json"
+    assert rm in branch, branch
+    assert branch.index(rm) < branch.index("exit 1"), branch
+
+
 # --- frames --------------------------------------------------------------------------
 
 def test_lid_transform_matches_layout():
@@ -343,8 +357,19 @@ def test_open_dimensions_match_assembly(route):
     assert proj[0][1] == pytest.approx(back, abs=1e-6)
     assert proj[0][2] > lay.outer.z0
     assert proj[-1] == pytest.approx(behind[1]["b"])
-    # the open height's top anchor is on the open lid's top
+    # the open height's top anchor is at the open lid's top
     assert front[1]["b"][2] == pytest.approx(top, abs=1e-6)
+    # F3 (M3): its foot sits on the box (its back-bottom-right corner), not
+    # on the ground behind it; a projection line runs from the open lid's
+    # top (behind the back face) to the top anchor, square to the line
+    o = lay.outer
+    foot, head = front[1]["a"], front[1]["b"]
+    assert foot == pytest.approx([o.x1, o.y1, o.z0])
+    assert head[:2] == pytest.approx(foot[:2])
+    (hproj,) = _outlines(front)
+    assert [d["style"] for d in front if d["kind"] == "outline"] == ["line"]
+    assert hproj[0][1] > o.y1 and hproj[0][2] == pytest.approx(top, abs=1e-6)
+    assert hproj[-1] == pytest.approx(head)
 
 
 @pytest.mark.parametrize("bank", sorted(BATTERIES))
@@ -367,15 +392,16 @@ def test_dims_follow_layout(bank):
             assert d["label"] == geom.mm(_dist_mm(d))
             assert d["a"][2] == pytest.approx(bay.z1)
         # P8: close to the bay's own edges (within 15 mm, at rim level): X
-        # off its front edge, Y off its right; the extension lines leave
-        # their shared front-right corner square (-Y and +X)
+        # off its front edge, Y off its left (F1: the side the camera
+        # sees); the extension lines leave their shared front-left corner
+        # square (-Y and -X)
         x, y = lin
         assert 0 < bay.y0 - (x["a"][1] + x["offset"][1]) <= 15.0
-        assert 0 < (y["a"][0] + y["offset"][0]) - bay.x1 <= 15.0
+        assert 0 < bay.x0 - (y["a"][0] + y["offset"][0]) <= 15.0
         assert x["offset"][0] == 0 and x["offset"][1] < 0
-        assert y["offset"][1] == 0 and y["offset"][0] > 0
+        assert y["offset"][1] == 0 and y["offset"][0] < 0
         assert x["offset"][2] == 0 and y["offset"][2] == 0
-        assert bay.y0 - 15.0 > o.y0 and bay.x1 + 15.0 < o.x1     # inside the box
+        assert bay.y0 - 15.0 > o.y0 and bay.x0 - 15.0 > o.x0     # inside the box
 
 
 def test_flatpack_dimensions():
@@ -511,3 +537,57 @@ def test_flatpack_has_every_panel_flat_and_apart(manifests):
     for i, a in enumerate(rects):
         for b in rects[i + 1:]:
             assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1], (a, b)
+
+
+# --- F1: every linear dimension's offset faces its view's camera ---------------------------
+
+def _camera_direction(monkeypatch):
+    """``render/dim_px.direction``: the bpy-free camera bearing that
+    ``render_scene._direction`` uses."""
+    monkeypatch.syspath_prepend(str(ROOT / "render"))
+    from dim_px import direction
+    assert "bpy" not in sys.modules
+    return direction
+
+
+def test_direction_convention(monkeypatch):
+    """Bearing 0 in front (-Y), +90 at the right (+X), elevation up (+Z):
+    the convention in ``View`` and ``render_scene``."""
+    direction = _camera_direction(monkeypatch)
+    assert direction(0.0, 0.0) == pytest.approx((0.0, -1.0, 0.0))
+    assert direction(90.0, 0.0) == pytest.approx((1.0, 0.0, 0.0))
+    assert direction(180.0, 0.0) == pytest.approx((0.0, 1.0, 0.0))
+    assert direction(0.0, 90.0) == pytest.approx((0.0, 0.0, 1.0))
+    assert math.hypot(*direction(-35.0, 28.0)) == pytest.approx(1.0)
+    src = (ROOT / "render" / "render_scene.py").read_text()
+    assert "from dim_px import" in src and "direction(" in src
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_dimension_offsets_face_the_camera(route, monkeypatch):
+    """F1 (I1): each linear dimension stands out on the side of the model
+    its view's camera sees, ``dot(offset, direction(az, el)) > 0``, so a
+    camera edit that would draw a dimension across the box's body fails
+    here and points at ``view_dimensions``."""
+    direction = _camera_direction(monkeypatch)
+    lay = layout(ROUTES[route])
+    away = []
+    for view, v in ES.VIEWS.items():
+        cam = direction(v.azimuth_deg, v.elevation_deg)
+        for d in ES.view_dimensions(lay, route, view):
+            if d["kind"] == "linear":
+                dot = sum(p * q for p, q in zip(d["offset"], cam))
+                if not dot > 0:
+                    away.append((view, d["label"], d["offset"], round(dot, 3)))
+    assert away == [], f"{route}: dimensions standing out away from the camera"
+
+
+def test_flatpack_dimensions_face_the_camera(monkeypatch):
+    """The flat-pack's dimensions lie flat on the kit (offsets and spans
+    horizontal), so the side they stand out on is never hidden; what must
+    face the camera is that plane: ``dot((0, 0, 1), direction) > 0``."""
+    direction = _camera_direction(monkeypatch)
+    cam = direction(*ES.FLATPACK_VIEW)
+    assert cam[2] > 0
+    for d in ES.view_dimensions(layout(ROUTES["laser"]), "laser", "flatpack"):
+        assert d["offset"][2] == 0 and d["a"][2] == d["b"][2], d

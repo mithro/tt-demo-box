@@ -560,20 +560,29 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
     numbers through ``geom.mm`` (the sheets' rounding); the anchors come
     from the layout's boxes moved by ``frame_matrix``, and must span them.
 
+    Every linear dimension stands out towards its view's camera
+    (``dot(offset, dim_px.direction(az, el)) > 0``, F1: tested), so a
+    camera edit that would put one behind the box fails ``make check``.
+
     * closed: W along the front, D along the left side (on the ground), H
-      up the front-right edge to the shut lid's top;
+      up the front-right edge to the shut lid's top, standing out square
+      to that edge, between the front (seen) and right (unseen) faces, so
+      it stays clear of W's extension line and faces the camera;
     * open-front: W, the open height (ground to the open lid's top, the
-      layout's ``lid_profile_yz``) up the right side, and the lid's
-      LID_OPEN_DEG arc about the hinge axis at the right face;
+      layout's ``lid_profile_yz``) up the right side's back edge, its foot
+      on the box's back-bottom-right corner, with a projection line from
+      the open lid's top (behind the back face) to its top anchor (F3,
+      like P6), and the lid's LID_OPEN_DEG arc about the hinge axis at the
+      right face;
     * open-back: D and, chained behind it, the open lid's reach behind the
       back face, both along the left side on the ground, with a projection
       line from the open lid's far corner down to the reach's far anchor
       (P6);
     * bank-out: the bank bay's rim-level rectangle as an "area" outline,
-      its length (X) off its front rim edge and its width (Y) off its right
-      rim edge, both BAY_DIM_OFFSET off the bay at rim level, over the
-      box's contents (P4, P8); the extension lines leave their shared
-      corner square, -Y and +X;
+      its length (X) off its front rim edge and its width (Y) off its left
+      rim edge (the side the camera sees, F1), both BAY_DIM_OFFSET off the
+      bay at rim level, over the box's contents (P4, P8); the extension
+      lines leave their shared front-left corner square, -Y and -X;
     * flatpack: each panel's (u, v) size at its place in the kit (W along
       its front edge, H along its left), then two ``fallback`` entries, the
       kit's overall extent in X (2 DIM_OFFSET behind it, along the back
@@ -606,19 +615,22 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
         return [_linear(o.size[0], (x0, y0, z0), (x1, y0, z0), (0.0, -off, 0.0)),
                 _linear(o.size[1], (x0, y0, z0), (x0, y1, z0), (-off, 0.0, 0.0)),
                 _linear(o.size[2] + lo.size[2], (x1, y0, z0), (x1, y0, lid_top),
-                        (off, 0.0, 0.0))]
+                        (off * math.sqrt(0.5), -off * math.sqrt(0.5), 0.0))]
     _py0, _pz0, back, top = lay.lid_profile_yz(v.lid_deg).bounds
     corners = _open_lid_corners(lay, v.lid_deg)
     if view == "open-front":
-        hi = max(corners, key=lambda p: p[2])
+        # the open lid's top on the right (dimensioned) side
+        hi = max(corners, key=lambda p: (round(p[2], 9), p[0]))
         hy, hz = lay.hinge_axis
         m = frame_matrix(lay, "lid", v.lid_deg, False)
         arm = (x1, hy - DIM_ARC_R, hz)                     # along the shut lid, forward
+        head = (x1, y1, hi[2])
         return [_linear(o.size[0], (x0, y0, z0), (x1, y0, z0), (0.0, -off, 0.0)),
-                _linear(top - z0, (x1, hi[1], z0), (x1, hi[1], hi[2]), (off, 0.0, 0.0)),
+                _linear(top - z0, (x1, y1, z0), head, (off, 0.0, 0.0)),
                 {"label": f"{v.lid_deg:g}\N{DEGREE SIGN}", "kind": "angle",
                  "centre": [x1, hy, hz], "a": list(arm), "b": _apply(m, arm),
-                 "fallback": False}]
+                 "fallback": False},
+                _outline([hi] + ([[x1, hi[1], hi[2]]] if hi[0] != x1 else []) + [head])]
     if view == "open-back":
         # the far corner on the left (dimensioned) side; the highest of a tie
         far = max(corners, key=lambda p: (round(p[1], 9), -p[0], p[2]))
@@ -632,7 +644,7 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
         rim = [(bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (bay.x1, bay.y1, z), (bay.x0, bay.y1, z)]
         boff = BAY_DIM_OFFSET
         return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (0.0, -boff, 0.0)),
-                _linear(bay.size[1], (bay.x1, bay.y0, z), (bay.x1, bay.y1, z), (boff, 0.0, 0.0)),
+                _linear(bay.size[1], (bay.x0, bay.y0, z), (bay.x0, bay.y1, z), (-boff, 0.0, 0.0)),
                 _outline(rim + rim[:1], "area")]
     raise ValueError(f"no dimensions for view {view!r}")
 
