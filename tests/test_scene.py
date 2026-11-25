@@ -88,6 +88,20 @@ def test_makefile_renders_fail_loudly():
     assert 'grep -q "rendered in" tmp/render-$$r.log' in recipe
 
 
+def test_makefile_annotate_failure_leaves_no_image():
+    """F2 (M1): if annotate fails, the fresh un-annotated PNG and its
+    sidecar are deleted before the recipe exits non-zero, so nothing in
+    output/renders looks current."""
+    text = (ROOT / "Makefile").read_text()
+    recipe = text.split("\nrenders:", 1)[1].split("\n\n", 1)[0].replace("\\\n", " ")
+    annotate = recipe.index("render/annotate.py output/renders/$$r.png")
+    branch = recipe[annotate:]
+    branch = branch[branch.index("||"):branch.index("}") + 1]
+    rm = "rm -f output/renders/$$r.png output/renders/$$r.png.dims.json"
+    assert rm in branch, branch
+    assert branch.index(rm) < branch.index("exit 1"), branch
+
+
 # --- frames --------------------------------------------------------------------------
 
 def test_lid_transform_matches_layout():
