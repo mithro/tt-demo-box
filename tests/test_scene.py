@@ -276,15 +276,16 @@ def test_view_dimensions_per_view(route):
         for d in dims:
             assert d["fallback"] is False
             if d["kind"] == "outline":
-                assert set(d) == {"kind", "points", "fallback"}
+                assert set(d) == {"kind", "points", "style", "fallback"}
+                assert d["style"] in ("line", "area")
                 assert len(d["points"]) >= 2
             elif d["kind"] == "linear":
                 assert set(d) == {"label", "kind", "a", "b", "offset", "fallback"}
-                # the line stands out (DIM_OFFSET, or clear of the box on
-                # bank-out), square to the measured span
+                # the line stands DIM_OFFSET out (BAY_DIM_OFFSET off the bay's
+                # edges on bank-out, P8), square to the measured span
                 off = d["offset"]
                 if view == "bank-out":
-                    assert math.hypot(*off) > ES.DIM_OFFSET
+                    assert math.hypot(*off) == pytest.approx(ES.BAY_DIM_OFFSET)
                 else:
                     assert math.hypot(*off) == pytest.approx(ES.DIM_OFFSET)
                 ab = [q - p for p, q in zip(d["a"], d["b"])]
@@ -354,8 +355,10 @@ def test_dims_follow_layout(bank):
         dims = ES.view_dimensions(lay, route, "bank-out")
         bay, o = lay.bank_bay, lay.outer
         assert _labels(dims) == [geom.mm(bay.size[0]), geom.mm(bay.size[1])]
-        # P4: the bay's rim-level rectangle as an outline, closed
+        # P4: the bay's rim-level rectangle as an outline, closed, drawn as
+        # an area (P8: heavy, tinted)
         (rim,) = _outlines(dims)
+        assert [d["style"] for d in dims if d["kind"] == "outline"] == ["area"]
         corners = [[bay.x0, bay.y0, bay.z1], [bay.x1, bay.y0, bay.z1],
                    [bay.x1, bay.y1, bay.z1], [bay.x0, bay.y1, bay.z1]]
         assert sum(rim, []) == pytest.approx(sum(corners + corners[:1], []))
@@ -363,14 +366,16 @@ def test_dims_follow_layout(bank):
         for d in lin:
             assert d["label"] == geom.mm(_dist_mm(d))
             assert d["a"][2] == pytest.approx(bay.z1)
-        # the lines clear the box (and its contents): X in front, Y to the
-        # right, so the extension lines from their shared front-right corner
-        # leave it square to each other (-Y and +X), not as a squiggle
+        # P8: close to the bay's own edges (within 15 mm, at rim level): X
+        # off its front edge, Y off its right; the extension lines leave
+        # their shared front-right corner square (-Y and +X)
         x, y = lin
-        assert x["a"][1] + x["offset"][1] < o.y0
-        assert y["a"][0] + y["offset"][0] > o.x1
+        assert 0 < bay.y0 - (x["a"][1] + x["offset"][1]) <= 15.0
+        assert 0 < (y["a"][0] + y["offset"][0]) - bay.x1 <= 15.0
         assert x["offset"][0] == 0 and x["offset"][1] < 0
         assert y["offset"][1] == 0 and y["offset"][0] > 0
+        assert x["offset"][2] == 0 and y["offset"][2] == 0
+        assert bay.y0 - 15.0 > o.y0 and bay.x1 + 15.0 < o.x1     # inside the box
 
 
 def test_flatpack_dimensions():

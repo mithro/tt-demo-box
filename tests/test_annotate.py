@@ -153,7 +153,7 @@ def test_frame_edge_nudges_along_line():
 
 def test_outline_drawn_without_label():
     pts = [[100, 100], [300, 100], [300, 250], [100, 250], [100, 100]]
-    dims = [{"kind": "outline", "fallback": False, "points": pts},
+    dims = [{"kind": "outline", "style": "line", "fallback": False, "points": pts},
             _linear("200", (100, 250), (300, 250), (100, 290), (300, 290))]
     png, side = _write("outline", (400, 320), dims)
     plan = A.plan(_sidecar(png))
@@ -167,7 +167,8 @@ def test_outline_drawn_without_label():
 
 def test_outline_point_outside_raises():
     png, side = _write("outline-out", (400, 300), [
-        {"kind": "outline", "fallback": False, "points": [[10, 10], [500, 10]]}])
+        {"kind": "outline", "style": "line", "fallback": False,
+         "points": [[10, 10], [500, 10]]}])
     with pytest.raises(ValueError, match="outside"):
         A.annotate(png, side)
 
@@ -255,3 +256,52 @@ def test_annotate_runs_without_bpy():
             "assert 'bpy' not in sys.modules, 'bpy imported'" % str(ROOT))
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
+
+
+def test_extension_line_gap():
+    """P8: every extension line starts EXT_GAP (5 px) off its anchor."""
+    assert A.EXT_GAP == 5
+    png, side = _write("gap", (800, 600), [
+        _linear("300", (100, 400), (500, 400), (100, 450), (500, 450))])
+    A.annotate(png, side)
+    img = Image.open(png).convert("RGB")
+    for x in (100, 500):
+        for y in range(398, 405):                      # the gap below the anchor
+            assert img.getpixel((x, y)) == (255, 255, 255), (x, y)
+        assert img.getpixel((x, 407)) == DIM_RGB       # then the line
+    # the segment itself starts EXT_GAP along, towards the line
+    assert A._segments(_linear("1", (0, 0), (0, 100), (50, 0), (50, 100)), 200, 200)[1][0] \
+        == pytest.approx((5.0, 0.0))
+
+
+def test_area_outline_heavy_and_tinted():
+    """P8: an "area" outline is drawn at the dimension line's width with a
+    light translucent C_DIM fill; a "line" outline is thin and unfilled."""
+    pts = [[100, 100], [300, 100], [300, 250], [100, 250], [100, 100]]
+    png, side = _write("area", (400, 320), [
+        {"kind": "outline", "style": "area", "fallback": False, "points": pts}])
+    A.annotate(png, side)
+    img = Image.open(png).convert("RGB")
+    inside = img.getpixel((200, 175))
+    assert inside not in ((255, 255, 255), DIM_RGB)
+    # a tint of C_DIM over white, at ALPHA
+    want = tuple(round(255 + (c - 255) * A.AREA_ALPHA) for c in DIM_RGB)
+    assert all(abs(a - b) <= 1 for a, b in zip(inside, want)), (inside, want)
+    assert 0.15 <= A.AREA_ALPHA <= 0.20
+    assert img.getpixel((50, 50)) == (255, 255, 255)
+    lw = max(2, 320 // 400)
+    heavy = sum(img.getpixel((200, y)) == DIM_RGB for y in range(95, 106))
+    assert heavy >= lw
+    png2, side2 = _write("thin", (400, 320), [
+        {"kind": "outline", "style": "line", "fallback": False, "points": pts}])
+    A.annotate(png2, side2)
+    img2 = Image.open(png2).convert("RGB")
+    assert img2.getpixel((200, 175)) == (255, 255, 255)
+
+
+def test_outline_unknown_style_raises():
+    png, side = _write("badstyle", (400, 300), [
+        {"kind": "outline", "style": "dotted", "fallback": False,
+         "points": [[10, 10], [200, 10]]}])
+    with pytest.raises(ValueError, match="style"):
+        A.annotate(png, side)

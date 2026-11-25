@@ -29,7 +29,8 @@ and every point is projected through the placed camera
                      "line_a", "line_b"},                 # linear
                     {"label", "kind", "fallback", "centre", "a", "b",
                      "arc"},                              # angle
-                    {"kind", "fallback", "points"}]}      # outline (no label)
+                    {"kind", "fallback", "points",
+                     "style"}]}                           # outline (no label)
 
 ``line_a``/``line_b`` are the dimension line's ends (``a``/``b`` + offset);
 ``points`` is an outline's polyline;
@@ -229,7 +230,7 @@ def project_dimensions(scene, cam, dims) -> dict:
 
     out = []
     for i, d in enumerate(dims):
-        e = {k: d[k] for k in ("label", "kind", "fallback") if k in d}
+        e = {k: d[k] for k in ("label", "kind", "style", "fallback") if k in d}
         name = repr(d["label"]) if "label" in d else f"#{i} ({d['kind']})"
         for key, v in dim_points(d).items():
             e[key] = ([px(p, name, key) for p in v] if isinstance(v, list)

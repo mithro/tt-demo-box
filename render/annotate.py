@@ -14,8 +14,12 @@ top-left pixels; see ``render_scene.project_dimensions``) and draws, in
   arrowheads, and the label centred on it;
 * angle: the arms from ``centre`` to ``a`` and ``b``, the ``arc`` polyline
   with arrowheads, and the label at its middle;
-* outline: the ``points`` polyline, thin, with no label (the bank bay's
-  rim, a projection line: rulings P4, P6).
+* outline: the ``points`` polyline with no label: ``style`` "line" thin
+  (a projection line, P6), "area" at the dimension line's width with a
+  light translucent ``C_DIM`` fill (the bank bay, P4, P8).
+
+Every extension line starts EXT_GAP px off its anchor (a drafting gap, P8),
+so corners read as corners.
 
 Labels are DejaVu Sans at ``max(18, h // 50)`` px on a white backing (3 px
 padding).  Each is centred on its own line, at the middle if it can be,
@@ -54,6 +58,9 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 PAD = 3                      # px of white backing round a label
 GAP = 2                      # px kept clear between labels, and to the image edge
 EXT_PAST = 8                 # px an extension line runs past the dimension line
+EXT_GAP = 5                  # px gap between an anchor and its extension line (P8)
+AREA_ALPHA = 0.18            # opacity of an "area" outline's C_DIM fill (P8)
+STYLES = ("line", "area")    # outline styles
 STEPS = 40                   # positions tried along a line, each side of the middle
 
 
@@ -98,7 +105,7 @@ def _font(px: int):
 #: Each kind's keys (``render_scene.project_dimensions``).
 KEYS = {"linear": {"label", "kind", "fallback", "a", "b", "line_a", "line_b"},
         "angle": {"label", "kind", "fallback", "centre", "a", "b", "arc"},
-        "outline": {"kind", "fallback", "points"}}
+        "outline": {"kind", "fallback", "points", "style"}}
 
 
 def _name(d: dict, i: int) -> str:
@@ -144,7 +151,11 @@ def _segments(d: dict, w: int, h: int) -> list[tuple[tuple, tuple]]:
     if d["kind"] == "linear":
         for a, la in ((d["a"], d["line_a"]), (d["b"], d["line_b"])):
             e = _ext_end(a, la)
-            segs.append((tuple(a), (min(max(e[0], 0), w), min(max(e[1], 0), h))))
+            dx, dy = la[0] - a[0], la[1] - a[1]
+            n = math.hypot(dx, dy)
+            g = min(EXT_GAP, n)
+            start = (a[0], a[1]) if n == 0 else (a[0] + dx / n * g, a[1] + dy / n * g)
+            segs.append((start, (min(max(e[0], 0), w), min(max(e[1], 0), h))))
     else:
         segs += [(tuple(d["centre"]), tuple(d["a"])), (tuple(d["centre"]), tuple(d["b"]))]
     return segs
@@ -261,6 +272,9 @@ def _check(side: dict, size: tuple[int, int] | None = None) -> tuple[int, int]:
         if set(d) != want:
             raise ValueError(f"dimension {_name(d, i)} ({d['kind']}): keys {sorted(set(d))}, "
                              f"want {sorted(want)} (missing {sorted(want - set(d))})")
+        if d["kind"] == "outline" and d["style"] not in STYLES:
+            raise ValueError(f"dimension {_name(d, i)}: outline style {d['style']!r}, "
+                             f"want one of {STYLES}")
         for key, (x, y) in _points(d):
             if not (0 <= x <= w and 0 <= y <= h):
                 raise ValueError(f"dimension {_name(d, i)} {key} ({x}, {y}) is outside "
@@ -313,11 +327,22 @@ def annotate(png: Path, sidecar: Path) -> Plan:
     w, h = img.size
     lw = max(2, h // 400)
     head = head_px(h)
+    areas = [d for d in p.dims if d["kind"] == "outline" and d["style"] == "area"]
+    if areas:                                # translucent fills first, under everything
+        mode = img.mode
+        base = img.convert("RGBA")
+        tint = Image.new("RGBA", base.size, (0, 0, 0, 0))
+        r, g, b = (int(C_DIM[i:i + 2], 16) for i in (1, 3, 5))
+        td = ImageDraw.Draw(tint)
+        for d in areas:
+            td.polygon([tuple(q) for q in d["points"]], fill=(r, g, b, round(255 * AREA_ALPHA)))
+        img = Image.alpha_composite(base, tint).convert(mode)
     draw = ImageDraw.Draw(img)
     for d in p.dims:
         path = _path(d)
         if d["kind"] == "outline":
-            draw.line(path, fill=C_DIM, width=max(1, lw - 1), joint="curve")
+            width = lw if d["style"] == "area" else max(1, lw - 1)
+            draw.line(path, fill=C_DIM, width=width, joint="curve")
             continue
         for a, q in _segments(d, w, h)[len(path) - 1:]:     # extension lines / arms
             draw.line([a, q], fill=C_DIM, width=max(1, lw - 1))

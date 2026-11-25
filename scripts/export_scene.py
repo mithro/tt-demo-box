@@ -476,6 +476,9 @@ def pigtail_parts(route: str, angle_deg: float, out: Path) -> list[dict]:
 
 #: How far a dimension line stands out from its anchors (mm, outward).
 DIM_OFFSET = 15.0
+#: How far the bank bay's dimension lines stand off its own edges, at rim
+#: level, over the box's contents (ruling P8).
+BAY_DIM_OFFSET = 10.0
 #: The lid-angle arc's radius about the hinge axis (mm): long enough to read
 #: as an angle along the lid edge and the rim (ruling P7).
 DIM_ARC_R = 90.0
@@ -498,11 +501,14 @@ def _linear(value: float, a, b, offset, fallback: bool = False) -> dict:
             "fallback": fallback}
 
 
-def _outline(points) -> dict:
-    """An unlabelled polyline (world, mm) drawn thin in the dimension colour:
-    the bank bay's rim, a projection line (rulings P4, P6)."""
+def _outline(points, style: str = "line") -> dict:
+    """An unlabelled polyline (world, mm) in the dimension colour: ``style``
+    "line" (thin: a projection line, P6) or "area" (closed, heavy and
+    tinted: the bank bay's rim, P4, P8)."""
+    if style not in ("line", "area"):
+        raise ValueError(f"outline style {style!r}: want 'line' or 'area'")
     return {"kind": "outline", "points": [[float(v) for v in p] for p in points],
-            "fallback": False}
+            "style": style, "fallback": False}
 
 
 def _open_lid_corners(lay: Layout, lid_deg: float) -> list[list[float]]:
@@ -550,7 +556,7 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
     ``b + offset``, DIM_OFFSET out, away from the model), ``{"label",
     "kind": "angle", "centre", "a", "b", "fallback"}`` (the arc about
     ``centre`` from arm point ``a`` to ``b``) or ``{"kind": "outline",
-    "points", "fallback"}`` (an unlabelled polyline, ``_outline``).  Labels are the layout's
+    "points", "style", "fallback"}`` (an unlabelled polyline, ``_outline``).  Labels are the layout's
     numbers through ``geom.mm`` (the sheets' rounding); the anchors come
     from the layout's boxes moved by ``frame_matrix``, and must span them.
 
@@ -563,11 +569,11 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
       back face, both along the left side on the ground, with a projection
       line from the open lid's far corner down to the reach's far anchor
       (P6);
-    * bank-out: the bank bay's rim-level rectangle as an outline, its
-      length (X) off its front rim edge, out in front of the box, and its
-      width (Y) off its right rim edge, out to the right of the box (P4:
-      DIM_OFFSET clear of the box, so the lines clear its contents and
-      the extension lines leave their shared corner square, -Y and +X);
+    * bank-out: the bank bay's rim-level rectangle as an "area" outline,
+      its length (X) off its front rim edge and its width (Y) off its right
+      rim edge, both BAY_DIM_OFFSET off the bay at rim level, over the
+      box's contents (P4, P8); the extension lines leave their shared
+      corner square, -Y and +X;
     * flatpack: each panel's (u, v) size at its place in the kit (W along
       its front edge, H along its left), then two ``fallback`` entries, the
       kit's overall extent in X (2 DIM_OFFSET behind it, along the back
@@ -624,11 +630,10 @@ def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
     if view == "bank-out":
         z = bay.z1
         rim = [(bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (bay.x1, bay.y1, z), (bay.x0, bay.y1, z)]
-        return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z),
-                        (0.0, (y0 - off) - bay.y0, 0.0)),
-                _linear(bay.size[1], (bay.x1, bay.y0, z), (bay.x1, bay.y1, z),
-                        ((x1 + off) - bay.x1, 0.0, 0.0)),
-                _outline(rim + rim[:1])]
+        boff = BAY_DIM_OFFSET
+        return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (0.0, -boff, 0.0)),
+                _linear(bay.size[1], (bay.x1, bay.y0, z), (bay.x1, bay.y1, z), (boff, 0.0, 0.0)),
+                _outline(rim + rim[:1], "area")]
     raise ValueError(f"no dimensions for view {view!r}")
 
 
