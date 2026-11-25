@@ -52,6 +52,13 @@ the part data so a visitor sees a recognisable thing (``bought_parts``):
 
 The boost module's leads are not drawn.
 
+Dimensions
+----------
+Each manifest's ``dimensions`` (``view_dimensions``) are the layout's sizes
+for that view, in the world frame and units of the parts (mm), labelled
+through ``geom.mm`` like the sheets.  ``render_scene.py`` frames them and
+writes their pixel positions to ``<png>.dims.json`` for the overlay.
+
 The scene uses Tim's monitor (``taobao-tim``), the Xiaomi PB2020 bank and the
 v3.3 board: ``body.ASSEMBLY_MONITOR``/``ASSEMBLY_BANK``/``ASSEMBLY_BOARD``.
 
@@ -80,7 +87,7 @@ import cadquery as cq  # noqa: E402
 
 import demobox  # noqa: E402,F401  (puts the submodule on sys.path)
 from demobox.checks import pigtail_path, usb_cable, usb_path  # noqa: E402
-from demobox.geom import Box  # noqa: E402
+from demobox.geom import Box, mm  # noqa: E402
 from demobox.layout import LID_OPEN_DEG, ROUTES, Layout, layout, tinyvga_offset  # noqa: E402
 from demobox.parts.board import board_spec  # noqa: E402
 from demobox.parts.cables import CABLES  # noqa: E402
@@ -465,11 +472,143 @@ def pigtail_parts(route: str, angle_deg: float, out: Path) -> list[dict]:
             for name, s, frame in pigtail(lay, angle_deg)]
 
 
+# --- dimensions --------------------------------------------------------------------
+
+#: How far a dimension line stands out from its anchors (mm, outward).
+DIM_OFFSET = 15.0
+#: The lid-angle arc's radius about the hinge axis (mm).
+DIM_ARC_R = 40.0
+
+
+def _apply(m: list[float], p) -> list[float]:
+    return [sum(m[4 * r + c] * v for c, v in enumerate((*p, 1.0))) for r in range(3)]
+
+
+def _linear(value: float, a, b, offset, fallback: bool = False) -> dict:
+    """A linear dimension from ``a`` to ``b`` (world, mm), its line ``offset``
+    out from them, labelled ``geom.mm(value)``: the layout's number.  Raises
+    if the anchors do not span that number (the label would lie)."""
+    label = mm(value)
+    span = math.dist(a, b)
+    if mm(span) != label:
+        raise ValueError(f"dimension {label}: its anchors span {mm(span)}")
+    return {"label": label, "kind": "linear", "a": [float(v) for v in a],
+            "b": [float(v) for v in b], "offset": [float(v) for v in offset],
+            "fallback": fallback}
+
+
+def _open_lid_corners(lay: Layout, lid_deg: float) -> list[list[float]]:
+    """The lid's outer box corners (``lid_outer``, shut, in the base frame),
+    moved by the lid frame's transform at ``lid_deg``: where the parts' lid
+    transform puts them."""
+    o, (hy, hz) = lay.lid_outer, lay.hinge_axis
+    m = frame_matrix(lay, "lid", lid_deg, False)
+    return [_apply(m, (x, hy + y, hz + z)) for x in (o.x0, o.x1) for y in (o.y0, o.y1)
+            for z in (o.z0, o.z1)]
+
+
+def flatpack_placement(lay: Layout) -> dict[str, tuple[float, float, float, float, float]]:
+    """The laser panels laid flat, shelf-packed in rows with FLATPACK_GAP
+    between them: panel -> (x, y, w, h, t), its (u, v) bounds' corner at
+    (x, y) on the ground, in packing order."""
+    from demobox.laser import panels as P
+    pans = P.build(lay, lay.wall, P.KERF).panels
+    size = {}
+    for name, pn in pans.items():
+        u0, v0, u1, v1 = pn.shape.bounds
+        size[name] = (u1 - u0, v1 - v0, pn.t)
+    area = sum((w + FLATPACK_GAP) * (h + FLATPACK_GAP) for w, h, _ in size.values())
+    row_w = max(max(w for w, _, _ in size.values()), math.sqrt(area * 4 / 3) * 1.05)
+    order = sorted(size, key=lambda n: (-size[n][1], -size[n][0], n))
+    x = y = row_h = 0.0
+    out = {}
+    for name in order:
+        w, h, t = size[name]
+        if x > 0 and x + w > row_w:
+            x, y, row_h = 0.0, y + row_h + FLATPACK_GAP, 0.0
+        out[name] = (x, y, w, h, t)
+        x += w + FLATPACK_GAP
+        row_h = max(row_h, h)
+    return out
+
+
+def view_dimensions(lay: Layout, route: str, view: str) -> list[dict]:
+    """The dimensions drawn on ``route``'s render in ``view`` (a ``VIEWS``
+    key, or ``"flatpack"`` for the laser kit), in the manifest's world frame
+    and units (mm, like the parts' transforms).
+
+    Each is ``{"label", "kind": "linear", "a", "b", "offset", "fallback"}``
+    (anchors ``a``, ``b`` on the model; the line at ``a + offset`` ..
+    ``b + offset``, DIM_OFFSET out, away from the model) or ``{"label",
+    "kind": "angle", "centre", "a", "b", "fallback"}`` (the arc about
+    ``centre`` from arm point ``a`` to ``b``).  Labels are the layout's
+    numbers through ``geom.mm`` (the sheets' rounding); the anchors come
+    from the layout's boxes moved by ``frame_matrix``, and must span them.
+
+    * closed: W along the front, D along the left side (on the ground), H
+      up the front-right edge to the shut lid's top;
+    * open-front: W, the open height (ground to the open lid's top, the
+      layout's ``lid_profile_yz``) up the right side, and the lid's
+      LID_OPEN_DEG arc about the hinge axis at the right face;
+    * open-back: D and, chained behind it, the open lid's reach behind the
+      back face, both along the left side on the ground;
+    * bank-out: the bank bay's length (X) along its front rim edge and its
+      width (Y) along its left rim edge;
+    * flatpack: each panel's (u, v) size at its place in the kit (W along
+      its front edge, H along its left), then one ``fallback`` entry, the
+      kit's overall extent in X, 2 DIM_OFFSET in front of the kit (ruling P2:
+      drawn only when the per-panel labels do not fit).
+    """
+    off = DIM_OFFSET
+    if view == "flatpack":
+        if route != "laser":
+            raise ValueError(f"the flat-pack is the laser route's, not {route!r}")
+        place = flatpack_placement(lay)
+        dims = []
+        for x, y, w, h, t in place.values():
+            dims.append(_linear(w, (x, y, t), (x + w, y, t), (0.0, -off, 0.0)))
+            dims.append(_linear(h, (x, y, t), (x, y + h, t), (-off, 0.0, 0.0)))
+        x1 = max(x + w for x, _y, w, _h, _t in place.values())
+        dims.append(_linear(x1, (0.0, 0.0, 0.0), (x1, 0.0, 0.0), (0.0, -2 * off, 0.0),
+                            fallback=True))
+        return dims
+    v = VIEWS[view]
+    o, lo, bay = lay.outer, lay.lid_outer, lay.bank_bay
+    W, D = o.size[0], o.size[1]
+    if view == "closed":
+        lid_top = max(p[2] for p in _open_lid_corners(lay, v.lid_deg))
+        return [_linear(W, (0.0, 0.0, 0.0), (W, 0.0, 0.0), (0.0, -off, 0.0)),
+                _linear(D, (0.0, 0.0, 0.0), (0.0, D, 0.0), (-off, 0.0, 0.0)),
+                _linear(o.size[2] + lo.size[2], (W, 0.0, 0.0), (W, 0.0, lid_top),
+                        (off, 0.0, 0.0))]
+    _y0, _z0, back, top = lay.lid_profile_yz(v.lid_deg).bounds
+    corners = _open_lid_corners(lay, v.lid_deg)
+    if view == "open-front":
+        hi = max(corners, key=lambda p: p[2])
+        hy, hz = lay.hinge_axis
+        m = frame_matrix(lay, "lid", v.lid_deg, False)
+        arm = (W, hy - DIM_ARC_R, hz)                      # along the shut lid, forward
+        return [_linear(W, (0.0, 0.0, 0.0), (W, 0.0, 0.0), (0.0, -off, 0.0)),
+                _linear(top, (W, hi[1], 0.0), (W, hi[1], hi[2]), (off, 0.0, 0.0)),
+                {"label": f"{v.lid_deg:g}\N{DEGREE SIGN}", "kind": "angle",
+                 "centre": [W, hy, hz], "a": list(arm), "b": _apply(m, arm),
+                 "fallback": False}]
+    if view == "open-back":
+        far = max(corners, key=lambda p: p[1])
+        return [_linear(D, (0.0, 0.0, 0.0), (0.0, D, 0.0), (-off, 0.0, 0.0)),
+                _linear(back - o.y1, (0.0, D, 0.0), (0.0, far[1], 0.0), (-off, 0.0, 0.0))]
+    if view == "bank-out":
+        z = bay.z1
+        return [_linear(bay.size[0], (bay.x0, bay.y0, z), (bay.x1, bay.y0, z), (0.0, -off, 0.0)),
+                _linear(bay.size[1], (bay.x0, bay.y0, z), (bay.x0, bay.y1, z), (-off, 0.0, 0.0))]
+    raise ValueError(f"no dimensions for view {view!r}")
+
+
 def view_manifest(route: str, view: str, entries: list[dict], pig: list[dict],
                   pattern: str) -> dict:
     """The manifest for ``route`` in ``view``: the shut ``entries`` with their
-    frames' transforms, the pigtail at the view's angle (``pig``) and the
-    screen."""
+    frames' transforms, the pigtail at the view's angle (``pig``), the
+    screen and the view's ``dimensions`` (``view_dimensions``)."""
     lay = layout(ROUTES[route])
     v = VIEWS[view]
     parts = [{**e, "transform": frame_matrix(lay, e["frame"], v.lid_deg, v.bank_out)}
@@ -482,44 +621,35 @@ def view_manifest(route: str, view: str, entries: list[dict], pig: list[dict],
             "camera": {"azimuth_deg": v.azimuth_deg, "elevation_deg": v.elevation_deg,
                        "lens_mm": LENS_MM},
             "resolution": list(RESOLUTION), "samples": SAMPLES,
-            "parts": parts, "screens": [screen]}
+            "parts": parts, "screens": [screen],
+            "dimensions": view_dimensions(lay, route, view)}
 
 
 # --- flat pack ---------------------------------------------------------------------
 
 def flatpack(out: Path) -> dict:
     """Every laser panel lying flat (its own (u, v) in the XY plane, 3 mm
-    thick), shelf-packed in rows with FLATPACK_GAP between them."""
+    thick), where ``flatpack_placement`` packs it, with the kit's
+    ``dimensions``."""
     from demobox.laser import panels as P
     lay = layout(ROUTES["laser"])
     pans = P.build(lay, lay.wall, P.KERF).panels
-    flat = {}
-    for name, pn in pans.items():
-        u0, v0, u1, v1 = pn.shape.bounds
-        s = replace(pn, normal="z", z0=0.0).solid().translate(cq.Vector(-u0, -v0, 0.0))
-        flat[name] = (s, u1 - u0, v1 - v0)
-    area = sum((w + FLATPACK_GAP) * (h + FLATPACK_GAP) for _, w, h in flat.values())
-    row_w = max(max(w for _, w, _ in flat.values()), math.sqrt(area * 4 / 3) * 1.05)
-    order = sorted(flat, key=lambda n: (-flat[n][2], -flat[n][1], n))
-    x = y = row_h = 0.0
     parts = []
-    for name in order:
-        s, w, h = flat[name]
-        if x > 0 and x + w > row_w:
-            x, y, row_h = 0.0, y + row_h + FLATPACK_GAP, 0.0
+    for name, (x, y, _w, _h, _t) in flatpack_placement(lay).items():
+        pn = pans[name]
+        u0, v0, _u1, _v1 = pn.shape.bounds
+        s = replace(pn, normal="z", z0=0.0).solid().translate(cq.Vector(-u0, -v0, 0.0))
         rel = Path("flatpack") / f"{name}.stl"
         _write_stl(s, out / rel)
         m = list(IDENTITY)
         m[3], m[7] = x, y
         parts.append({"part": name, "file": str(rel), "frame": "flat", "material": "plywood",
                       "colour": list(PALETTE["plywood"]), "transform": m})
-        x += w + FLATPACK_GAP
-        row_h = max(row_h, h)
     az, el = FLATPACK_VIEW
     return {"name": "laser-flatpack", "route": "laser", "view": "flatpack",
             "camera": {"azimuth_deg": az, "elevation_deg": el, "lens_mm": LENS_MM},
             "resolution": list(RESOLUTION), "samples": SAMPLES, "parts": parts,
-            "screens": []}
+            "screens": [], "dimensions": view_dimensions(lay, "laser", "flatpack")}
 
 
 # --- driver ------------------------------------------------------------------------
