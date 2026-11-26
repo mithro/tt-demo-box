@@ -19,7 +19,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 import export_scene as ES  # noqa: E402
 
+from demobox import geom  # noqa: E402
 from demobox.checks import pigtail_path  # noqa: E402
+from demobox.parts.batteries import BATTERIES  # noqa: E402
 from demobox.layout import LID_OPEN_DEG, ROUTES, layout  # noqa: E402
 from demobox.printed import body  # noqa: E402
 from demobox.shared.solids import BANK_OUT_LIFT  # noqa: E402
@@ -84,6 +86,20 @@ def test_makefile_renders_fail_loudly():
     assert "rm -f output/renders/$$r.png" in recipe
     assert recipe.index("rm -f output/renders/$$r.png") < recipe.index("$(BLENDER)")
     assert 'grep -q "rendered in" tmp/render-$$r.log' in recipe
+
+
+def test_makefile_annotate_failure_leaves_no_image():
+    """F2 (M1): if annotate fails, the fresh un-annotated PNG and its
+    sidecar are deleted before the recipe exits non-zero, so nothing in
+    output/renders looks current."""
+    text = (ROOT / "Makefile").read_text()
+    recipe = text.split("\nrenders:", 1)[1].split("\n\n", 1)[0].replace("\\\n", " ")
+    annotate = recipe.index("render/annotate.py output/renders/$$r.png")
+    branch = recipe[annotate:]
+    branch = branch[branch.index("||"):branch.index("}") + 1]
+    rm = "rm -f output/renders/$$r.png output/renders/$$r.png.dims.json"
+    assert rm in branch, branch
+    assert branch.index(rm) < branch.index("exit 1"), branch
 
 
 # --- frames --------------------------------------------------------------------------
@@ -224,6 +240,343 @@ def test_bought_parts_present(route):
     assert names["board"] == "pcb"
 
 
+# --- dimensions ---------------------------------------------------------------------
+#
+# The manifests are in mm: the parts' ``transform``s are mm (``frame_matrix``)
+# and the dimension anchors are in the same frame and units, so a scene-unit
+# distance is already mm (ruling P1: convert before comparing; the factor is 1).
+
+SCENE_UNIT_MM = 1.0
+DEG = "\N{DEGREE SIGN}"
+
+
+def _dist_mm(e) -> float:
+    return math.dist(e["a"], e["b"]) * SCENE_UNIT_MM
+
+
+def _labels(dims) -> list[str]:
+    """The labelled dimensions' labels (outlines have none)."""
+    return [d["label"] for d in dims if d["kind"] != "outline"]
+
+
+def _outlines(dims) -> list[list[list[float]]]:
+    return [d["points"] for d in dims if d["kind"] == "outline"]
+
+
+def _open_extent(lay):
+    """The open lid's top (Z) and back (Y), from the layout's own profile."""
+    _y0, _z0, y1, z1 = lay.lid_profile_yz(LID_OPEN_DEG).bounds
+    return z1, y1
+
+
+def _expected_labels(lay, view) -> list[str]:
+    o, lo, bay = lay.outer, lay.lid_outer, lay.bank_bay
+    top, back = _open_extent(lay)
+    return {"closed": [geom.mm(o.size[0]), geom.mm(o.size[1]), geom.mm(o.size[2] + lo.size[2])],
+            "open-front": [geom.mm(o.size[0]), geom.mm(top - o.z0)],
+            "open-back": [geom.mm(o.size[1]), geom.mm(back - o.y1), f"{LID_OPEN_DEG:g}{DEG}"],
+            "bank-out": [geom.mm(bay.size[0]), geom.mm(bay.size[1])]}[view]
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_view_dimensions_per_view(route):
+    """The spec's table (amended 2026-11-26): closed W, D, H; open-front W
+    and the open height; open-back D, the reach behind the back face and
+    the lid's angle (at the left face, x0); bank-out the bay's L and W."""
+    lay = layout(ROUTES[route])
+    for view in ES.VIEWS:
+        dims = ES.view_dimensions(lay, route, view)
+        assert _labels(dims) == _expected_labels(lay, view), (route, view)
+        for d in dims:
+            assert d["fallback"] is False
+            if d["kind"] == "outline":
+                assert set(d) == {"kind", "points", "style", "fallback"}
+                assert d["style"] in ("line", "area")
+                assert len(d["points"]) >= 2
+            elif d["kind"] == "linear":
+                assert set(d) == {"label", "kind", "a", "b", "offset", "fallback"}
+                # the line stands DIM_OFFSET out (BAY_DIM_OFFSET off the bay's
+                # edges on bank-out, P8), square to the measured span
+                off = d["offset"]
+                if view == "bank-out":
+                    assert math.hypot(*off) == pytest.approx(ES.BAY_DIM_OFFSET)
+                else:
+                    assert math.hypot(*off) == pytest.approx(ES.DIM_OFFSET)
+                ab = [q - p for p, q in zip(d["a"], d["b"])]
+                assert sum(u * v for u, v in zip(ab, off)) == pytest.approx(0.0, abs=1e-9)
+            else:
+                assert d["kind"] == "angle"
+                assert set(d) == {"label", "kind", "centre", "a", "b", "fallback"}
+                c = d["centre"]
+                ca = [p - q for p, q in zip(d["a"], c)]
+                cb = [p - q for p, q in zip(d["b"], c)]
+                assert math.hypot(*ca) == pytest.approx(math.hypot(*cb))
+                cos = sum(u * v for u, v in zip(ca, cb)) / math.hypot(*ca) / math.hypot(*cb)
+                assert math.degrees(math.acos(cos)) == pytest.approx(LID_OPEN_DEG)
+                # on the hinge axis, the arms swept by the lid's own transform;
+                # on open-back, in the left face's plane (review I1)
+                assert view == "open-back"
+                assert c[0] == d["a"][0] == d["b"][0] == pytest.approx(lay.outer.x0)
+                assert c[1:] == pytest.approx(list(lay.hinge_axis))
+                m = ES.frame_matrix(lay, "lid", LID_OPEN_DEG, False)
+                assert list(_apply(m, d["a"])) == pytest.approx(d["b"])
+                # P7: a radius that reads along the lid edge and the rim
+                assert math.hypot(*ca) == pytest.approx(ES.DIM_ARC_R)
+                assert ES.DIM_ARC_R == pytest.approx(90.0)
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_labels_use_geom_mm(route):
+    """Every linear label is ``geom.mm`` of its anchors' span (in mm) and
+    the layout's value: the same text as the sheets."""
+    lay = layout(ROUTES[route])
+    for view in ES.VIEWS:
+        for d in ES.view_dimensions(lay, route, view):
+            if d["kind"] == "linear":
+                assert d["label"] == geom.mm(_dist_mm(d)), (route, view, d)
+    closed = ES.view_dimensions(lay, route, "closed")
+    assert closed[0]["label"] == geom.mm(lay.outer.size[0])
+    assert closed[1]["label"] == geom.mm(lay.outer.size[1])
+
+
+def test_linear_refuses_anchors_that_do_not_span_the_label():
+    """M6: ``_linear``'s guard, so a label cannot lie about its own line."""
+    assert ES._linear(100.0, (0, 0, 0), (100.0, 0, 0), (0, -1, 0))["label"] == geom.mm(100.0)
+    for b in ((99.0, 0, 0), (101.0, 0, 0), (0, 0, 0)):
+        with pytest.raises(ValueError, match="anchors span"):
+            ES._linear(100.0, (0, 0, 0), b, (0, -1, 0))
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_open_dimensions_match_assembly(route):
+    """The open height and reach (from the layout's lid profile) are what the
+    GA sheet measures off the open lid's solids: the top of every part the
+    lid moves, and how far behind the back face they go."""
+    lay = layout(ROUTES[route])
+    still = {n: s.Center() for n, s, _ in body.assembly(route, 0.0, False)}
+    moved = [_bb(s) for n, s, _ in body.assembly(route, LID_OPEN_DEG, False)
+             if (s.Center() - still[n]).Length > 1e-6]
+    top = max(b[5] for b in moved)
+    back = max(b[4] for b in moved)
+    front = ES.view_dimensions(lay, route, "open-front")
+    behind = ES.view_dimensions(lay, route, "open-back")
+    assert front[1]["label"] == geom.mm(top - lay.outer.z0)
+    assert behind[1]["label"] == geom.mm(back - lay.outer.y1)
+    # P6: a projection line from the open lid's far corner down to the
+    # reach's far anchor
+    (proj,) = _outlines(behind)
+    assert proj[0][1] == pytest.approx(back, abs=1e-6)
+    assert proj[0][2] > lay.outer.z0
+    assert proj[-1] == pytest.approx(behind[1]["b"])
+    # the open height's top anchor is at the open lid's top
+    assert front[1]["b"][2] == pytest.approx(top, abs=1e-6)
+    # F3 (M3): its foot sits on the box (its back-bottom-right corner), not
+    # on the ground behind it; a projection line runs from the open lid's
+    # top (behind the back face) to the top anchor, square to the line
+    o = lay.outer
+    foot, head = front[1]["a"], front[1]["b"]
+    assert foot == pytest.approx([o.x1, o.y1, o.z0])
+    assert head[:2] == pytest.approx(foot[:2])
+    (hproj,) = _outlines(front)
+    assert [d["style"] for d in front if d["kind"] == "outline"] == ["line"]
+    assert hproj[0][1] > o.y1 and hproj[0][2] == pytest.approx(top, abs=1e-6)
+    assert hproj[-1] == pytest.approx(head)
+
+
+@pytest.mark.parametrize("bank", sorted(BATTERIES))
+def test_dims_follow_layout(bank):
+    """The bank-out dimensions are the bay laid out for that bank."""
+    for route, w in ROUTES.items():
+        lay = layout(w, bank=bank)
+        dims = ES.view_dimensions(lay, route, "bank-out")
+        bay, o = lay.bank_bay, lay.outer
+        assert _labels(dims) == [geom.mm(bay.size[0]), geom.mm(bay.size[1])]
+        # P4: the bay's rim-level rectangle as an outline, closed, drawn as
+        # an area (P8: heavy, tinted)
+        (rim,) = _outlines(dims)
+        assert [d["style"] for d in dims if d["kind"] == "outline"] == ["area"]
+        corners = [[bay.x0, bay.y0, bay.z1], [bay.x1, bay.y0, bay.z1],
+                   [bay.x1, bay.y1, bay.z1], [bay.x0, bay.y1, bay.z1]]
+        assert sum(rim, []) == pytest.approx(sum(corners + corners[:1], []))
+        lin = [d for d in dims if d["kind"] == "linear"]
+        for d in lin:
+            assert d["label"] == geom.mm(_dist_mm(d))
+            assert d["a"][2] == pytest.approx(bay.z1)
+        # P8: close to the bay's own edges (within 15 mm, at rim level): X
+        # off its front edge, Y off its left (F1: the side the camera
+        # sees); the extension lines leave their shared front-left corner
+        # square (-Y and -X)
+        x, y = lin
+        assert 0 < bay.y0 - (x["a"][1] + x["offset"][1]) <= 15.0
+        assert 0 < bay.x0 - (y["a"][0] + y["offset"][0]) <= 15.0
+        assert x["offset"][0] == 0 and x["offset"][1] < 0
+        assert y["offset"][1] == 0 and y["offset"][0] < 0
+        assert x["offset"][2] == 0 and y["offset"][2] == 0
+        assert bay.y0 - 15.0 > o.y0 and bay.x0 - 15.0 > o.x0     # inside the box
+
+
+def test_flatpack_dimensions():
+    """Each panel's (u, v) size, at its place in the kit, plus two
+    overall-extent entries (rulings P2, P2b: ``fallback``): the kit in X
+    and in Y."""
+    from demobox.laser import panels as P
+    lay = layout(ROUTES["laser"])
+    pans = P.build(lay, lay.wall, P.KERF).panels
+    dims = ES.view_dimensions(lay, "laser", "flatpack")
+    per = [d for d in dims if not d["fallback"]]
+    over_x, over_y = [d for d in dims if d["fallback"]]
+    assert len(per) == 2 * len(pans)
+    want = sorted(geom.mm(v) for p in pans.values()
+                  for v in (p.shape.bounds[2] - p.shape.bounds[0],
+                            p.shape.bounds[3] - p.shape.bounds[1]))
+    assert sorted(_labels(per)) == want
+    place = ES.flatpack_placement(lay)
+    x0 = min(x for x, _y, _w, _h, _t in place.values())
+    y0 = min(y for _x, y, _w, _h, _t in place.values())
+    x1 = max(x + w for x, _y, w, _h, _t in place.values())
+    y1 = max(y + h for _x, y, _w, h, _t in place.values())
+    assert over_x["label"] == geom.mm(x1 - x0)
+    assert over_y["label"] == geom.mm(y1 - y0)
+    assert over_x["b"][1] == over_x["a"][1] and over_y["b"][0] == over_y["a"][0]
+    # P5: the X extent behind the kit, where its widest (back) row is
+    assert over_x["a"][1] == pytest.approx(y1)
+    assert over_x["offset"][1] > 0
+    for d in dims:
+        assert d["kind"] == "linear" and d["label"] == geom.mm(_dist_mm(d))
+
+
+def test_manifest_has_dimensions():
+    """Every view's manifest and the flat-pack's carry their dimensions."""
+    for route in ROUTES:
+        lay = layout(ROUTES[route])
+        for view in ES.VIEWS:
+            m = ES.view_manifest(route, view, [], [], "pattern.png")
+            assert m["dimensions"], (route, view)
+            assert m["dimensions"] == ES.view_dimensions(lay, route, view)
+            json.dumps(m)
+    m = ES.flatpack(OUT)
+    assert m["dimensions"] == ES.view_dimensions(layout(ROUTES["laser"]), "laser", "flatpack")
+    assert any(d["fallback"] for d in m["dimensions"])
+
+
+def test_to_px():
+    """The sidecar's pixel conversion (``render/dim_px.py``, no bpy):
+    camera-view (x, y, depth) to pixels from the top-left; a point off the
+    image or behind the camera raises."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import to_px
+    assert "bpy" not in sys.modules
+    assert to_px((0.25, 0.75, 1.0), 1600, 1200) == [400.0, 300.0]
+    assert to_px((0.0, 1.0, 0.5), 1600, 1200) == [0.0, 0.0]
+    assert to_px((1.0, 0.0, 0.5), 1600, 1200) == [1600.0, 1200.0]
+    for bad in ((-0.01, 0.5, 1.0), (1.01, 0.5, 1.0), (0.5, -0.01, 1.0), (0.5, 1.01, 1.0)):
+        with pytest.raises(ValueError, match="outside"):
+            to_px(bad, 1600, 1200)
+    for depth in (0.0, -1.0):
+        with pytest.raises(ValueError, match="outside"):
+            to_px((0.5, 0.5, depth), 1600, 1200)
+
+
+def test_arc_points():
+    """M9: ``render_scene._arc`` is ``dim_px.arc_points`` (no bpy): the
+    points lie on the circle from ``a`` to ``b`` the short way, evenly; arms
+    of different lengths, a zero arm, or an angle not safely inside (0, 180)
+    degrees raise."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import ARC_MARGIN_DEG, arc_points
+    assert "bpy" not in sys.modules
+    c, r = (10.0, 20.0, 30.0), 90.0
+    a = (c[0], c[1] - r, c[2])
+    t = math.radians(LID_OPEN_DEG)
+    b = (c[0], c[1] - r * math.cos(t), c[2] + r * math.sin(t))
+    pts = arc_points(c, a, b, 32)
+    assert len(pts) == 33
+    assert pts[0] == pytest.approx(a) and pts[-1] == pytest.approx(b)
+    for p in pts:
+        assert math.dist(p, c) == pytest.approx(r)
+        assert p[0] == pytest.approx(c[0])                  # in the arms' plane
+    steps = [math.dist(p, q) for p, q in zip(pts, pts[1:])]
+    assert max(steps) == pytest.approx(min(steps))
+    # the short way: through the bisector, not the reflex side
+    mid = pts[16]
+    bis = (c[1] - r * math.cos(t / 2), c[2] + r * math.sin(t / 2))
+    assert mid[1:] == pytest.approx(bis)
+    with pytest.raises(ValueError, match="arms differ"):
+        arc_points(c, a, (c[0], c[1], c[2] + r + 1.0), 8)
+    with pytest.raises(ValueError, match="arms differ"):
+        arc_points(c, c, c, 8)
+    for deg in (0.0, 0.5 * ARC_MARGIN_DEG, 180.0 - 0.5 * ARC_MARGIN_DEG, 180.0):
+        u = math.radians(deg)
+        bad = (c[0], c[1] - r * math.cos(u), c[2] + r * math.sin(u))
+        with pytest.raises(ValueError, match=r"not inside \(0, 180\)"):
+            arc_points(c, a, bad, 8)
+    src = (ROOT / "render" / "render_scene.py").read_text()
+    assert "dim_points(" in src and "def dim_points" not in src
+
+
+def test_dim_points():
+    """``dim_px.dim_points`` (no bpy): a linear dimension's anchors and its
+    line's ends (anchors + offset), an angle's centre, arms and
+    ARC_STEPS + 1 arc points, an outline's points."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import ARC_STEPS, dim_points, flat_points
+    assert "bpy" not in sys.modules
+    lin = {"kind": "linear", "a": [0, 0, 0], "b": [10, 0, 0], "offset": [0, -5, 0]}
+    assert dim_points(lin) == {"a": (0.0, 0.0, 0.0), "b": (10.0, 0.0, 0.0),
+                               "line_a": (0.0, -5.0, 0.0), "line_b": (10.0, -5.0, 0.0)}
+    ang = {"kind": "angle", "centre": [0, 0, 0], "a": [0, -1, 0], "b": [0, 0, 1]}
+    p = dim_points(ang)
+    assert set(p) == {"centre", "a", "b", "arc"} and len(p["arc"]) == ARC_STEPS + 1
+    out = {"kind": "outline", "points": [[1, 2, 3], [4, 5, 6]]}
+    assert dim_points(out) == {"points": [(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]}
+    assert len(flat_points([lin, ang, out])) == 4 + 3 + ARC_STEPS + 1 + 2
+    with pytest.raises(ValueError, match="unknown dimension kind"):
+        dim_points({"kind": "spline"})
+
+
+def test_fit_camera_and_camera_view():
+    """N2: ``dim_px.fit_camera`` and ``camera_view`` (no bpy; render_scene
+    checks ``camera_view`` against Blender's ``world_to_camera_view`` on
+    every render): the camera looks along ``-direction``, square to world
+    up; every fitted point is in the frame shrunk by the margin, and it is
+    as close as that allows (the points touch the shrunk frame); the view's
+    axis point is the frame's centre."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import FRAME_MARGIN, camera_axes, camera_view, direction, fit_camera
+    assert "bpy" not in sys.modules
+    right, up, back = camera_axes(-35.0, 28.0)
+    assert back == pytest.approx(direction(-35.0, 28.0))
+    assert right[2] == pytest.approx(0.0) and up[2] > 0
+    for p, q in ((right, up), (up, back), (back, right)):
+        assert sum(a * b for a, b in zip(p, q)) == pytest.approx(0.0, abs=1e-12)
+    with pytest.raises(ValueError, match="up is undefined"):
+        camera_axes(0.0, 90.0)
+    box = [(x, y, z) for x in (0.0, 0.2) for y in (0.0, 0.1) for z in (0.0, 0.08)]
+    extra = [(0.25, -0.02, 0.0)]
+    res = [1600, 1200]
+    m = fit_camera(-35.0, 28.0, 35.0, res, box, extra)
+    cam = {"matrix_world_m": m, "lens_mm": 35.0, "sensor_width_mm": 36.0,
+           "sensor_fit": "HORIZONTAL", "shift": [0.0, 0.0], "resolution": res}
+    views = [camera_view(cam, p) for p in box + extra]
+    lo = 0.5 - 0.5 / FRAME_MARGIN
+    assert all(v[2] > 0 for v in views)
+    xs, ys = [v[0] for v in views], [v[1] for v in views]
+    assert min(xs) >= lo - 1e-9 and max(xs) <= 1 - lo + 1e-9
+    assert min(ys) >= lo - 1e-9 and max(ys) <= 1 - lo + 1e-9
+    # tight in one direction, centred in both
+    assert max(max(xs) - min(xs), max(ys) - min(ys)) == pytest.approx(1 - 2 * lo, rel=1e-6)
+    assert (min(xs) + max(xs)) / 2 == pytest.approx(0.5, abs=1e-6)
+    assert (min(ys) + max(ys)) / 2 == pytest.approx(0.5, abs=1e-6)
+    loc = (m[3], m[7], m[11])
+    ahead = tuple(c - 0.3 * b for c, b in zip(loc, back))
+    assert camera_view(cam, ahead) == pytest.approx((0.5, 0.5, 0.3))
+    for bad in ({"sensor_fit": "VERTICAL"}, {"shift": [0.1, 0.0]}):
+        with pytest.raises(ValueError, match="only"):
+            camera_view({**cam, **bad}, ahead)
+    src = (ROOT / "render" / "render_scene.py").read_text()
+    assert "fit_camera(" in src and "camera_view(" in src
+
+
 # --- the manifests (slow: every STL) ------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -295,3 +648,57 @@ def test_flatpack_has_every_panel_flat_and_apart(manifests):
     for i, a in enumerate(rects):
         for b in rects[i + 1:]:
             assert a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1], (a, b)
+
+
+# --- F1: every linear dimension's offset faces its view's camera ---------------------------
+
+def _camera_direction(monkeypatch):
+    """``render/dim_px.direction``: the bpy-free camera bearing that
+    ``render_scene._direction`` uses."""
+    monkeypatch.syspath_prepend(str(ROOT / "render"))
+    from dim_px import direction
+    assert "bpy" not in sys.modules
+    return direction
+
+
+def test_direction_convention(monkeypatch):
+    """Bearing 0 in front (-Y), +90 at the right (+X), elevation up (+Z):
+    the convention in ``View`` and ``render_scene``."""
+    direction = _camera_direction(monkeypatch)
+    assert direction(0.0, 0.0) == pytest.approx((0.0, -1.0, 0.0))
+    assert direction(90.0, 0.0) == pytest.approx((1.0, 0.0, 0.0))
+    assert direction(180.0, 0.0) == pytest.approx((0.0, 1.0, 0.0))
+    assert direction(0.0, 90.0) == pytest.approx((0.0, 0.0, 1.0))
+    assert math.hypot(*direction(-35.0, 28.0)) == pytest.approx(1.0)
+    src = (ROOT / "render" / "render_scene.py").read_text()
+    assert "from dim_px import" in src and "direction(" in src
+
+
+@pytest.mark.parametrize("route", ["printed", "laser"])
+def test_dimension_offsets_face_the_camera(route, monkeypatch):
+    """F1 (I1): each linear dimension stands out on the side of the model
+    its view's camera sees, ``dot(offset, direction(az, el)) > 0``, so a
+    camera edit that would draw a dimension across the box's body fails
+    here and points at ``view_dimensions``."""
+    direction = _camera_direction(monkeypatch)
+    lay = layout(ROUTES[route])
+    away = []
+    for view, v in ES.VIEWS.items():
+        cam = direction(v.azimuth_deg, v.elevation_deg)
+        for d in ES.view_dimensions(lay, route, view):
+            if d["kind"] == "linear":
+                dot = sum(p * q for p, q in zip(d["offset"], cam))
+                if not dot > 0:
+                    away.append((view, d["label"], d["offset"], round(dot, 3)))
+    assert away == [], f"{route}: dimensions standing out away from the camera"
+
+
+def test_flatpack_dimensions_face_the_camera(monkeypatch):
+    """The flat-pack's dimensions lie flat on the kit (offsets and spans
+    horizontal), so the side they stand out on is never hidden; what must
+    face the camera is that plane: ``dot((0, 0, 1), direction) > 0``."""
+    direction = _camera_direction(monkeypatch)
+    cam = direction(*ES.FLATPACK_VIEW)
+    assert cam[2] > 0
+    for d in ES.view_dimensions(layout(ROUTES["laser"]), "laser", "flatpack"):
+        assert d["offset"][2] == 0 and d["a"][2] == d["b"][2], d

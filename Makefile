@@ -50,19 +50,27 @@ fetch:
 
 ## renders: Blender renders -> output/renders/*.png (scene in tmp/scene, logs tmp/render-*.log)
 ## Each PNG is deleted first and a render fails unless Blender exits 0 and logs "rendered in"
-## (a crashed render must not leave the old image looking current).
+## (a crashed render must not leave the old image looking current); then render/annotate.py
+## draws the dimensions from the sidecar <png>.dims.json onto it, failing if that is missing
+## (log tmp/annotate-*.log; it refuses a PNG it has already annotated, so only a fresh
+## render is annotated); if annotate fails, the PNG and its sidecar are deleted too.
 renders:
 	$(PY) python scripts/export_scene.py
 	mkdir -p output/renders tmp
 	@for r in $(RENDERS); do \
 	  echo "render $$r (log: tmp/render-$$r.log)"; \
-	  rm -f output/renders/$$r.png; \
+	  rm -f output/renders/$$r.png output/renders/$$r.png.dims.json; \
 	  $(BLENDER) -P render/render_scene.py -- --manifest tmp/scene/$$r.json \
 	    --out output/renders/$$r.png > tmp/render-$$r.log 2>&1 \
 	    || { tail -n 40 tmp/render-$$r.log; echo "render $$r FAILED"; exit 1; }; \
 	  grep -q "rendered in" tmp/render-$$r.log \
 	    || { tail -n 40 tmp/render-$$r.log; echo "render $$r FAILED: no \"rendered in\""; exit 1; }; \
 	  grep "rendered in" tmp/render-$$r.log; \
+	  $(PY) python render/annotate.py output/renders/$$r.png > tmp/annotate-$$r.log 2>&1 \
+	    || { tail -n 40 tmp/annotate-$$r.log; \
+	         rm -f output/renders/$$r.png output/renders/$$r.png.dims.json; \
+	         echo "render $$r FAILED: annotate (log: tmp/annotate-$$r.log)"; exit 1; }; \
+	  cat tmp/annotate-$$r.log; \
 	done
 
 ## sheets: drawing sheets -> output/sheets/*.svg, *.pdf, previews/*.png (log tmp/sheets.log)

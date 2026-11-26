@@ -93,6 +93,10 @@ barrel, are not yet routed or checked; the builder has to find a way for them fo
 
 Laser flat-pack layout: ![laser flat-pack](output/renders/laser-flatpack.png)
 
+The renders carry the layout's dimensions (outer size, open height and lid angle, the lid's
+reach, the bank bay; the flat-pack's overall extent), drawn from each render's
+`<png>.dims.json` sidecar by `render/annotate.py`.
+
 The renders are Blender Cycles images and are not reproducible byte for byte, so `make check`
 does not compare `output/renders/*.png`. Everything else under `output/` is checked.
 
