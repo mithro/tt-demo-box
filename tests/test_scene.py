@@ -273,16 +273,16 @@ def _expected_labels(lay, view) -> list[str]:
     o, lo, bay = lay.outer, lay.lid_outer, lay.bank_bay
     top, back = _open_extent(lay)
     return {"closed": [geom.mm(o.size[0]), geom.mm(o.size[1]), geom.mm(o.size[2] + lo.size[2])],
-            "open-front": [geom.mm(o.size[0]), geom.mm(top - o.z0), f"{LID_OPEN_DEG:g}{DEG}"],
-            "open-back": [geom.mm(o.size[1]), geom.mm(back - o.y1)],
+            "open-front": [geom.mm(o.size[0]), geom.mm(top - o.z0)],
+            "open-back": [geom.mm(o.size[1]), geom.mm(back - o.y1), f"{LID_OPEN_DEG:g}{DEG}"],
             "bank-out": [geom.mm(bay.size[0]), geom.mm(bay.size[1])]}[view]
 
 
 @pytest.mark.parametrize("route", ["printed", "laser"])
 def test_view_dimensions_per_view(route):
-    """The spec's table: closed W, D, H; open-front W, the open height and
-    the lid's angle; open-back D and the reach behind the back face;
-    bank-out the bay's L and W."""
+    """The spec's table (amended 2026-11-26): closed W, D, H; open-front W
+    and the open height; open-back D, the reach behind the back face and
+    the lid's angle (at the left face, x0); bank-out the bay's L and W."""
     lay = layout(ROUTES[route])
     for view in ES.VIEWS:
         dims = ES.view_dimensions(lay, route, view)
@@ -313,7 +313,10 @@ def test_view_dimensions_per_view(route):
                 assert math.hypot(*ca) == pytest.approx(math.hypot(*cb))
                 cos = sum(u * v for u, v in zip(ca, cb)) / math.hypot(*ca) / math.hypot(*cb)
                 assert math.degrees(math.acos(cos)) == pytest.approx(LID_OPEN_DEG)
-                # on the hinge axis, the arms swept by the lid's own transform
+                # on the hinge axis, the arms swept by the lid's own transform;
+                # on open-back, in the left face's plane (review I1)
+                assert view == "open-back"
+                assert c[0] == d["a"][0] == d["b"][0] == pytest.approx(lay.outer.x0)
                 assert c[1:] == pytest.approx(list(lay.hinge_axis))
                 m = ES.frame_matrix(lay, "lid", LID_OPEN_DEG, False)
                 assert list(_apply(m, d["a"])) == pytest.approx(d["b"])

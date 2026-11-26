@@ -13,13 +13,28 @@ drawing sheets give.
 | View | Dimensions |
 |---|---|
 | closed | overall width, depth, height (base + lid, closed) |
-| open-front | width, and the open height with the 100° lid angle |
-| open-back | depth, and how far the open lid reaches behind the back face |
+| open-front | width, and the open height |
+| open-back | depth, how far the open lid reaches behind the back face, and the 100° lid angle (on the box's left face) |
 | bank-out | the bank bay's length and width |
 | laser-flatpack | each panel's size if legible, otherwise the overall laid-out extent |
 
 The values are the layout's numbers (`demobox/layout.py`), printed through the same rounding as
 the sheets (`geom.mm`), so a render can never disagree with a drawing.
+
+### Amendment 2026-11-26: the lid angle moved to open-back
+
+Decided during PR review (review finding I1).
+
+| | Before | After |
+|---|---|---|
+| View | open-front | open-back |
+| Arc's plane | right face (x = x1) | left face (x = x0) |
+| Camera off the plane's normal | about 67° | about 37° |
+| Arms' angle on screen | about 160° | measured from the sidecars, tested within 25° of 100° |
+
+Why: the open-front camera saw the arc nearly edge-on, so the 100° arc drew as two almost
+collinear lines. The open-back camera sees the left face closer to face-on. A test checks every
+committed open-back sidecar's on-screen arm angle.
 
 ## Approach (chosen)
 
