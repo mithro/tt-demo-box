@@ -1,4 +1,4 @@
-"""Draw the dimension overlay onto a render, in place.
+"""Draw the dimension overlay onto a render, in place, once.
 
 ``make renders`` runs this after each Blender render::
 
@@ -38,6 +38,10 @@ labels cannot all be placed, and then they replace them all; the plan keeps
 the ``PlacementError`` that caused it (``Plan.fallback_reason``) and the
 command prints it.
 
+The annotated PNG carries a ``dims-annotated`` text chunk (MARKER);
+annotating a PNG that has it raises ``AlreadyAnnotatedError`` (the overlay
+would be drawn twice), so annotate only a fresh render (``make renders``).
+
 Fails loudly: a missing sidecar, a resolution that is not the image's, an
 entry missing a key, or a point off the image raises.  No ``bpy``: plain Pillow.
 """
@@ -52,6 +56,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+from PIL.PngImagePlugin import PngInfo
 from shapely.geometry import LineString, Point, Polygon
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -70,6 +75,13 @@ EXT_GAP = 5                  # px gap between an anchor and its extension line (
 AREA_ALPHA = 0.18            # opacity of an "area" outline's C_DIM fill (P8)
 STYLES = ("line", "area")    # outline styles
 STEPS = 40                   # positions tried along a line, each side of the middle
+#: PNG text chunk written on an annotated image (M1): annotating it again
+#: would draw the overlay twice (the "area" tint compounds), so it raises.
+MARKER = ("dims-annotated", "1")
+
+
+class AlreadyAnnotatedError(ValueError):
+    """The PNG already carries the overlay (its MARKER text chunk)."""
 
 
 class PlacementError(ValueError):
@@ -360,6 +372,9 @@ def annotate(png: Path, sidecar: Path) -> Plan:
     side = json.loads(sidecar.read_text())
     img = Image.open(png)
     img.load()
+    if getattr(img, "text", {}).get(MARKER[0]) is not None:
+        raise AlreadyAnnotatedError(f"{png} is already annotated (PNG text chunk "
+                                    f"{MARKER[0]!r}); re-render it (make renders) first")
     p = plan(side, img.size)
     w, h = img.size
     lw = max(2, h // 400)
@@ -389,7 +404,9 @@ def annotate(png: Path, sidecar: Path) -> Plan:
     font = _font(p.font_px)
     for pl in p.placed:
         img = _paste_label(img, pl, font)
-    img.save(png)
+    info = PngInfo()
+    info.add_text(*MARKER)
+    img.save(png, pnginfo=info)
     return p
 
 

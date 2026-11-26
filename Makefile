@@ -52,7 +52,8 @@ fetch:
 ## Each PNG is deleted first and a render fails unless Blender exits 0 and logs "rendered in"
 ## (a crashed render must not leave the old image looking current); then render/annotate.py
 ## draws the dimensions from the sidecar <png>.dims.json onto it, failing if that is missing
-## (log tmp/annotate-*.log); if annotate fails, the PNG and its sidecar are deleted too.
+## (log tmp/annotate-*.log; it refuses a PNG it has already annotated, so only a fresh
+## render is annotated); if annotate fails, the PNG and its sidecar are deleted too.
 renders:
 	$(PY) python scripts/export_scene.py
 	mkdir -p output/renders tmp

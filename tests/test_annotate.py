@@ -465,3 +465,34 @@ def test_fallback_keeps_its_reason(capsys):
     fits = A.plan(_sidecar(_write("fits-reason", (800, 600), [
         _linear("300", (100, 300), (400, 300), (100, 330), (400, 330))])[0]))
     assert not fits.fallback and fits.fallback_reason is None
+
+
+def test_refuses_an_annotated_png():
+    """M1: the annotated PNG carries the MARKER text chunk; annotating it
+    again raises (rather than drawing the overlay twice) and leaves it as it
+    was; the CLI fails the same way."""
+    dims = [_linear("300", (100, 400), (500, 400), (100, 450), (500, 450))]
+    png, side = _write("twice", (800, 600), dims)
+    assert Image.open(png).text.get(A.MARKER[0]) is None      # a fresh render has none
+    A.annotate(png, side)
+    assert Image.open(png).text.get(A.MARKER[0]) == A.MARKER[1]
+    before = png.read_bytes()
+    with pytest.raises(A.AlreadyAnnotatedError, match="already annotated"):
+        A.annotate(png, side)
+    assert png.read_bytes() == before
+    r = subprocess.run([sys.executable, str(ROOT / "render" / "annotate.py"), str(png)],
+                       capture_output=True, text=True)
+    assert r.returncode != 0 and "already annotated" in r.stderr
+    # a fresh render over it (as make renders writes one) annotates again
+    Image.new("RGB", (800, 600), "white").save(png)
+    A.annotate(png, side)
+    assert png.read_bytes() == before                           # and deterministically
+
+
+def test_makefile_renders_annotate_a_fresh_render():
+    """M1: ``make renders`` deletes each PNG before Blender writes it, so
+    annotate always sees a fresh render, never its own output."""
+    mk = (ROOT / "Makefile").read_text()
+    recipe = mk[mk.index("\nrenders:"):]
+    rm = recipe.index("rm -f output/renders/$$r.png")
+    assert rm < recipe.index("$(BLENDER)") < recipe.index("render/annotate.py")
