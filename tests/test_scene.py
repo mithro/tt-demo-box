@@ -273,7 +273,7 @@ def _expected_labels(lay, view) -> list[str]:
     o, lo, bay = lay.outer, lay.lid_outer, lay.bank_bay
     top, back = _open_extent(lay)
     return {"closed": [geom.mm(o.size[0]), geom.mm(o.size[1]), geom.mm(o.size[2] + lo.size[2])],
-            "open-front": [geom.mm(o.size[0]), geom.mm(top), f"{LID_OPEN_DEG:g}{DEG}"],
+            "open-front": [geom.mm(o.size[0]), geom.mm(top - o.z0), f"{LID_OPEN_DEG:g}{DEG}"],
             "open-back": [geom.mm(o.size[1]), geom.mm(back - o.y1)],
             "bank-out": [geom.mm(bay.size[0]), geom.mm(bay.size[1])]}[view]
 
@@ -336,6 +336,14 @@ def test_labels_use_geom_mm(route):
     assert closed[1]["label"] == geom.mm(lay.outer.size[1])
 
 
+def test_linear_refuses_anchors_that_do_not_span_the_label():
+    """M6: ``_linear``'s guard, so a label cannot lie about its own line."""
+    assert ES._linear(100.0, (0, 0, 0), (100.0, 0, 0), (0, -1, 0))["label"] == geom.mm(100.0)
+    for b in ((99.0, 0, 0), (101.0, 0, 0), (0, 0, 0)):
+        with pytest.raises(ValueError, match="anchors span"):
+            ES._linear(100.0, (0, 0, 0), b, (0, -1, 0))
+
+
 @pytest.mark.parametrize("route", ["printed", "laser"])
 def test_open_dimensions_match_assembly(route):
     """The open height and reach (from the layout's lid profile) are what the
@@ -349,7 +357,7 @@ def test_open_dimensions_match_assembly(route):
     back = max(b[4] for b in moved)
     front = ES.view_dimensions(lay, route, "open-front")
     behind = ES.view_dimensions(lay, route, "open-back")
-    assert front[1]["label"] == geom.mm(top)
+    assert front[1]["label"] == geom.mm(top - lay.outer.z0)
     assert behind[1]["label"] == geom.mm(back - lay.outer.y1)
     # P6: a projection line from the open lid's far corner down to the
     # reach's far anchor
