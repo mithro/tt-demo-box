@@ -77,6 +77,10 @@ model.
 - Each view's manifest has the dimensions in the table above.
 - The overlay drawing is deterministic: the same sidecar and image give the same pixels.
 - A projected point off the frame raises.
+- Each committed render's sidecar lists `view_dimensions`' entries in order, at the render
+  resolution, and annotate can place its labels (added 2026-11-26, review I2).
+- On each committed open-back sidecar, the arc's arms are within 25° of the lid angle on screen
+  (added 2026-11-26, review I1).
 
 ## Left to the builder
 
