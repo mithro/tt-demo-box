@@ -446,3 +446,22 @@ def test_font_is_the_drafting_styles():
     assert A.FONT == FONT_FILES[("sans", False)]
     assert Path(A.FONT).is_file()
     assert "FONT_FILES[" in (ROOT / "render" / "annotate.py").read_text()
+
+
+def test_fallback_keeps_its_reason(capsys):
+    """M2: a fallback records why the per-panel labels failed, and the
+    command prints it; a plan that did not fall back has no reason."""
+    png, _side = _write("crowded-reason", (800, 600), _crowded(True))
+    plan = A.plan(_sidecar(png))
+    assert plan.fallback
+    assert plan.fallback_reason and "label '10" in plan.fallback_reason
+    with pytest.raises(A.PlacementError) as e:
+        A.plan(_sidecar(_write("crowded-reason-nofb", (800, 600), _crowded(False))[0]))
+    assert plan.fallback_reason == str(e.value)
+    assert A.main([str(png)]) == 0
+    out = capsys.readouterr().out
+    assert "(fallback: overall extent)" in out
+    assert f"fell back because {plan.fallback_reason}" in out
+    fits = A.plan(_sidecar(_write("fits-reason", (800, 600), [
+        _linear("300", (100, 300), (400, 300), (100, 330), (400, 330))])[0]))
+    assert not fits.fallback and fits.fallback_reason is None

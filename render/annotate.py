@@ -34,7 +34,9 @@ label's shape.  A label with no such place is a
 
 Fallback (rulings P2, P2b): entries with ``"fallback": true`` (the
 flat-pack's overall X and Y extents) are drawn only when the others'
-labels cannot all be placed, and then they replace them all.
+labels cannot all be placed, and then they replace them all; the plan keeps
+the ``PlacementError`` that caused it (``Plan.fallback_reason``) and the
+command prints it.
 
 Fails loudly: a missing sidecar, a resolution that is not the image's, an
 entry missing a key, or a point off the image raises.  No ``bpy``: plain Pillow.
@@ -90,6 +92,7 @@ class Plan:
     placed: list[Placed]      # the labelled ones' labels, in the same order
     fallback: bool            # True if the fallback entries replaced the others
     font_px: int
+    fallback_reason: str | None = None   # why the others' labels failed, if they did
 
 
 def sidecar_for(png: Path) -> Path:
@@ -313,7 +316,7 @@ def plan(side: dict, size: tuple[int, int] | None = None) -> Plan:
         if not fall:
             raise
         try:
-            return Plan(fall, _place(fall, w, h, draw, font), True, px)
+            return Plan(fall, _place(fall, w, h, draw, font), True, px, str(e))
         except PlacementError as e2:
             raise PlacementError(f"{e2} (falling back, because {e})") from e2
 
@@ -400,6 +403,8 @@ def main(argv=None) -> int:
         print(f"annotate: {png}: {len(p.placed)} dimensions and {n_out} outlines drawn"
               f"{' (fallback: overall extent)' if p.fallback else ''}: "
               + ", ".join(pl.label for pl in p.placed))
+        if p.fallback:
+            print(f"annotate: {png}: fell back because {p.fallback_reason}")
     return 0
 
 
