@@ -30,7 +30,8 @@ Decided during PR review (review finding I1).
 | View | open-front | open-back |
 | Arc's plane | right face (x = x1) | left face (x = x0) |
 | Camera off the plane's normal | about 67° | about 37° |
-| Arms' angle on screen | about 160° | measured from the sidecars, tested within 25° of 100° |
+| Arms' angle on screen | about 160° | 83.5° (printed and laser) |
+| Test tolerance | none | ±25° of 100° |
 
 Why: the open-front camera saw the arc nearly edge-on, so the 100° arc drew as two almost
 collinear lines. The open-back camera sees the left face closer to face-on. A test checks every
