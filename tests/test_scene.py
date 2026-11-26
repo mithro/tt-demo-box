@@ -453,17 +453,17 @@ def test_to_px():
     camera-view (x, y, depth) to pixels from the top-left; a point off the
     image or behind the camera raises."""
     sys.path.insert(0, str(ROOT / "render"))
-    from dim_px import _to_px
+    from dim_px import to_px
     assert "bpy" not in sys.modules
-    assert _to_px((0.25, 0.75, 1.0), 1600, 1200) == [400.0, 300.0]
-    assert _to_px((0.0, 1.0, 0.5), 1600, 1200) == [0.0, 0.0]
-    assert _to_px((1.0, 0.0, 0.5), 1600, 1200) == [1600.0, 1200.0]
+    assert to_px((0.25, 0.75, 1.0), 1600, 1200) == [400.0, 300.0]
+    assert to_px((0.0, 1.0, 0.5), 1600, 1200) == [0.0, 0.0]
+    assert to_px((1.0, 0.0, 0.5), 1600, 1200) == [1600.0, 1200.0]
     for bad in ((-0.01, 0.5, 1.0), (1.01, 0.5, 1.0), (0.5, -0.01, 1.0), (0.5, 1.01, 1.0)):
         with pytest.raises(ValueError, match="outside"):
-            _to_px(bad, 1600, 1200)
+            to_px(bad, 1600, 1200)
     for depth in (0.0, -1.0):
         with pytest.raises(ValueError, match="outside"):
-            _to_px((0.5, 0.5, depth), 1600, 1200)
+            to_px((0.5, 0.5, depth), 1600, 1200)
 
 
 # --- the manifests (slow: every STL) ------------------------------------------------------

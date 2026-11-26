@@ -54,7 +54,7 @@ from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # Blender's -P does not
-from dim_px import _to_px, direction  # noqa: E402
+from dim_px import to_px, direction  # noqa: E402
 
 MM = 0.001
 #: Margin round the fitted framing (the camera backs off by this factor).
@@ -226,7 +226,7 @@ def project_dimensions(scene, cam, dims) -> dict:
 
     def px(p_mm: Vector, name: str, key: str) -> list[float]:
         v = world_to_camera_view(scene, cam, p_mm * MM)
-        return _to_px((v.x, v.y, v.z), w, h, f"dimension {name} {key} {tuple(p_mm)}")
+        return to_px((v.x, v.y, v.z), w, h, f"dimension {name} {key} {tuple(p_mm)}")
 
     out = []
     for i, d in enumerate(dims):

@@ -3,7 +3,7 @@ dimension sidecar.
 
 Pure Python (no ``bpy``), so it is testable outside Blender:
 ``render_scene._direction`` is ``direction`` (the camera and lights), and
-``render_scene.project_dimensions`` uses ``_to_px`` on
+``render_scene.project_dimensions`` uses ``to_px`` on
 ``world_to_camera_view``'s output.  ``tests/test_scene.py`` checks with
 ``direction`` that every dimension stands out towards its view's camera.
 """
@@ -21,7 +21,7 @@ def direction(az_deg: float, el_deg: float) -> tuple[float, float, float]:
     return (math.sin(az) * math.cos(el), -math.cos(az) * math.cos(el), math.sin(el))
 
 
-def _to_px(v, w: int, h: int, what: str = "point") -> list[float]:
+def to_px(v, w: int, h: int, what: str = "point") -> list[float]:
     """``v`` = (x, y, depth) from ``world_to_camera_view`` (x, y in 0..1 from
     the bottom-left, depth along the view) -> ``[px, py]`` in a ``w`` x ``h``
     image, origin top-left.  Raises ``ValueError`` if the point is behind the
