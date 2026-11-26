@@ -54,7 +54,7 @@ from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # Blender's -P does not
-from dim_px import to_px, direction  # noqa: E402
+from dim_px import arc_points, direction, to_px  # noqa: E402
 
 MM = 0.001
 #: Margin round the fitted framing (the camera backs off by this factor).
@@ -179,16 +179,9 @@ def _screen_material(image: Path):
 
 def _arc(centre, a, b, steps=ARC_STEPS) -> list[Vector]:
     """Points on the circular arc about ``centre`` from ``a`` to ``b`` (equal
-    radii), the short way round."""
-    c, va, vb = Vector(centre), Vector(a) - Vector(centre), Vector(b) - Vector(centre)
-    r = va.length
-    if r <= 0 or abs(vb.length - r) > 1e-6 * max(r, 1.0):
-        raise ValueError(f"angle arms differ: {va.length} and {vb.length}")
-    u = va.normalized()
-    theta = va.angle(vb)
-    w = (vb - u * vb.dot(u)).normalized()
-    return [c + (u * math.cos(theta * i / steps) + w * math.sin(theta * i / steps)) * r
-            for i in range(steps + 1)]
+    radii), the short way round (``dim_px.arc_points``: raises unless the
+    angle is safely inside (0, 180) degrees)."""
+    return [Vector(p) for p in arc_points(tuple(centre), tuple(a), tuple(b), steps)]
 
 
 def dim_points(d) -> dict[str, list]:

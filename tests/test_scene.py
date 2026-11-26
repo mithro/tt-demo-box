@@ -466,6 +466,43 @@ def test_to_px():
             to_px((0.5, 0.5, depth), 1600, 1200)
 
 
+def test_arc_points():
+    """M9: ``render_scene._arc`` is ``dim_px.arc_points`` (no bpy): the
+    points lie on the circle from ``a`` to ``b`` the short way, evenly; arms
+    of different lengths, a zero arm, or an angle not safely inside (0, 180)
+    degrees raise."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import ARC_MARGIN_DEG, arc_points
+    assert "bpy" not in sys.modules
+    c, r = (10.0, 20.0, 30.0), 90.0
+    a = (c[0], c[1] - r, c[2])
+    t = math.radians(LID_OPEN_DEG)
+    b = (c[0], c[1] - r * math.cos(t), c[2] + r * math.sin(t))
+    pts = arc_points(c, a, b, 32)
+    assert len(pts) == 33
+    assert pts[0] == pytest.approx(a) and pts[-1] == pytest.approx(b)
+    for p in pts:
+        assert math.dist(p, c) == pytest.approx(r)
+        assert p[0] == pytest.approx(c[0])                  # in the arms' plane
+    steps = [math.dist(p, q) for p, q in zip(pts, pts[1:])]
+    assert max(steps) == pytest.approx(min(steps))
+    # the short way: through the bisector, not the reflex side
+    mid = pts[16]
+    bis = (c[1] - r * math.cos(t / 2), c[2] + r * math.sin(t / 2))
+    assert mid[1:] == pytest.approx(bis)
+    with pytest.raises(ValueError, match="arms differ"):
+        arc_points(c, a, (c[0], c[1], c[2] + r + 1.0), 8)
+    with pytest.raises(ValueError, match="arms differ"):
+        arc_points(c, c, c, 8)
+    for deg in (0.0, 0.5 * ARC_MARGIN_DEG, 180.0 - 0.5 * ARC_MARGIN_DEG, 180.0):
+        u = math.radians(deg)
+        bad = (c[0], c[1] - r * math.cos(u), c[2] + r * math.sin(u))
+        with pytest.raises(ValueError, match=r"not inside \(0, 180\)"):
+            arc_points(c, a, bad, 8)
+    src = (ROOT / "render" / "render_scene.py").read_text()
+    assert "arc_points(" in src
+
+
 # --- the manifests (slow: every STL) ------------------------------------------------------
 
 @pytest.fixture(scope="module")
