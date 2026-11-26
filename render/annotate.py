@@ -57,9 +57,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from demobox import _paths  # noqa: E402,F401  (puts the vendored tools on sys.path)
-from tools.drafting.style import C_DIM  # noqa: E402
+from tools.drafting.style import C_DIM, FONT_FILES  # noqa: E402
 
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+#: DejaVu Sans, the drafting style's own file (one source of truth with the sheets).
+FONT = FONT_FILES[("sans", False)]
 PAD = 3                      # px of white backing round a label
 GAP = 2                      # px kept clear between labels, and to the image edge
 EXT_PAST = 8                 # px an extension line runs past the dimension line

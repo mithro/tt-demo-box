@@ -435,3 +435,14 @@ def test_rotated_label_drawn_on_its_poly():
                 n_out += 1
                 assert px == bg, ("label outside its poly", x, y, px)
     assert n_in > 500 and n_out > 200, (n_in, n_out)
+
+
+# --- review fixes ---------------------------------------------------------------------
+
+def test_font_is_the_drafting_styles():
+    """M3: the labels' font is the drafting style's DejaVu Sans entry, not a
+    second copy of its path."""
+    from tools.drafting.style import FONT_FILES
+    assert A.FONT == FONT_FILES[("sans", False)]
+    assert Path(A.FONT).is_file()
+    assert "FONT_FILES[" in (ROOT / "render" / "annotate.py").read_text()
