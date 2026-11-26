@@ -511,7 +511,70 @@ def test_arc_points():
         with pytest.raises(ValueError, match=r"not inside \(0, 180\)"):
             arc_points(c, a, bad, 8)
     src = (ROOT / "render" / "render_scene.py").read_text()
-    assert "arc_points(" in src
+    assert "dim_points(" in src and "def dim_points" not in src
+
+
+def test_dim_points():
+    """``dim_px.dim_points`` (no bpy): a linear dimension's anchors and its
+    line's ends (anchors + offset), an angle's centre, arms and
+    ARC_STEPS + 1 arc points, an outline's points."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import ARC_STEPS, dim_points, flat_points
+    assert "bpy" not in sys.modules
+    lin = {"kind": "linear", "a": [0, 0, 0], "b": [10, 0, 0], "offset": [0, -5, 0]}
+    assert dim_points(lin) == {"a": (0.0, 0.0, 0.0), "b": (10.0, 0.0, 0.0),
+                               "line_a": (0.0, -5.0, 0.0), "line_b": (10.0, -5.0, 0.0)}
+    ang = {"kind": "angle", "centre": [0, 0, 0], "a": [0, -1, 0], "b": [0, 0, 1]}
+    p = dim_points(ang)
+    assert set(p) == {"centre", "a", "b", "arc"} and len(p["arc"]) == ARC_STEPS + 1
+    out = {"kind": "outline", "points": [[1, 2, 3], [4, 5, 6]]}
+    assert dim_points(out) == {"points": [(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]}
+    assert len(flat_points([lin, ang, out])) == 4 + 3 + ARC_STEPS + 1 + 2
+    with pytest.raises(ValueError, match="unknown dimension kind"):
+        dim_points({"kind": "spline"})
+
+
+def test_fit_camera_and_camera_view():
+    """N2: ``dim_px.fit_camera`` and ``camera_view`` (no bpy; render_scene
+    checks ``camera_view`` against Blender's ``world_to_camera_view`` on
+    every render): the camera looks along ``-direction``, square to world
+    up; every fitted point is in the frame shrunk by the margin, and it is
+    as close as that allows (the points touch the shrunk frame); the view's
+    axis point is the frame's centre."""
+    sys.path.insert(0, str(ROOT / "render"))
+    from dim_px import FRAME_MARGIN, camera_axes, camera_view, direction, fit_camera
+    assert "bpy" not in sys.modules
+    right, up, back = camera_axes(-35.0, 28.0)
+    assert back == pytest.approx(direction(-35.0, 28.0))
+    assert right[2] == pytest.approx(0.0) and up[2] > 0
+    for p, q in ((right, up), (up, back), (back, right)):
+        assert sum(a * b for a, b in zip(p, q)) == pytest.approx(0.0, abs=1e-12)
+    with pytest.raises(ValueError, match="up is undefined"):
+        camera_axes(0.0, 90.0)
+    box = [(x, y, z) for x in (0.0, 0.2) for y in (0.0, 0.1) for z in (0.0, 0.08)]
+    extra = [(0.25, -0.02, 0.0)]
+    res = [1600, 1200]
+    m = fit_camera(-35.0, 28.0, 35.0, res, box, extra)
+    cam = {"matrix_world_m": m, "lens_mm": 35.0, "sensor_width_mm": 36.0,
+           "sensor_fit": "HORIZONTAL", "shift": [0.0, 0.0], "resolution": res}
+    views = [camera_view(cam, p) for p in box + extra]
+    lo = 0.5 - 0.5 / FRAME_MARGIN
+    assert all(v[2] > 0 for v in views)
+    xs, ys = [v[0] for v in views], [v[1] for v in views]
+    assert min(xs) >= lo - 1e-9 and max(xs) <= 1 - lo + 1e-9
+    assert min(ys) >= lo - 1e-9 and max(ys) <= 1 - lo + 1e-9
+    # tight in one direction, centred in both
+    assert max(max(xs) - min(xs), max(ys) - min(ys)) == pytest.approx(1 - 2 * lo, rel=1e-6)
+    assert (min(xs) + max(xs)) / 2 == pytest.approx(0.5, abs=1e-6)
+    assert (min(ys) + max(ys)) / 2 == pytest.approx(0.5, abs=1e-6)
+    loc = (m[3], m[7], m[11])
+    ahead = tuple(c - 0.3 * b for c, b in zip(loc, back))
+    assert camera_view(cam, ahead) == pytest.approx((0.5, 0.5, 0.3))
+    for bad in ({"sensor_fit": "VERTICAL"}, {"shift": [0.1, 0.0]}):
+        with pytest.raises(ValueError, match="only"):
+            camera_view({**cam, **bad}, ahead)
+    src = (ROOT / "render" / "render_scene.py").read_text()
+    assert "fit_camera(" in src and "camera_view(" in src
 
 
 # --- the manifests (slow: every STL) ------------------------------------------------------
